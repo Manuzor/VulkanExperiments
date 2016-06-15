@@ -1,0 +1,106 @@
+
+#include "Build/System.bff"
+
+.BuildPath = '$RepoRoot$\Build'
+
+.Compiler = '$VS2015Path$/VC/bin/amd64/cl.exe'
+.CompilerOptions = '/c %1 /Fo%2'
+                   + ' /nologo'  // Supress compiler info print.
+                   + ' /Z7'      // /Z{7|i|I} Debug information. (7 = in obj, i = in pbd)
+                   + ' /FC'      // Use full pathnames in diagnostics
+                   + ' /Od'      // Disable optimizations
+                   + ' /Oi'      // Generate intrinsic functions
+                   + ' /WX'      // Treat warnings as errors
+                   + ' /W4'      // /W<n> Set warning level (default n=1)
+                   + ' /wd4201'  // /wd<n> Disable warning number n.
+                   + ' /wd4100'  // /wd<n> Disable warning number n.
+                   + ' /wd4189'  // /wd<n> Disable warning number n.
+                   + ' /Gm-'     // /Gm[-] Enable minimal rebuild
+                   + ' /GR-'     // /GR[-]   Enable runtime type information
+                   + ' /EHa-'    // /EHa[-]  Something about exception handling
+                   + ' /TP'      // /TP      Compile all as .cpp
+                   + ' /MTd'     // /MD[d] /MT[d] Dynamically or statically linked C run-time library (d = debug)
+
+                   + ' /ICode'
+
+                   //
+                   // Defines
+                   //
+                   + ' /DBB_Platform_Windows'   // For a win32 build.
+                   + ' /DBB_Platform_x64'       // For x64 builds.
+                   + ' /DBB_Enable_Assert'      // Enable assertions.
+                   + ' /DBB_Enable_BoundsCheck' // Enable bounds checking.
+
+                   //
+                   // Windows specific defines
+                   //
+                   + ' /DNOMINMAX'                // Exclude annoying Windows macros.
+                   + ' /DWIN32_LEAN_AND_MEAN'     // Strip some rarely used Windows stuff.
+                   + ' /D_CRT_SECURE_NO_WARNINGS' // Shut up windows.h's warnings
+
+                   //
+                   // System Includes
+                   //
+                   + ' /I"$VS2015Path$\VC\Include"'
+                   + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\ucrt"'
+                   + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\share"'
+                   + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\um"'
+                   + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\winrt"'
+
+.Linker = '$VS2015Path$/VC/bin/amd64/link.exe'
+.LinkerOptions = '%1 /OUT:%2'
+                 + ' /DEBUG'          // Tell the linker that we're in debug mode. Required for PDBs to work
+                 + ' /nologo'         // Suppress linker info print.
+                 + ' /INCREMENTAL:NO' // No incremental linking.
+                 + ' /LIBPATH:"$VS2015Path$\VC\lib\amd64"'
+                 + ' /LIBPATH:"$Windows10SDKPath$\Lib\$Windows10SDKVersion$\um\x64"'
+                 + ' /LIBPATH:"$Windows10SDKPath$\Lib\$Windows10SDKVersion$\ucrt\x64"'
+.Libraries = {}
+
+
+//
+// Visual Studio Project Generation
+//
+
+.Project_Common =
+[
+  .ProjectBuildCommand   = 'cd $RepoRoot$ &amp; fbuild -ide ^$(ProjectName)-^$(Configuration)'
+  .ProjectRebuildCommand = 'cd $RepoRoot$ &amp; fbuild -ide -clean ^$(ProjectName)-^$(Configuration)'
+  .OutputDirectory       = '$BuildPath$'
+  .IntermediateDirectory = '$BuildPath$'
+  .Platform              = 'x64'
+  .PlatformToolset       = 'v140'
+  .IncludeSearchPath     = '$RepoRoot$/Code'
+]
+
+.Project_x64_Debug   = [ Using(.Project_Common) .Config = 'x64-Debug' ]
+.Project_x64_Release = [ Using(.Project_Common) .Config = 'x64-Release' ]
+
+.ProjectConfigs = { .Project_x64_Debug, .Project_x64_Release }
+
+//
+// Targets
+//
+
+#include "Code/VulkanExperiments/fbuild.bff"
+
+//
+// Aliases
+//
+
+Alias( 'all' )
+{
+  .Targets = { 'VulkanExperiments' }
+}
+
+//
+// Visual Studio Solution
+//
+
+VSSolution( 'GenerateVisualStudioSolution' )
+{
+  .SolutionOutput = 'Workspace/VisualStudio/VulkanExperiments.sln'
+  .SolutionConfigs = .ProjectConfigs
+  .SolutionProjects = { 'VulkanExperiments-Proj' }
+  .SolutionBuildProject = 'VulkanExperiments-Proj'
+}

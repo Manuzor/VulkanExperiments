@@ -1,0 +1,33 @@
+{
+  .ProjectName = 'VulkanExperiments'
+  .ProjectBasePath = '$RepoRoot$/Code/VulkanExperiments'
+
+  VCXProject( 'VulkanExperiments-Proj' )
+  {
+    .ProjectOutput = 'Workspace/VisualStudio/VulkanExperiments.vcxproj'
+    .ProjectInputPaths = { '$ProjectBasePath$' }
+    .LocalDebuggerCommand = '$RepoRoot$/Build/$ProjectName$.exe'
+    .LocalDebuggerWorkingDirectory = '$RepoRoot$/Build'
+  }
+
+  // VulkanExperiments
+  {
+    .SourcePath = 'Code/VulkanExperiments'
+
+    ObjectList( 'VulkanExperiments-Lib' )
+    {
+      .CompilerInputPath = '$SourcePath$'
+      .CompilerOutputPath = '$BuildPath$/VulkanExperiments'
+    }
+
+    Executable( 'VulkanExperiments' )
+    {
+      .Libraries + 'VulkanExperiments-Lib'
+      .LinkerOptions + ' /PDB:$BuildPath$/VulkanExperiments.pdb'
+      .LinkerOutput = '$BuildPath$/VulkanExperiments.exe'
+    }
+
+    Alias( 'VulkanExperiments-x64-Debug' )   { .Targets = 'VulkanExperiments' }
+    Alias( 'VulkanExperiments-x64-Release' ) { .Targets = 'VulkanExperiments' }
+  }
+}

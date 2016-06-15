@@ -1,0 +1,25 @@
+{
+  "folders":
+  [
+    {
+      "path": "."
+    }
+  ],
+  "build_systems":
+  [
+    {
+      "name": "VulkanExperiments",
+      "file_regex": "([A-z]:.*?)\\(([0-9]+)(?:,\\s*[0-9]+)?\\)",
+      "working_dir": "${folder}",
+      "cmd": [ "${folder}/Utilities/FASTBuild/FBuild.exe", "-ide" ],
+
+      "variants":
+      [
+        {
+          "name": "Rebuild",
+          "cmd": [ "${folder}/Utilities/FASTBuild/FBuild.exe", "-ide", "-clean" ],
+        }
+      ],
+    }
+  ]
+}
