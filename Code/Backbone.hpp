@@ -146,12 +146,26 @@ struct impl_rm_ref<t_type&>
 template<typename t_type>
 using rm_ref = typename impl_rm_ref<t_type>::Result;
 
-template<class t_type> inline
-typename rm_ref<t_type>&&
+template<class t_type>
+constexpr typename rm_ref<t_type>&&
 Move(t_type&& Argument)
 {
   // forward Argument as movable
   return static_cast<typename rm_ref<t_type>&&>(Argument);
+}
+
+template<typename t_type>
+constexpr t_type&&
+Forward(typename rm_ref<t_type>& Argument)
+{
+  return static_cast<t_type&&>(Argument);
+}
+
+template<typename t_type>
+constexpr t_type&&
+Forward(rm_ref<t_type>&& Argument)
+{
+  return static_cast<t_type&&>(Argument);
 }
 
 // TODO(Manu): Add int_trait (platform specific because of DWORD etc.)
