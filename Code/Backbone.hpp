@@ -313,6 +313,11 @@ struct _defer_impl
   ~_defer_impl() { Func(); }
 };
 
+#define PRE_Concat2_Impl(A, B)  A ## B
+#define PRE_Concat2(A, B)       PRE_Concat2_Impl(A, B)
+#define PRE_Concat3(A, B, C)    PRE_Concat2(PRE_Concat2(A, B), C)
+#define PRE_Concat4(A, B, C, D) PRE_Concat2(PRE_Concat2(A, B), PRE_Concat2(C, D))
+
 // Usage:
 // int i = 0;
 // Defer(&, printf("Foo %d\n", i); i++ );
@@ -323,8 +328,8 @@ struct _defer_impl
 // Foo 1
 //
 // \param CaptureSpec The lambda capture specification.
-#define Defer(CaptureSpec, ...) auto _DeferFunc##__LINE__ = [CaptureSpec](){ __VA_ARGS__; }; \
-_defer_impl<decltype(_DeferFunc##__LINE__)> _Defer##__LINE__{ _DeferFunc##__LINE__ }
+#define Defer(CaptureSpec, ...) auto PRE_Concat2(_DeferFunc, __LINE__) = [CaptureSpec](){ __VA_ARGS__; }; \
+_defer_impl<decltype(PRE_Concat2(_DeferFunc, __LINE__))> PRE_Concat2(_Defer, __LINE__){ PRE_Concat2(_DeferFunc, __LINE__) }
 
 // ==================================
 // === Source: Backbone/Slice.hpp ===
