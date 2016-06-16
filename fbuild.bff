@@ -20,6 +20,7 @@
                    + ' /EHa-'    // /EHa[-]  Something about exception handling
                    + ' /TP'      // /TP      Compile all as .cpp
                    + ' /MTd'     // /MD[d] /MT[d] Dynamically or statically linked C run-time library (d = debug)
+                   + ' /EHsc'    // Enable exception handling.
 
                    + ' /ICode'
 
@@ -77,6 +78,7 @@
 .Project_x64_Release = [ Using(.Project_Common) .Config = 'x64-Release' ]
 
 .ProjectConfigs = { .Project_x64_Debug, .Project_x64_Release }
+.ProjectAllowedFileExtensions = { '.cpp', '.hpp', '.ipp', '.h', '.inl', }
 
 //
 // Targets

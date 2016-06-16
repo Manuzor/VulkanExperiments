@@ -4,9 +4,11 @@
 
   VCXProject( 'VulkanExperiments-Proj' )
   {
+    .Output = '$RepoRoot$/Build/$ProjectName$.exe'
+
     .ProjectOutput = 'Workspace/VisualStudio/VulkanExperiments.vcxproj'
     .ProjectInputPaths = { '$ProjectBasePath$' }
-    .LocalDebuggerCommand = '$RepoRoot$/Build/$ProjectName$.exe'
+    .LocalDebuggerCommand = '$Output$'
     .LocalDebuggerWorkingDirectory = '$RepoRoot$/Build'
   }
 
@@ -16,6 +18,7 @@
 
     ObjectList( 'VulkanExperiments-Lib' )
     {
+      .CompilerOptions + ' /I"$VulkanSDK$/Include"'
       .CompilerInputPath = '$SourcePath$'
       .CompilerOutputPath = '$BuildPath$/VulkanExperiments'
     }

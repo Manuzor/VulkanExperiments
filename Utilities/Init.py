@@ -66,6 +66,14 @@ Windows10SDKVersions.reverse()
 Vars["Windows10SDKVersion"] = Windows10SDKVersions[0]
 
 #
+# Vulkan SDK Path
+#
+
+VULKAN_SDK = Path(os.environ.get("VULKAN_SDK", os.environ.get("VK_SDK_PATH", None)))
+if VULKAN_SDK is not None:
+  Vars["VulkanSDK"] = VULKAN_SDK
+
+#
 # Write The File
 #
 
