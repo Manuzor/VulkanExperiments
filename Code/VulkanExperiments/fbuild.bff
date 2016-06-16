@@ -5,6 +5,7 @@
   VCXProject( 'VulkanExperiments-Proj' )
   {
     .Output = '$RepoRoot$/Build/$ProjectName$.exe'
+    .OutputDirectory = '$RepoRoot$/Build'
 
     .ProjectOutput = 'Workspace/VisualStudio/VulkanExperiments.vcxproj'
     .ProjectInputPaths = { '$ProjectBasePath$' }
