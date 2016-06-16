@@ -32,11 +32,10 @@ struct log_data
   int Indentation;
 };
 
-void
-LogInit(log_data* Log, allocator_interface* Allocator);
+extern log_data* GlobalLog;
 
 void
-LogClearMessageBuffer(log_data* Log);
+LogInit(log_data* Log, allocator_interface* Allocator);
 
 void
 LogIndent(log_data* Log, int By = 1);
@@ -44,17 +43,27 @@ LogIndent(log_data* Log, int By = 1);
 void
 LogDedent(log_data* Log, int By = 1);
 
+/// Globally log a string literal or zero terminated string.
 void
-LogMessageDispatch(log_data* Log, log_level LogLevel, char const* Message, ...);
+LogMessageDispatch(log_level LogLevel, char const* Message, ...);
 
+/// Globally log a string slice.
 void
-LogMessageDispatch(log_data* Log, log_level LogLevel, slice<char const> Message, ...);
+LogMessageDispatch(log_level LogLevel, slice<char const> Message, ...);
 
-#define LogBeginScope(Log, ...) LogMessageDispatch(Log, log_level::ScopeBegin, __VA_ARGS__);
-#define LogEndScope(Log, ...)   LogMessageDispatch(Log, log_level::ScopeEnd,   __VA_ARGS__);
-#define LogInfo(Log, ...)       LogMessageDispatch(Log, log_level::Info,       __VA_ARGS__);
-#define LogWarning(Log, ...)    LogMessageDispatch(Log, log_level::Warning,    __VA_ARGS__);
-#define LogError(Log, ...)      LogMessageDispatch(Log, log_level::Error,      __VA_ARGS__);
+/// Log a string literal or zero terminated string with the given log.
+void
+LogMessageDispatch(log_level LogLevel, log_data* Log, char const* Message, ...);
+
+/// Log a string slice with the given log.
+void
+LogMessageDispatch(log_level LogLevel, log_data* Log, slice<char const> Message, ...);
+
+#define LogBeginScope(...) LogMessageDispatch(log_level::ScopeBegin, __VA_ARGS__);
+#define LogEndScope(...)   LogMessageDispatch(log_level::ScopeEnd,   __VA_ARGS__);
+#define LogInfo(...)       LogMessageDispatch(log_level::Info,       __VA_ARGS__);
+#define LogWarning(...)    LogMessageDispatch(log_level::Warning,    __VA_ARGS__);
+#define LogError(...)      LogMessageDispatch(log_level::Error,      __VA_ARGS__);
 
 //
 // Default Log Sinks

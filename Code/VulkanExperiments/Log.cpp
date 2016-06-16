@@ -3,17 +3,14 @@
 #include <Windows.h>
 #include <stdio.h>
 
+
+log_data* GlobalLog = nullptr;
+
 void
 LogInit(log_data* Log, allocator_interface* Allocator)
 {
   Log->MessageBuffer.Allocator = Allocator;
   Log->Sinks.Allocator = Allocator;
-}
-
-void
-LogClearMessageBuffer(log_data* Log)
-{
-  ArrayClear(&Log->MessageBuffer);
 }
 
 void
@@ -51,12 +48,38 @@ LogMessageDispatch_Helper(log_data* Log, log_level LogLevel, slice<char const> M
 }
 
 void
+LogMessageDispatch(log_level LogLevel, char const* Message, ...)
+{
+  if(GlobalLog == nullptr)
+    return;
+
+  ArrayClear(&GlobalLog->MessageBuffer);
+  // TODO Format message
+
+  auto SlicedMessage = CreateSliceFromString(Message);
+  LogMessageDispatch_Helper(GlobalLog, LogLevel, SlicedMessage);
+}
+
+void
+LogMessageDispatch(log_level LogLevel, slice<char const> Message, ...)
+{
+  if(GlobalLog == nullptr)
+    return;
+
+  ArrayClear(&GlobalLog->MessageBuffer);
+  // TODO Format message
+
+  LogMessageDispatch_Helper(GlobalLog, LogLevel, Message);
+}
+
+
+void
 LogMessageDispatch(log_data* Log, log_level LogLevel, char const* Message, ...)
 {
   if(Log == nullptr)
     return;
 
-  LogClearMessageBuffer(Log);
+  ArrayClear(&Log->MessageBuffer);
   // TODO Format message
 
   auto SlicedMessage = CreateSliceFromString(Message);
@@ -69,7 +92,7 @@ LogMessageDispatch(log_data* Log, log_level LogLevel, slice<char const> Message,
   if(Log == nullptr)
     return;
 
-  LogClearMessageBuffer(Log);
+  ArrayClear(&Log->MessageBuffer);
   // TODO Format message
 
   LogMessageDispatch_Helper(Log, LogLevel, Message);

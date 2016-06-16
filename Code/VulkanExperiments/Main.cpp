@@ -59,6 +59,8 @@ CreateVulkanInstance(vulkan_data* Vulkan)
   // Load DLL
   //
   {
+    LogBeginScope("Foo");
+
   }
 
   return true;
@@ -79,14 +81,17 @@ int WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
   mallocator Mallocator = {};
   log_data Log = {};
-  LogInit(&Log, &Mallocator);
-  ArrayPushBack(&Log.Sinks, log_sink(StdoutLogSink));
-  ArrayPushBack(&Log.Sinks, log_sink(VisualStudioLogSink));
+  GlobalLog = &Log;
+  Defer(=, GlobalLog = nullptr);
 
-  LogInfo(&Log, "Hello logging world!");
+  LogInit(GlobalLog, &Mallocator);
+  ArrayPushBack(&GlobalLog->Sinks, log_sink(StdoutLogSink));
+  ArrayPushBack(&GlobalLog->Sinks, log_sink(VisualStudioLogSink));
+
+  LogInfo("Hello logging world!");
 
   auto Message = CreateSliceFromString("Hello slicing world!");
-  LogInfo(&Log, Message);
+  LogInfo(Message);
 
   return 0;
 }
