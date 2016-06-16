@@ -36,6 +36,11 @@ LogDedent(log_data* Log, int By)
 static void
 LogMessageDispatch_Helper(log_data* Log, log_level LogLevel, slice<char const> Message)
 {
+  if(LogLevel == log_level::ScopeEnd)
+  {
+    LogDedent(Log);
+  }
+
   log_sink_args LogSinkArgs;
   LogSinkArgs.LogLevel = LogLevel;
   LogSinkArgs.Message = Message;
@@ -44,6 +49,11 @@ LogMessageDispatch_Helper(log_data* Log, log_level LogLevel, slice<char const> M
   for(auto LogSink : ArrayData(&Log->Sinks))
   {
     LogSink(LogSinkArgs);
+  }
+
+  if(LogLevel == log_level::ScopeBegin)
+  {
+    LogIndent(Log);
   }
 }
 
