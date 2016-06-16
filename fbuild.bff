@@ -71,7 +71,6 @@
   .IntermediateDirectory = '$BuildPath$'
   .Platform              = 'x64'
   .PlatformToolset       = 'v140'
-  .IncludeSearchPath     = '$RepoRoot$/Code'
 ]
 
 .Project_x64_Debug   = [ Using(.Project_Common) .Config = 'x64-Debug' ]
@@ -79,6 +78,7 @@
 
 .ProjectConfigs = { .Project_x64_Debug, .Project_x64_Release }
 .ProjectAllowedFileExtensions = { '.cpp', '.hpp', '.ipp', '.h', '.inl', }
+.IncludeSearchPath = '$RepoRoot$/Code;'
 
 //
 // Targets
