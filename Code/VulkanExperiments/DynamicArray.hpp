@@ -6,7 +6,7 @@
   #define DYNAMIC_ARRAY_MIN_ALLOCATION_COUNT 16
 #endif
 
-constexpr size_t ArrayInvalidIndex = (size_t)-1;
+constexpr size_t DynamicArrayInvalidIndex = (size_t)-1;
 
 template<typename T>
 struct dynamic_array
@@ -20,45 +20,52 @@ struct dynamic_array
 
 template<typename T>
 void
-ArrayInit(dynamic_array<T>* Array, allocator_interface* Allocator)
+Init(dynamic_array<T>* Array, allocator_interface* Allocator)
 {
   Array->Allocator = Allocator;
 }
 
 template<typename T>
+void
+Finalize(dynamic_array<T>* Array)
+{
+  DeleteArray(Array->Allocator, Array->RawData);
+}
+
+template<typename T>
 slice<T>
-ArrayData(dynamic_array<T>* Array)
+Data(dynamic_array<T>* Array)
 {
   return Slice(Array->RawData, 0, Array->Num);
 }
 
 template<typename T>
 size_t
-ArrayCapacity(dynamic_array<T>* Array)
+Capacity(dynamic_array<T>* Array)
 {
   return Array->RawData.Num;
 }
 
 template<typename T>
 void
-ArrayReserve(dynamic_array<T>* Array, size_t MinBytesToReserve)
+Reserve(dynamic_array<T>* Array, size_t MinBytesToReserve)
 {
   auto BytesToReserve = Max(MinBytesToReserve, DYNAMIC_ARRAY_MIN_ALLOCATION_COUNT);
-  if(ArrayCapacity(Array) >= BytesToReserve)
+  if(Capacity(Array) >= BytesToReserve)
     return;
 
   auto NewRawData = NewArray<T>(Array->Allocator, BytesToReserve);
   Assert(bool(NewRawData));
-  SliceCopy(Slice(NewRawData, 0, Array->Num), SliceAsConst(ArrayData(Array)));
+  SliceCopy(Slice(NewRawData, 0, Array->Num), SliceAsConst(Data(Array)));
   DeleteArray(Array->Allocator, Array->RawData);
   Array->RawData = NewRawData;
 }
 
 template<typename T>
 size_t
-ArrayPushBack(dynamic_array<T>* Array, T NewElement)
+PushBack(dynamic_array<T>* Array, T NewElement)
 {
-  ArrayReserve(Array, Array->Num + 1);
+  Reserve(Array, Array->Num + 1);
   const auto Index = Array->Num;
   ++Array->Num;
   Array->RawData[Index] = NewElement;
@@ -67,7 +74,7 @@ ArrayPushBack(dynamic_array<T>* Array, T NewElement)
 
 template<typename T>
 void
-ArrayPopBack(dynamic_array<T>* Array)
+PopBack(dynamic_array<T>* Array)
 {
   Assert(Array->Num > 0);
   --Array->Num;
@@ -75,7 +82,7 @@ ArrayPopBack(dynamic_array<T>* Array)
 
 template<typename T>
 void
-ArrayClear(dynamic_array<T>* Array)
+Clear(dynamic_array<T>* Array)
 {
   // TODO Destruct.
   Array->Num = 0;

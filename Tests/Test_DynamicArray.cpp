@@ -9,13 +9,14 @@ TEST_CASE("Dynamic Array", "[dynamic_array]")
   allocator_interface* Allocator = &Mallocator;
 
   dynamic_array<int> Arr;
-  ArrayInit(&Arr, Allocator);
+  Init(&Arr, Allocator);
+  Defer(&, Finalize(&Arr));
 
   REQUIRE( Arr.Num == 0 );
 
   SECTION("Reserve")
   {
-    ArrayReserve(&Arr, 10);
+    Reserve(&Arr, 10);
     REQUIRE( Arr.Num == 0 );
     REQUIRE( Arr.RawData.Num >= 10 );
     REQUIRE( Arr.RawData.Data != nullptr );
@@ -23,8 +24,8 @@ TEST_CASE("Dynamic Array", "[dynamic_array]")
 
   SECTION("PushBack")
   {
-    ArrayPushBack(&Arr, 42);
+    PushBack(&Arr, 42);
     REQUIRE( Arr.Num == 1 );
-    REQUIRE( ArrayData(&Arr)[0] == 42 );
+    REQUIRE( Data(&Arr)[0] == 42 );
   }
 }

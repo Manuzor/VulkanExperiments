@@ -46,7 +46,7 @@ LogMessageDispatch_Helper(log_data* Log, log_level LogLevel, slice<char const> M
   LogSinkArgs.Message = Message;
   LogSinkArgs.Indentation = Log->Indentation;
 
-  for(auto LogSink : ArrayData(&Log->Sinks))
+  for(auto LogSink : Data(&Log->Sinks))
   {
     LogSink(LogSinkArgs);
   }
@@ -63,7 +63,7 @@ LogMessageDispatch(log_level LogLevel, char const* Message, ...)
   if(GlobalLog == nullptr)
     return;
 
-  ArrayClear(&GlobalLog->MessageBuffer);
+  Clear(&GlobalLog->MessageBuffer);
   // TODO Format message
 
   auto SlicedMessage = CreateSliceFromString(Message);
@@ -76,7 +76,7 @@ LogMessageDispatch(log_level LogLevel, slice<char const> Message, ...)
   if(GlobalLog == nullptr)
     return;
 
-  ArrayClear(&GlobalLog->MessageBuffer);
+  Clear(&GlobalLog->MessageBuffer);
   // TODO Format message
 
   LogMessageDispatch_Helper(GlobalLog, LogLevel, Message);
@@ -89,7 +89,7 @@ LogMessageDispatch(log_data* Log, log_level LogLevel, char const* Message, ...)
   if(Log == nullptr)
     return;
 
-  ArrayClear(&Log->MessageBuffer);
+  Clear(&Log->MessageBuffer);
   // TODO Format message
 
   auto SlicedMessage = CreateSliceFromString(Message);
@@ -102,7 +102,7 @@ LogMessageDispatch(log_data* Log, log_level LogLevel, slice<char const> Message,
   if(Log == nullptr)
     return;
 
-  ArrayClear(&Log->MessageBuffer);
+  Clear(&Log->MessageBuffer);
   // TODO Format message
 
   LogMessageDispatch_Helper(Log, LogLevel, Message);
