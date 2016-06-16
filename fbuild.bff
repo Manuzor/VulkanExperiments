@@ -44,7 +44,7 @@
                    //
                    + ' /I"$VS2015Path$\VC\Include"'
                    + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\ucrt"'
-                   + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\share"'
+                   + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\shared"'
                    + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\um"'
                    + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\winrt"'
 
@@ -85,6 +85,7 @@
 //
 
 #include "Code/VulkanExperiments/fbuild.bff"
+#include "Tests/fbuild.bff"
 
 //
 // Aliases
@@ -92,7 +93,7 @@
 
 Alias( 'all' )
 {
-  .Targets = { 'VulkanExperiments' }
+  .Targets = { 'VulkanExperiments', 'Tests' }
 }
 
 //
@@ -105,4 +106,5 @@ VSSolution( 'GenerateVisualStudioSolution' )
   .SolutionConfigs = .ProjectConfigs
   .SolutionProjects = { 'VulkanExperiments-Proj' }
   .SolutionBuildProject = 'VulkanExperiments-Proj'
+  .ExtraFiles = { 'Utilities/VulkanExperiments.natvis' }
 }
