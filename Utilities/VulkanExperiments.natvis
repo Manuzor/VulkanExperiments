@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+  <Type Name="slice&lt;*&gt;">
+    <DisplayString>{{ Num={Num} }}</DisplayString>
+    <Expand>
+      <Item Name="Num">Num</Item>
+      <ArrayItems>
+        <Size>Num</Size>
+        <ValuePointer>Data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <Type Name="dynamic_array&lt;*&gt;">
+    <DisplayString>{{ Num={Num}, Capacity={RawData.Num} }}</DisplayString>
+    <Expand>
+      <Item Name="Num">Num</Item>
+      <Item Name="Capacity">RawData.Num</Item>
+      <ArrayItems>
+        <Size>Num</Size>
+        <ValuePointer>RawData.Data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+</AutoVisualizer>
