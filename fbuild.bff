@@ -105,7 +105,7 @@ VSSolution( 'GenerateVisualStudioSolution' )
 {
   .SolutionOutput = 'Workspace/VisualStudio/VulkanExperiments.sln'
   .SolutionConfigs = .ProjectConfigs
-  .SolutionProjects = { 'VulkanExperiments-Proj' }
+  .SolutionProjects = { 'VulkanExperiments-Proj', 'Tests-Proj' }
   .SolutionBuildProject = 'VulkanExperiments-Proj'
   .ExtraFiles = { 'Utilities/VulkanExperiments.natvis' }
 }
