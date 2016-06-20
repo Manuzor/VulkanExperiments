@@ -1,25 +1,30 @@
-<?xml version="1.0" encoding="utf-8"?> 
+<?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
   <Type Name="slice&lt;*&gt;">
+    <DisplayString Condition="Ptr == nullptr">{{ Null }}</DisplayString>
+    <DisplayString Condition="Num == 0">{{ Empty }}</DisplayString>
     <DisplayString>{{ Num={Num} }}</DisplayString>
     <Expand>
       <Item Name="Num">Num</Item>
       <ArrayItems>
         <Size>Num</Size>
-        <ValuePointer>Data</ValuePointer>
+        <ValuePointer>Ptr</ValuePointer>
       </ArrayItems>
     </Expand>
   </Type>
 
   <Type Name="dynamic_array&lt;*&gt;">
-    <DisplayString>{{ Num={Num}, Capacity={RawData.Num} }}</DisplayString>
+    <DisplayString Condition="Ptr == nullptr">{{ Null }}</DisplayString>
+    <DisplayString Condition="Num == 0">{{ Empty }}</DisplayString>
+    <DisplayString>{{ Num={Num}, Capacity={Capacity} }}</DisplayString>
     <Expand>
       <Item Name="Num">Num</Item>
-      <Item Name="Capacity">RawData.Num</Item>
+      <Item Name="Capacity">Capacity</Item>
+      <Item Name="Ptr">Ptr</Item>
       <ArrayItems>
         <Size>Num</Size>
-        <ValuePointer>RawData.Data</ValuePointer>
+        <ValuePointer>Ptr</ValuePointer>
       </ArrayItems>
     </Expand>
   </Type>

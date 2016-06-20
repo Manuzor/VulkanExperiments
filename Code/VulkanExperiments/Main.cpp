@@ -76,9 +76,9 @@ CreateVulkanInstance(allocator_interface* TempAllocator, vulkan_data* Vulkan)
     {
       fixed_block<KiB(1), char> BufferMemory;
       auto Buffer = Slice(BufferMemory);
-      auto CharCount = GetModuleFileNameA(Vulkan->DLL, Buffer.Data, Cast<DWORD>(Buffer.Num));
+      auto CharCount = GetModuleFileNameA(Vulkan->DLL, Buffer.Ptr, Cast<DWORD>(Buffer.Num));
       Vulkan->DLLName = Slice(Buffer, DWORD(0), CharCount);
-      LogInfo("Loaded Vulkan DLL: %*s", Vulkan->DLLName.Num, Vulkan->DLLName.Data);
+      LogInfo("Loaded Vulkan DLL: %*s", Vulkan->DLLName.Num, Vulkan->DLLName.Ptr);
     }
     else
     {
@@ -147,10 +147,10 @@ CreateVulkanInstance(allocator_interface* TempAllocator, vulkan_data* Vulkan)
     CreateInfo.pApplicationInfo = &ApplicationInfo;
 
     CreateInfo.enabledExtensionCount = Cast<uint>(ExtensionNames.Num);
-    CreateInfo.ppEnabledExtensionNames = Data(&ExtensionNames).Data;
+    CreateInfo.ppEnabledExtensionNames = ExtensionNames.Ptr;
 
     CreateInfo.enabledLayerCount = Cast<uint>(LayerNames.Num);
-    CreateInfo.ppEnabledLayerNames = Data(&LayerNames).Data;
+    CreateInfo.ppEnabledLayerNames = LayerNames.Ptr;
 
     Verify(vkCreateInstance(&CreateInfo, nullptr, &Vulkan->Instance));
   }
@@ -177,8 +177,9 @@ int WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
   Defer(=, GlobalLog = nullptr);
 
   LogInit(GlobalLog, &Mallocator);
-  PushBack(&GlobalLog->Sinks, log_sink(StdoutLogSink));
-  PushBack(&GlobalLog->Sinks, log_sink(VisualStudioLogSink));
+  auto SinkSlots = ExpandBy(&GlobalLog->Sinks, 2);
+  SinkSlots[0] = log_sink(StdoutLogSink);
+  SinkSlots[1] = log_sink(VisualStudioLogSink);
 
   vulkan_data Vulkan;
 

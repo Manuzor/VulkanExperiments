@@ -4,6 +4,9 @@
 
 #pragma once
 
+// For placement-new.
+#include <new>
+
 
 // ===================================
 // === Source: Backbone/Common.hpp ===
@@ -335,28 +338,28 @@ _defer_impl<decltype(PRE_Concat2(_DeferFunc, __LINE__))> PRE_Concat2(_Defer, __L
 // === Source: Backbone/Slice.hpp ===
 // ==================================
 
-template<typename t_element>
+template<typename ElementType>
 struct slice
 {
-  using element_type = t_element;
+  using element_type = ElementType;
 
   size_t Num;
-  element_type* Data;
+  element_type* Ptr;
 
   /// Test whether this slice is valid or not.
   ///
   /// A slice is considered valid if it does not point to null and contains at
   /// least one element.
-  operator bool() const { return Num && Data; }
+  operator bool() const { return Num && Ptr; }
 
   /// Index operator to access elements of the slice.
-  template<typename t_index_type>
+  template<typename IndexType>
   auto
-  operator[](t_index_type Index) const
-    -> decltype(Data[Index])
+  operator[](IndexType Index) const
+    -> decltype(Ptr[Index])
   {
     BoundsCheck(Index >= 0 && Index < Num);
-    return Data[Index];
+    return Ptr[Index];
   }
 };
 
@@ -366,13 +369,13 @@ struct slice<void>
   using element_type = void;
 
   size_t Num;
-  element_type* Data;
+  element_type* Ptr;
 
   /// Test whether this slice is valid or not.
   ///
   /// A slice is considered valid if it does not point to null and contains at
   /// least one element.
-  operator bool() const { return Num && Data; }
+  operator bool() const { return Num && Ptr; }
 };
 
 template<>
@@ -381,75 +384,75 @@ struct slice<void const>
   using element_type = void const;
 
   size_t Num;
-  element_type* Data;
+  element_type* Ptr;
 
   /// Test whether this slice is valid or not.
   ///
   /// A slice is considered valid if it does not point to null and contains at
   /// least one element.
-  operator bool() const { return Num && Data; }
+  operator bool() const { return Num && Ptr; }
 };
 
-template<typename t_type>
-typename slice<t_type>::element_type*
-First(slice<t_type> const& SomeSlice)
+template<typename T>
+typename slice<T>::element_type*
+First(slice<T> const& SomeSlice)
 {
-  return SomeSlice.Data;
+  return SomeSlice.Ptr;
 }
 
-template<typename t_type>
-typename slice<t_type>::element_type*
-Last(slice<t_type> const& SomeSlice)
+template<typename T>
+typename slice<T>::element_type*
+Last(slice<T> const& SomeSlice)
 {
   return MemAddOffset(First(SomeSlice), Max(1, SomeSlice.Num) - 1);
 }
 
-template<typename t_type>
-typename slice<t_type>::element_type*
-OnePastLast(slice<t_type> const& SomeSlice)
+template<typename T>
+typename slice<T>::element_type*
+OnePastLast(slice<T> const& SomeSlice)
 {
   return MemAddOffset(First(SomeSlice), SomeSlice.Num);
 }
 
 /// C++11 range API
-template<typename t_type>
-typename slice<t_type>::element_type*
-begin(slice<t_type> const& SomeSlice)
+template<typename T>
+typename slice<T>::element_type*
+begin(slice<T> const& SomeSlice)
 {
   return First(SomeSlice);
 }
 
 /// C++11 range API
-template<typename t_type>
-typename slice<t_type>::element_type*
-end(slice<t_type> const& SomeSlice)
+template<typename T>
+typename slice<T>::element_type*
+end(slice<T> const& SomeSlice)
 {
   return OnePastLast(SomeSlice);
 }
 
-template<typename t_target, typename t_source>
-slice<t_target>
-SliceReinterpret(slice<t_source> SomeSlice)
+template<typename TargetType, typename SourceType>
+slice<TargetType>
+SliceReinterpret(slice<SourceType> SomeSlice)
 {
-  return CreateSlice(Reinterpret<t_target*>(First(SomeSlice)),
-                     Reinterpret<t_target*>(OnePastLast(SomeSlice)));
+  return Slice(Reinterpret<TargetType*>(First(SomeSlice)),
+              Reinterpret<TargetType*>(OnePastLast(SomeSlice)));
 }
 
-template<typename t_source>
-slice<t_source const>
-SliceAsConst(slice<t_source> SomeSlice)
+template<typename SourceType>
+slice<SourceType const>
+SliceAsConst(slice<SourceType> SomeSlice)
 {
-  return CreateSlice(AsPtrToConst(First(SomeSlice)),
-                     AsPtrToConst(OnePastLast(SomeSlice)));
+  return Slice(AsPtrToConst(First(SomeSlice)),
+               AsPtrToConst(OnePastLast(SomeSlice)));
 }
 
 /// Concatenate two slices together.
 ///
 /// \return The returned slice will be a subset of the given Buffer, which is
 /// \used to write the actual result in.
-template<typename t_element>
-slice<t_element>
-SliceConcat(slice<t_element const> Head, slice<t_element const> Tail, slice<t_element> Buffer)
+template<typename ElementType>
+slice<ElementType>
+SliceConcat(slice<ElementType const> Head, slice<ElementType const> Tail, slice<ElementType> Buffer)
 {
   BoundsCheck(Buffer.Num >= Head.Num + Tail.Num);
   size_t DestIndex = 0;
@@ -469,27 +472,27 @@ SliceConcat(slice<t_element const> Head, slice<t_element const> Tail, slice<t_el
 }
 
 /// Create a union of both input spans. The resulting slice will contain everything
-template<typename t_element>
-constexpr slice<t_element>
-SliceUnion(slice<t_element> SliceA, slice<t_element> SliceB)
+template<typename ElementType>
+constexpr slice<ElementType>
+SliceUnion(slice<ElementType> SliceA, slice<ElementType> SliceB)
 {
   // A union only makes sense when both slices are overlapping.
   Assert(SlicesAreOverlapping(SliceA, SliceB));
   return { Min(First(SliceA), First(SliceB)), Max(OnePastLast(SliceA), OnePastLast(SliceB)) };
 }
 
-template<typename t_element_a, typename t_element_b>
+template<typename ElementTypeA, typename ElementTypeB>
 constexpr bool
-SlicesAreDisjoint(slice<t_element_a> SliceA, slice<t_element_b> SliceB)
+SlicesAreDisjoint(slice<ElementTypeA> SliceA, slice<ElementTypeB> SliceB)
 {
   return Last(SliceA) < First(SliceB) || First(SliceA) > Last(SliceB);
 }
 
 /// Whether SliceA and SliceB overlap.
 /// \see Contains
-template<typename t_element_a, typename t_element_b>
+template<typename ElementTypeA, typename ElementTypeB>
 bool
-SlicesAreOverlapping(slice<t_element_a> SliceA, slice<t_element_b> SliceB)
+SlicesAreOverlapping(slice<ElementTypeA> SliceA, slice<ElementTypeB> SliceB)
 {
   auto UnionOfAB = SliceUnion(SliceA, SliceB);
   return SliceContains(UnionOfAB, SliceA) || SliceContains(UnionOfAB, SliceA);
@@ -497,36 +500,36 @@ SlicesAreOverlapping(slice<t_element_a> SliceA, slice<t_element_b> SliceB)
 
 /// Whether SliceA completely contains SliceB.
 /// \see AreOverlapping
-template<typename t_element_a, typename t_element_b>
+template<typename ElementTypeA, typename ElementTypeB>
 constexpr bool
-SliceContains(slice<t_element_a> SliceA, slice<t_element_b> SliceB)
+SliceContains(slice<ElementTypeA> SliceA, slice<ElementTypeB> SliceB)
 {
   return First(SliceA) <= First(SliceB) && OnePastLast(SliceA) >= OnePastLast(SliceB);
 }
 
-template<typename t_element>
-constexpr slice<t_element>
-CreateSlice(size_t Num, t_element* Data)
+template<typename ElementType>
+constexpr slice<ElementType>
+Slice(size_t Num, ElementType* Ptr)
 {
-  return { Num, Data };
+  return { Num, Ptr };
 }
 
-template<typename t_element>
-slice<t_element>
-CreateSlice(t_element* Begin, t_element* End)
+template<typename ElementType>
+slice<ElementType>
+Slice(ElementType* FirstPtr, ElementType* OnePastLastPtr)
 {
-  auto EndInt = Reinterpret<size_t>(End);
-  auto BeginInt = Reinterpret<size_t>(Begin);
+  auto OnePastLastInt = Reinterpret<size_t>(OnePastLastPtr);
+  auto FirstInt = Reinterpret<size_t>(FirstPtr);
 
-  slice<t_element> Result;
-  Result.Num = EndInt < BeginInt ? 0 : BeginInt - EndInt;
-  Result.Data = Begin;
+  slice<ElementType> Result;
+  Result.Num = OnePastLastInt < FirstInt ? 0 : FirstInt - OnePastLastInt;
+  Result.Ptr = FirstPtr;
   return Result;
 }
 
-template<typename t_element, size_t N>
-slice<t_element>
-CreateSlice(t_element (&Array)[N])
+template<typename ElementType, size_t N>
+slice<ElementType>
+Slice(ElementType (&Array)[N])
 {
   return { N, &Array[0] };
 }
@@ -534,7 +537,7 @@ CreateSlice(t_element (&Array)[N])
 /// Create a char slice from a static char array, excluding '\0'.
 template<size_t N>
 slice<char const>
-CreateSliceFromString(char const(&StringLiteral)[N])
+SliceFromString(char const(&StringLiteral)[N])
 {
   return { N - 1, &StringLiteral[0] };
 }
@@ -542,7 +545,7 @@ CreateSliceFromString(char const(&StringLiteral)[N])
 /// \param StringPtr Must be null-terminated.
 inline
 slice<char const>
-CreateSliceFromString(char const* StringPtr)
+SliceFromString(char const* StringPtr)
 {
   auto Seek = StringPtr;
   size_t Count = 0;
@@ -553,26 +556,28 @@ CreateSliceFromString(char const* StringPtr)
 /// \param StringPtr Must be null-terminated.
 inline
 slice<char>
-CreateSliceFromString(char* StringPtr)
+SliceFromString(char* StringPtr)
 {
   auto Constified = Coerce<char const*>(StringPtr);
-  auto Result = CreateSliceFromString(Constified);
-  return CreateSlice(Coerce<char*>(First(Result)),
-                     Coerce<char*>(First(Result)));
+  auto ConstResult = SliceFromString(Constified);
+  slice<char> Result;
+  Result.Num = ConstResult.Num;
+  Result.Ptr = Coerce<char*>(ConstResult.Ptr);
+  return Result;
 }
 
 /// Creates a new slice from an existing slice.
 ///
 /// \param InclusiveStartIndex The index to start slicing from.
 /// \param ExclusiveEndIndex The index of the first excluded element.
-template<typename t_element, typename t_start_index, typename t_end_index>
-slice<t_element>
-Slice(slice<t_element> SomeSlice, t_start_index InclusiveStartIndex, t_end_index ExclusiveEndIndex)
+template<typename ElementType, typename StartIndexType, typename EndIndexType>
+slice<ElementType>
+Slice(slice<ElementType> SomeSlice, StartIndexType InclusiveStartIndex, EndIndexType ExclusiveEndIndex)
 {
   Assert(InclusiveStartIndex <= ExclusiveEndIndex);
-  slice<t_element> Result;
+  slice<ElementType> Result;
   Result.Num = ExclusiveEndIndex - InclusiveStartIndex;
-  Result.Data = MemAddOffset(SomeSlice.Data, InclusiveStartIndex);
+  Result.Ptr = MemAddOffset(SomeSlice.Ptr, InclusiveStartIndex);
   BoundsCheck(SliceContains(SomeSlice, Result));
   return Result;
 }
@@ -580,29 +585,83 @@ Slice(slice<t_element> SomeSlice, t_start_index InclusiveStartIndex, t_end_index
 /// Copies the contents of one slice into another.
 ///
 /// If the number of elements don't match, the minimum of both is used.
-template<typename t_type>
+template<typename T>
 size_t
-SliceCopy(slice<t_type> Target, slice<t_type const> Source)
+SliceCopy(slice<T> Target, slice<T const> Source)
 {
+  // TODO Optimize for PODs
+
   size_t Amount = Min(Target.Num, Source.Num);
-  // TODO(Manu): memcpy?
-  // size_t Bytes = Amount * sizeof(t_type);
-  // ::memcpy(Target.Data, Source.Data, Bytes);
   for(size_t Index = 0; Index < Amount; ++Index)
   {
-    Target.Data[Index] = Source.Data[Index];
+    Target.Ptr[Index] = Source.Ptr[Index];
   }
   return Amount;
 }
+
+template<typename T>
+size_t
+SliceMove(slice<T> Target, slice<T const> Source)
+{
+  // TODO Optimize for PODs
+
+  size_t Amount = Min(Target.Num, Source.Num);
+  for(size_t Index = 0; Index < Amount; ++Index)
+  {
+    Target.Ptr[Index] = Move(Source.Ptr[Index]);
+  }
+  return Amount;
+}
+
+template<typename T>
+size_t
+SliceCopyConstruct(slice<T> Target, slice<T const> Source)
+{
+  // TODO Optimize for PODs
+
+  size_t Amount = Min(Target.Num, Source.Num);
+  for(size_t Index = 0; Index < Amount; ++Index)
+  {
+    new (&Target.Ptr[Index]) T(Source.Ptr[Index]);
+  }
+  return Amount;
+}
+
+template<typename T>
+size_t
+SliceMoveConstruct(slice<T> Target, slice<T const> Source)
+{
+  // TODO Optimize for PODs
+
+  size_t Amount = Min(Target.Num, Source.Num);
+  for(size_t Index = 0; Index < Amount; ++Index)
+  {
+    new (&Target.Ptr[Index]) T(Move(Source.Ptr[Index]));
+  }
+  return Amount;
+}
+
+template<typename T>
+void
+SliceDestruct(slice<T> Target)
+{
+  // TODO Optimize for PODs
+
+  for(auto& Element : Target)
+  {
+    Element.~T();
+  }
+}
+
 
 /// Compares the contents of the two slices for equality.
 ///
 /// Two slices are deemed equal if they have the same number of elements and
 /// each individual element in A compares equal to the corresponding element
 /// in B in the order they appear in.
-template<typename t_element_a, typename t_element_b>
+template<typename ElementTypeA, typename ElementTypeB>
 bool
-operator ==(slice<t_element_a> A, slice<t_element_b> B)
+operator ==(slice<ElementTypeA> A, slice<ElementTypeB> B)
 {
   if(A.Num != B.Num) return false;
 
@@ -623,9 +682,9 @@ operator ==(slice<t_element_a> A, slice<t_element_b> B)
   return true;
 }
 
-template<typename t_element_a, typename t_element_b>
+template<typename ElementTypeA, typename ElementTypeB>
 bool
-operator !=(slice<t_element_a> A, slice<t_element_b> B)
+operator !=(slice<ElementTypeA> A, slice<ElementTypeB> B)
 {
   return !(A == B);
 }

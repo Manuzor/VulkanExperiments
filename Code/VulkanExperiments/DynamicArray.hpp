@@ -2,21 +2,64 @@
 
 #include "Allocator.hpp"
 
-#ifndef DYNAMIC_ARRAY_MIN_ALLOCATION_COUNT
-  #define DYNAMIC_ARRAY_MIN_ALLOCATION_COUNT 16
-#endif
-
-constexpr size_t DynamicArrayInvalidIndex = (size_t)-1;
+constexpr size_t DynamicArrayMinimumCapacity = 16;
 
 template<typename T>
 struct dynamic_array
 {
   allocator_interface* Allocator;
-  slice<T> RawData;
+  size_t Capacity;
   size_t Num;
+  T* Ptr;
 
-  operator bool() const { return Num > 0; }
+  operator bool() const { return Num && Ptr; }
+
+  /// Index operator to access elements of the slice.
+  template<typename T>
+  auto
+  operator[](T Index) const
+    -> decltype(Ptr[Index])
+  {
+    BoundsCheck(Index >= 0 && Index < Num);
+    return Ptr[Index];
+  }
 };
+
+template<>
+struct dynamic_array<void>
+{
+  allocator_interface* Allocator;
+  size_t Capacity;
+  size_t Num;
+  void* Ptr;
+
+  operator bool() const { return Num && Ptr; }
+};
+
+template<>
+struct dynamic_array<void const>
+{
+  allocator_interface* Allocator;
+  size_t Capacity;
+  size_t Num;
+  void const* Ptr;
+
+  operator bool() const { return Num && Ptr; }
+};
+
+template<typename T>
+slice<T>
+Slice(dynamic_array<T>* Array)
+{
+  return Slice(Array->Num, Array->Ptr);
+}
+
+template<typename T>
+slice<T>
+AllocatedMemory(dynamic_array<T>* Array)
+{
+  return Slice(Array->Capacity, Array->Ptr);
+}
 
 template<typename T>
 void
@@ -29,61 +72,81 @@ template<typename T>
 void
 Finalize(dynamic_array<T>* Array)
 {
-  DeleteArray(Array->Allocator, Array->RawData);
-}
-
-template<typename T>
-slice<T>
-Data(dynamic_array<T>* Array)
-{
-  return Slice(Array->RawData, 0, Array->Num);
-}
-
-template<typename T>
-size_t
-Capacity(dynamic_array<T>* Array)
-{
-  return Array->RawData.Num;
+  SliceDeallocate(Array->Allocator, AllocatedMemory(Array));
 }
 
 template<typename T>
 void
 Reserve(dynamic_array<T>* Array, size_t MinBytesToReserve)
 {
-  auto BytesToReserve = Max(MinBytesToReserve, DYNAMIC_ARRAY_MIN_ALLOCATION_COUNT);
-  if(Capacity(Array) >= BytesToReserve)
+  auto BytesToReserve = Max(MinBytesToReserve, DynamicArrayMinimumCapacity);
+  if(Array->Capacity >= BytesToReserve)
     return;
 
-  auto NewRawData = NewArray<T>(Array->Allocator, BytesToReserve);
-  Assert(bool(NewRawData));
-  SliceCopy(Slice(NewRawData, 0, Array->Num), SliceAsConst(Data(Array)));
-  DeleteArray(Array->Allocator, Array->RawData);
-  Array->RawData = NewRawData;
+  auto OldAllocatedMemory = AllocatedMemory(Array);
+  auto OldUsedMemory = Slice(Array);
+  auto NewAllocatedMemory = SliceAllocate<T>(Array->Allocator, BytesToReserve);
+  auto NewUsedMemory = Slice(NewAllocatedMemory, 0, Array->Num);
+
+  Assert(NewAllocatedMemory.Num == BytesToReserve);
+
+  // Move from the old memory.
+  SliceMove(NewUsedMemory, SliceAsConst(OldUsedMemory));
+
+  // Destruct and free the old memory.
+  SliceDestruct(OldUsedMemory);
+  SliceDeallocate(Array->Allocator, OldAllocatedMemory);
+
+  // Update array members.
+  Array->Ptr = NewAllocatedMemory.Ptr;
+  Array->Capacity = NewAllocatedMemory.Num;
 }
 
 template<typename T>
-size_t
-PushBack(dynamic_array<T>* Array, T NewElement)
+slice<T>
+ExpandBy(dynamic_array<T>* Array, size_t Amount)
 {
-  Reserve(Array, Array->Num + 1);
-  const auto Index = Array->Num;
+  Reserve(Array, Array->Num + Amount);
+  const auto BeginIndex = Array->Num;
   ++Array->Num;
-  Array->RawData[Index] = NewElement;
-  return Index;
+  const auto EndIndex = Array->Num;
+  return Slice(AllocatedMemory(Array), BeginIndex, EndIndex);
+}
+
+template<typename T>
+T&
+Expand(dynamic_array<T>* Array)
+{
+  return ExpandBy(Array, 1)[0];
 }
 
 template<typename T>
 void
-PopBack(dynamic_array<T>* Array)
+ShrinkBy(dynamic_array<T>* Array, size_t Amount)
 {
-  Assert(Array->Num > 0);
-  --Array->Num;
+  Assert(Array->Num >= Amount);
+  Array->Num -= Amount;
+}
+
+template<typename T>
+void
+ShrinkByAndDestruct(dynamic_array<T>* Array, size_t Amount)
+{
+  auto ToDestruct = Slice(Slice(Array), Array->Num - Amount, Array->Num);
+  ShrinkBy(Amount);
+  SliceDestruct(ToDestruct);
 }
 
 template<typename T>
 void
 Clear(dynamic_array<T>* Array)
 {
-  // TODO Destruct.
-  Array->Num = 0;
+  ShrinkBy(Array, Array->Num);
+}
+
+template<typename T>
+void
+ClearAndDestruct(dynamic_array<T>* Array)
+{
+  ShrinkByAndDestruct(Array, Array->Num);
 }

@@ -46,7 +46,7 @@ LogMessageDispatch_Helper(log_data* Log, log_level LogLevel, slice<char const> M
   LogSinkArgs.Message = Message;
   LogSinkArgs.Indentation = Log->Indentation;
 
-  for(auto LogSink : Data(&Log->Sinks))
+  for(auto LogSink : Slice(&Log->Sinks))
   {
     LogSink(LogSinkArgs);
   }
@@ -66,7 +66,7 @@ LogMessageDispatch(log_level LogLevel, char const* Message, ...)
   Clear(&GlobalLog->MessageBuffer);
   // TODO Format message
 
-  auto SlicedMessage = CreateSliceFromString(Message);
+  auto SlicedMessage = SliceFromString(Message);
   LogMessageDispatch_Helper(GlobalLog, LogLevel, SlicedMessage);
 }
 
@@ -92,7 +92,7 @@ LogMessageDispatch(log_data* Log, log_level LogLevel, char const* Message, ...)
   Clear(&Log->MessageBuffer);
   // TODO Format message
 
-  auto SlicedMessage = CreateSliceFromString(Message);
+  auto SlicedMessage = SliceFromString(Message);
   LogMessageDispatch_Helper(Log, LogLevel, SlicedMessage);
 }
 
@@ -130,7 +130,7 @@ StdoutLogSink(log_sink_args Args)
       --Args.Indentation;
     }
 
-    printf("%*s\n", Cast<int>(Args.Message.Num), Args.Message.Data);
+    printf("%*s\n", Cast<int>(Args.Message.Num), Args.Message.Ptr);
   }
   else
   {
@@ -169,7 +169,7 @@ VisualStudioLogSink(log_sink_args Args)
       SliceCopy(Slice(Buffer, 0, Amount), Slice(Args.Message, 0, Amount));
       Buffer[Amount] = '\0';
 
-      OutputDebugStringA(Buffer.Data);
+      OutputDebugStringA(Buffer.Ptr);
 
       Args.Message = Slice(Args.Message, Amount, Args.Message.Num);
     }

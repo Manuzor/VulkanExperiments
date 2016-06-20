@@ -11,10 +11,18 @@
       "name": "VulkanExperiments",
       "file_regex": "([A-z]:.*?)\\(([0-9]+)(?:,\\s*[0-9]+)?\\)",
       "working_dir": "${folder}",
-      "cmd": [ "${folder}/Utilities/FASTBuild/FBuild.exe", "-ide" ],
+      "cmd": [ "${folder}/Utilities/FASTBuild/FBuild.exe", "-ide", "VulkanExperiments" ],
 
       "variants":
       [
+        {
+          "name": "Tests: Build Only",
+          "cmd": [ "${folder}/Utilities/FASTBuild/FBuild.exe", "-ide", "Tests" ],
+        },
+        {
+          "name": "Tests: Build and Run",
+          "cmd": [ "${folder}/Utilities/FASTBuild/FBuild.exe", "-ide", "Tests-Run" ],
+        },
         {
           "name": "Rebuild",
           "cmd": [ "${folder}/Utilities/FASTBuild/FBuild.exe", "-ide", "-clean" ],

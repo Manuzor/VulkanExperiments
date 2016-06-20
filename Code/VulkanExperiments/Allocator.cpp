@@ -2,16 +2,16 @@
 
 #include <stdlib.h>
 
-slice<void>
+void*
 mallocator::Allocate(size_t NumBytes, size_t Alignment)
 {
   auto Ptr = ::malloc(NumBytes);
-  return CreateSlice(NumBytes, Ptr);
+  return Ptr;
 }
 
 bool
-mallocator::Deallocate(slice<void> Memory)
+mallocator::Deallocate(void* Memory)
 {
-  ::free(Memory.Data);
+  ::free(Memory);
   return true;
 }

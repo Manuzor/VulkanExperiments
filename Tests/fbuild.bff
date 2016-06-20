@@ -29,6 +29,13 @@
     .LinkerOutput = '$BuildPath$/Tests.exe'
   }
 
+  Test( 'Tests-Run' )
+  {
+    .TestExecutable = 'Tests'
+    .TestOutput = 'CON'
+    .TestWorkingDir = '$RepoRoot$'
+  }
+
   Alias( 'Tests-x64-Debug' )   { .Targets = 'Tests' }
   Alias( 'Tests-x64-Release' ) { .Targets = 'Tests' }
 }
