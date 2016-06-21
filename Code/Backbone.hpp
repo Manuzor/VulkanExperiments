@@ -134,6 +134,10 @@ MemAddOffset(t_pointer_type* Pointer, OffsetType Offset)
   return MemAddByteOffset(Pointer, Offset * non_void<t_pointer_type>::Size);
 }
 
+template<typename T>
+constexpr bool
+IsPOD() { return std::is_pod<T>::value; }
+
 template<typename t_type>
 struct impl_rm_ref
 {
@@ -334,9 +338,160 @@ struct _defer_impl
 #define Defer(CaptureSpec, ...) auto PRE_Concat2(_DeferFunc, __LINE__) = [CaptureSpec](){ __VA_ARGS__; }; \
 _defer_impl<decltype(PRE_Concat2(_DeferFunc, __LINE__))> PRE_Concat2(_Defer, __LINE__){ PRE_Concat2(_DeferFunc, __LINE__) }
 
+// ===================================
+// === Source: Backbone/Memory.hpp ===
+// ===================================
+
+//
+// Untyped / Raw Memory Functions
+//
+
+void
+MemCopyBytes(void* Destination, void const* Source, size_t NumBytes);
+
+void
+MemSetBytes(void* Destination, int Value, size_t NumBytes);
+
+bool
+MemEqualBytes(void const* A, void const* B, size_t NumBytes);
+
+int
+MemCompareBytes(void const* A, void const* B, size_t NumBytes);
+
+//
+// Typed Copy
+//
+
+template<typename T, bool IsPlainOldData = false>
+struct impl_mem_copy
+{
+  static void Do(T* Destination, T const* Source, size_t Num)
+  {
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      Destination[Index] = Source[Index];
+    }
+  }
+};
+
+template<typename T>
+struct impl_mem_copy<T, false>
+{
+  static constexpr void Do(T* Destination, T const* Source, size_t Num)
+  {
+    MemCopyBytes(Reinterpret<void*>(Destination), Reinterpret<void const*>(Source), Num * sizeof(T));
+  }
+};
+
+template<typename T>
+constexpr void
+MemCopy(T* Destination, T const* Source, size_t Num)
+{
+  impl_mem_copy<T, IsPOD<T>()>::Do(Destination, Source, Num);
+}
+
+//
+// Typed Move
+//
+
+template<typename T, bool IsPlainOldData = false>
+struct impl_mem_move
+{
+  static void Do(T* Destination, T const* Source, size_t Num)
+  {
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      Destination[Index] = Source[Index];
+    }
+  }
+};
+
+template<typename T>
+struct impl_mem_move<T, false>
+{
+  static constexpr void Do(T* Destination, T const* Source, size_t Num)
+  {
+    MemCopyBytes(Reinterpret<void*>(Destination), Reinterpret<void const*>(Source), Num * sizeof(T));
+  }
+};
+
+template<typename T>
+constexpr void
+MemMove(T* Destination, T const* Source, size_t Num)
+{
+  impl_mem_move<T, IsPOD<T>()>::Do(Destination, Source, Num);
+}
+
+
+//
+// Default Construction
+//
+
+template<typename T, bool IsPOD = false>
+struct impl_mem_default_construct
+{
+  static void Do(T* Elements, size_t Num)
+  {
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      new (Elements + Index) T;
+    }
+  }
+};
+
+template<typename T>
+struct impl_mem_default_construct<T, true>
+{
+  static void Do(T* Elements, size_t Num)
+  {
+    MemSetBytes(Elements, 0, Num * sizeof(T));
+  }
+};
+
+template<typename T>
+constexpr void
+MemDefaultConstruct(T* Elements, size_t Num)
+{
+  impl_mem_default_construct<T, IsPOD<T>()>::Do(Elements, Num);
+}
+
+//
+// Typed Destruction
+//
+
+template<typename T, bool IsPOD = false>
+struct impl_mem_destruct
+{
+  static void Do(T* Elements, size_t Num)
+  {
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      Elements[Index].~T();
+    }
+  }
+};
+
+template<typename T>
+struct impl_mem_destruct<T, true>
+{
+  static void Do(T* Elements, size_t Num)
+  {
+    // Nothing to do for PODs
+  }
+};
+
+template<typename T>
+constexpr void
+MemDestruct(T* Elements, size_t Num)
+{
+  impl_mem_destruct<T, IsPOD<T>()>::Do(Elements, Num);
+}
+
 // ==================================
 // === Source: Backbone/Slice.hpp ===
 // ==================================
+
+constexpr size_t INVALID_INDEX = (size_t)-1;
 
 template<typename ElementType>
 struct slice
@@ -614,16 +769,18 @@ SliceMove(slice<T> Target, slice<T const> Source)
 }
 
 template<typename T>
+void
+SliceDefaultConstruct(slice<T> Target)
+{
+  MemDefaultConstruct(Target.Ptr, Target.Num);
+}
+
+template<typename T>
 size_t
 SliceCopyConstruct(slice<T> Target, slice<T const> Source)
 {
-  // TODO Optimize for PODs
-
   size_t Amount = Min(Target.Num, Source.Num);
-  for(size_t Index = 0; Index < Amount; ++Index)
-  {
-    new (&Target.Ptr[Index]) T(Source.Ptr[Index]);
-  }
+  MemCopy(Target.Ptr, SourcePtr Amount);
   return Amount;
 }
 
@@ -631,13 +788,8 @@ template<typename T>
 size_t
 SliceMoveConstruct(slice<T> Target, slice<T const> Source)
 {
-  // TODO Optimize for PODs
-
   size_t Amount = Min(Target.Num, Source.Num);
-  for(size_t Index = 0; Index < Amount; ++Index)
-  {
-    new (&Target.Ptr[Index]) T(Move(Source.Ptr[Index]));
-  }
+  MemMove(Target.Ptr, SourcePtr Amount);
   return Amount;
 }
 
@@ -645,12 +797,23 @@ template<typename T>
 void
 SliceDestruct(slice<T> Target)
 {
-  // TODO Optimize for PODs
+  MemDestruct(Target.Ptr, Target.Num);
+}
 
-  for(auto& Element : Target)
+template<typename T>
+size_t
+SliceCountUntil(slice<T> Haystack, const T& Needle)
+{
+  size_t Index = 0;
+
+  for(auto& Straw : Haystack)
   {
-    Element.~T();
+    if(Straw == Needle)
+      return Index;
+    ++Index;
   }
+
+  return INVALID_INDEX;
 }
 
 

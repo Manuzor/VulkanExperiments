@@ -2,6 +2,9 @@
 
 #include "Allocator.hpp"
 
+#include <Backbone.hpp>
+
+
 constexpr size_t DynamicArrayMinimumCapacity = 16;
 
 template<typename T>
@@ -108,9 +111,11 @@ ExpandBy(dynamic_array<T>* Array, size_t Amount)
 {
   Reserve(Array, Array->Num + Amount);
   const auto BeginIndex = Array->Num;
-  ++Array->Num;
+  Array->Num += Amount;
   const auto EndIndex = Array->Num;
-  return Slice(AllocatedMemory(Array), BeginIndex, EndIndex);
+  auto Result = Slice(AllocatedMemory(Array), BeginIndex, EndIndex);
+  SliceDefaultConstruct(Result);
+  return Result;
 }
 
 template<typename T>
@@ -125,16 +130,9 @@ void
 ShrinkBy(dynamic_array<T>* Array, size_t Amount)
 {
   Assert(Array->Num >= Amount);
-  Array->Num -= Amount;
-}
-
-template<typename T>
-void
-ShrinkByAndDestruct(dynamic_array<T>* Array, size_t Amount)
-{
   auto ToDestruct = Slice(Slice(Array), Array->Num - Amount, Array->Num);
-  ShrinkBy(Amount);
   SliceDestruct(ToDestruct);
+  Array->Num -= Amount;
 }
 
 template<typename T>
@@ -146,7 +144,30 @@ Clear(dynamic_array<T>* Array)
 
 template<typename T>
 void
-ClearAndDestruct(dynamic_array<T>* Array)
+RemoveAt(dynamic_array<T>* Array, size_t Index, size_t CountToRemove = 1)
 {
-  ShrinkByAndDestruct(Array, Array->Num);
+  BoundsCheck(CountToRemove >= 0);
+  BoundsCheck(Index >= 0);
+  BoundsCheck(Index + CountToRemove <= Array->Num);
+
+  const size_t EndIndex = Index + CountToRemove;
+  auto Hole = Slice(Slice(Array), Index, EndIndex);
+  SliceDestruct(Hole);
+
+  auto From = Slice(Slice(Array), EndIndex, Array->Num);
+  auto To   = Slice(Slice(Array), Index, Array->Num - CountToRemove);
+  SliceMove(To, SliceAsConst(From));
+  Array->Num -= CountToRemove;
+}
+
+template<typename T>
+bool
+RemoveFirst(dynamic_array<T>* Array, const T& Needle)
+{
+  auto Index = SliceCountUntil(Slice(Array), Needle);
+  if(Index == INVALID_INDEX)
+    return false;
+
+  RemoveAt(Array, Index);
+  return true;
 }

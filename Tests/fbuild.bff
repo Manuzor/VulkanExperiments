@@ -32,8 +32,9 @@
   Test( 'Tests-Run' )
   {
     .TestExecutable = 'Tests'
-    .TestOutput = 'CON'
+    .TestOutput = '$BuildPath$/TestsOutput.txt'
     .TestWorkingDir = '$RepoRoot$'
+    .TestArguments = '--break'
   }
 
   Alias( 'Tests-x64-Debug' )   { .Targets = 'Tests' }

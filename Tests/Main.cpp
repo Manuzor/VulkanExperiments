@@ -3,5 +3,6 @@
 #include "catch.hpp"
 
 // TODO Make a Core.lib that can be linked against instead of this:
+#include <Backbone.cpp>
 #include <VulkanExperiments/Allocator.cpp>
 #include <VulkanExperiments/Log.cpp>
