@@ -29,7 +29,7 @@ Init(dictionary<K, V>* Dict, allocator_interface* Allocator)
 }
 
 template<typename K, typename V>
-slice<V>
+void
 Clear(dictionary<K, V>* Dict)
 {
   if(Dict->Num)
@@ -85,42 +85,72 @@ Keys(dictionary<K, V>* Dict)
 }
 
 template<typename K, typename V>
+slice<K const>
+Keys(dictionary<K, V> const* Dict)
+{
+  return Slice(Dict->Num, AsPtrToConst(Dict->KeysPtr));
+}
+
+template<typename K, typename V>
 slice<V>
 Values(dictionary<K, V>* Dict)
 {
   return Slice(Dict->Num, Dict->ValuesPtr);
 }
 
+template<typename K, typename V>
+slice<V const>
+Values(dictionary<K, V> const* Dict)
+{
+  return Slice(Dict->Num, AsPtrToConst(Dict->ValuesPtr));
+}
+
 template<typename K, typename V, typename IndexType>
 V*
 Get(dictionary<K, V>* Dict, IndexType KeyIndex)
 {
+  auto ArrayIndex = SliceCountUntil(AsConst(Keys(Dict)), KeyIndex);
+  if(ArrayIndex == INVALID_INDEX)
+    return nullptr;
+  return &Values(Dict)[ArrayIndex];
+}
+
+template<typename K, typename V, typename IndexType>
+V const*
+Get(dictionary<K, V> const* Dict, IndexType KeyIndex)
+{
   auto ArrayIndex = SliceCountUntil(Keys(Dict), KeyIndex);
   if(ArrayIndex == INVALID_INDEX)
     return nullptr;
-  return Values(Dict)[ArrayIndex];
+  return &Values(Dict)[ArrayIndex];
 }
 
 template<typename K, typename V, typename IndexType>
 V*
 GetOrCreate(dictionary<K, V>* Dict, IndexType KeyIndex)
 {
-  auto ArrayIndex = SliceCountUntil(Keys(Dict), KeyIndex);
+  auto ArrayIndex = SliceCountUntil(AsConst(Keys(Dict)), KeyIndex);
   if(ArrayIndex >= 0)
-    return Values(Dict)[ArrayIndex];
+    return &Values(Dict)[ArrayIndex];
 
   Reserve(Dict, Dict->Capacity + 1);
 
-  ArrayIndex = Dict->Num;
-  MemConstruct(Dict->KeysPtr + ArrayIndex, )
-  ++Dict->Num;
+  ArrayIndex = Dict->Num++;
+
+  auto NewKeyPtr = Dict->KeysPtr + ArrayIndex;
+  MemConstruct(1, NewKeyPtr, KeyIndex);
+
+  auto NewValuePtr = Dict->ValuesPtr + ArrayIndex;
+  MemDefaultConstruct(1, NewValuePtr);
+
+  return NewValuePtr;
 }
 
 template<typename K, typename V, typename IndexType>
 bool
 Remove(dictionary<K, V>* Dict, IndexType KeyIndex)
 {
-  auto ArrayIndex = SliceCountUntil(Keys(Dict), KeyIndex);
+  auto ArrayIndex = SliceCountUntil(AsConst(Keys(Dict)), KeyIndex);
   if(ArrayIndex == INVALID_INDEX)
     return false;
 

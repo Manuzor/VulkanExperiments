@@ -35,9 +35,19 @@
 #endif
 
 #if defined(BB_Enable_BoundsCheck)
-  #define BoundsCheck(Expression) Assert(Expression)
+  #define BoundsCheck(...) Assert(__VA_ARGS__)
 #else
-  #define BoundsCheck(Expression) NoOp
+  #define BoundsCheck(...) NoOp
+#endif
+
+#ifdef DEBUG
+  #define BB_Debugging 1
+#endif
+
+#if BB_Debugging
+  #define DebugCode(...) __VA_ARGS__
+#else
+  #define DebugCode(...) /* Empty */
 #endif
 
 //
@@ -77,11 +87,13 @@ constexpr uint64 TB(uint64 Amount) { return GB(Amount) * (uint64)1000; }
 // ================
 //
 
-constexpr double Pi64 = 3.14159265359;
-constexpr double E64 = 2.71828182845;
+template<typename T = float>
+constexpr T
+Pi() { return (T)3.14159265359; }
 
-constexpr float Pi32 = (float)Pi64;
-constexpr float E32  = (float)E64;
+template<typename T = float>
+constexpr T
+E() { return (T)2.71828182845; }
 
 //
 // ================
@@ -137,6 +149,30 @@ MemAddOffset(t_pointer_type* Pointer, OffsetType Offset)
 template<typename T>
 constexpr bool
 IsPOD() { return std::is_pod<T>::value; }
+
+template<typename T>
+constexpr size_t
+NumBits() { return sizeof(T) * 8; }
+
+template<typename T>
+constexpr bool
+IntIsSigned() { return ((T)-1) < 0; }
+
+template<typename T>
+constexpr T
+IntMaxValue()
+{
+  return IntIsSigned<T>() ? (T(1) << (NumBits<T>() - 1)) - T(1)
+                          : T(0);
+}
+
+template<typename T>
+constexpr T
+IntMinValue()
+{
+  return IntIsSigned<T>() ? -(T(1) << (NumBits<T>() - 1))
+                          : (T(1) << NumBits<T>());
+}
 
 template<typename t_type>
 struct impl_rm_ref
@@ -283,6 +319,16 @@ Wrap(t_value_type Value, t_lower_bound_type LowerBound, t_upper_bound_type Upper
   //                              Value;
 }
 
+double
+Pow(double Base, double Exponent);
+
+float
+Pow(float Base, float Exponent);
+
+template<typename ReturnType = double, typename BaseType, typename ExponentType>
+constexpr ReturnType
+Pow(BaseType Base, ExponentType Exponent) { return (ReturnType)Pow((double)Base, (double)Exponent); }
+
 // Project a value from [LowerBound, UpperBound] to [0, 1]
 // Example:
 //   auto Result = NormalizeValue<float>(15, 10, 30); // == 0.25f
@@ -295,10 +341,10 @@ NormalizeValue(t_value_type Value, t_lower_bound_type LowerBound, t_upper_bound_
          Cast<t_result>(Value - LowerBound) / Cast<t_result>(UpperBound - LowerBound);
 }
 
-BB_Inline bool
+bool
 AreNearlyEqual(double A, double B, double Epsilon);
 
-BB_Inline bool
+bool
 AreNearlyEqual(float A, float B, float Epsilon);
 
 template<typename t_a, typename t_b>
@@ -452,7 +498,7 @@ struct impl_mem_set<T, false>
 
 template<typename T>
 void
-MemSet(T* Destination, T Value, size_t Num)
+MemSet(size_t Num, T* Destination, T Value)
 {
   impl_mem_set<T, IsPOD<T>()>::Do(Num, Destination, Move(Value));
 }
@@ -663,7 +709,7 @@ SliceReinterpret(slice<SourceType> SomeSlice)
 
 template<typename SourceType>
 slice<SourceType const>
-SliceAsConst(slice<SourceType> SomeSlice)
+AsConst(slice<SourceType> SomeSlice)
 {
   return Slice(AsPtrToConst(First(SomeSlice)),
                AsPtrToConst(OnePastLast(SomeSlice)));
@@ -741,17 +787,25 @@ template<typename ElementType>
 slice<ElementType>
 Slice(ElementType* FirstPtr, ElementType* OnePastLastPtr)
 {
-  auto OnePastLastInt = Reinterpret<size_t>(OnePastLastPtr);
-  auto FirstInt = Reinterpret<size_t>(FirstPtr);
+  auto OnePastLastPtr_ = NonVoidPtr(OnePastLastPtr);
+  auto FirstPtr_       = NonVoidPtr(FirstPtr);
+
+  DebugCode(
+  {
+    auto A = Reinterpret<size_t>(FirstPtr);
+    auto B = Reinterpret<size_t>(OnePastLastPtr);
+    auto Delta = Max(A, B) - Min(A, B);
+    Assert(Delta % sizeof(ElementType) == 0);
+  });
 
   slice<ElementType> Result;
-  Result.Num = OnePastLastInt < FirstInt ? 0 : FirstInt - OnePastLastInt;
+  Result.Num = OnePastLastPtr_ <= FirstPtr_ ? 0 : OnePastLastPtr_ - FirstPtr_;
   Result.Ptr = FirstPtr;
   return Result;
 }
 
 template<typename ElementType, size_t N>
-slice<ElementType>
+constexpr slice<ElementType>
 Slice(ElementType (&Array)[N])
 {
   return { N, &Array[0] };
@@ -759,35 +813,19 @@ Slice(ElementType (&Array)[N])
 
 /// Create a char slice from a static char array, excluding '\0'.
 template<size_t N>
-slice<char const>
+constexpr slice<char const>
 SliceFromString(char const(&StringLiteral)[N])
 {
   return { N - 1, &StringLiteral[0] };
 }
 
 /// \param StringPtr Must be null-terminated.
-inline
 slice<char const>
-SliceFromString(char const* StringPtr)
-{
-  auto Seek = StringPtr;
-  size_t Count = 0;
-  while(*Seek++) ++Count;
-  return { Count, StringPtr };
-}
+SliceFromString(char const* StringPtr);
 
 /// \param StringPtr Must be null-terminated.
-inline
 slice<char>
-SliceFromString(char* StringPtr)
-{
-  auto Constified = Coerce<char const*>(StringPtr);
-  auto ConstResult = SliceFromString(Constified);
-  slice<char> Result;
-  Result.Num = ConstResult.Num;
-  Result.Ptr = Coerce<char*>(ConstResult.Ptr);
-  return Result;
-}
+SliceFromString(char* StringPtr);
 
 /// Creates a new slice from an existing slice.
 ///
@@ -870,7 +908,7 @@ SliceDestruct(slice<T> Target)
 
 template<typename T>
 size_t
-SliceCountUntil(slice<T> Haystack, const T& Needle)
+SliceCountUntil(slice<T const> Haystack, const T& Needle)
 {
   size_t Index = 0;
 
@@ -972,13 +1010,13 @@ inline void operator /=(degrees& A, float Scale) { A.Value /= Scale; }
 constexpr inline degrees
 ToDegrees(radians Radians)
 {
-  return { Radians.Value * (180.0f / Pi32) };
+  return { Radians.Value * (180.0f / Pi()) };
 }
 
 constexpr inline radians
 ToRadians(degrees Degrees)
 {
-  return { Degrees.Value * (Pi32 / 180.0f) };
+  return { Degrees.Value * (Pi() / 180.0f) };
 }
 
 //
@@ -1126,24 +1164,6 @@ Slice(fixed_block<N, t_element>& Block, t_start_index InclusiveStartIndex, t_end
 // === Inline Files ===
 // ====================
 
-// ===================================
-// === Source: Backbone/Common.inl ===
-// ===================================
-
-auto
-::AreNearlyEqual(double A, double B, double Epsilon)
-  -> bool
-{
-  return Abs(A - B) <= Epsilon;
-}
-
-auto
-::AreNearlyEqual(float A, float B, float Epsilon)
-  -> bool
-{
-  return Abs(A - B) <= Epsilon;
-}
-
 // ==================================
 // === Source: Backbone/Angle.inl ===
 // ==================================
@@ -1152,14 +1172,14 @@ auto
 ::IsNormalized(radians Radians)
   -> bool
 {
-  return Radians.Value >= 0.0f && Radians.Value < 2.0f * Pi32;
+  return Radians.Value >= 0.0f && Radians.Value < 2.0f * Pi();
 }
 
 auto
 ::Normalized(radians Radians)
   -> radians
 {
-  return { Wrap(Radians.Value, 0.0f, 2.0f * Pi32) };
+  return { Wrap(Radians.Value, 0.0f, 2.0f * Pi()) };
 }
 
 auto
@@ -1168,7 +1188,7 @@ auto
 {
   // Taken from ezEngine who got it from here:
   // http://gamedev.stackexchange.com/questions/4467/comparing-angles-and-working-out-the-difference
-  return { Pi32 - Abs(Abs(A.Value - B.Value) - Pi32) };
+  return { Pi() - Abs(Abs(A.Value - B.Value) - Pi()) };
 }
 
 auto
@@ -1246,7 +1266,7 @@ auto
                                   path_options Options)
   -> size_t
 {
-  return ExtractPathDirectoryAndFileName(SliceAsConst(Path),
+  return ExtractPathDirectoryAndFileName(AsConst(Path),
                                          Coerce<slice<char const>*>(Out_Directory), Coerce<slice<char const>*>(Out_Name),
                                          Options);
 }

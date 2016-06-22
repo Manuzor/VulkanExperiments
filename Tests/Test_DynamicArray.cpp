@@ -81,7 +81,7 @@ TEST_CASE("Dynamic Array Expand", "[dynamic_array]")
     REQUIRE( Arr[2] == 0 );
 
     int Ints[] = { 0, 1, 2, 3, 4, 5 };
-    SliceCopy(ExpandBy(&Arr, 6), SliceAsConst(Slice(Ints)));
+    SliceCopy(ExpandBy(&Arr, 6), AsConst(Slice(Ints)));
     REQUIRE( Arr.Num == 9 );
     REQUIRE( Arr[0] == 42 );
     REQUIRE( Arr[1] == 0 );
@@ -105,7 +105,7 @@ TEST_CASE("Dynamic Array Remove", "[dynamic_array]")
   Defer(&, Finalize(&Arr));
 
   int Ints[] = { 0, 1, 2, 3 };
-  SliceCopy(ExpandBy(&Arr, 4), SliceAsConst(Slice(Ints)));
+  SliceCopy(ExpandBy(&Arr, 4), AsConst(Slice(Ints)));
   REQUIRE( Arr.Num == 4 );
 
   SECTION("RemoveAt")

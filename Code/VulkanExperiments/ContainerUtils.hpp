@@ -25,7 +25,7 @@ ContainerReserve(allocator_interface* Allocator,
   Assert(NewAllocatedMemory.Num == BytesToReserve);
 
   // Move from the old memory.
-  SliceMove(NewUsedMemory, SliceAsConst(OldUsedMemory));
+  SliceMove(NewUsedMemory, AsConst(OldUsedMemory));
 
   // Destruct and free the old memory.
   SliceDestruct(OldUsedMemory);
@@ -49,7 +49,7 @@ ContainerRemoveAt(slice<T> Data, size_t Index, size_t CountToRemove = 1)
 
   auto From = Slice(Data, EndIndex, Data.Num);
   auto To   = Slice(Data, Index, Data.Num - CountToRemove);
-  SliceMove(To, SliceAsConst(From));
+  SliceMove(To, AsConst(From));
   Data.Num -= CountToRemove;
 
   return Data;

@@ -27,7 +27,7 @@ struct event
 
   dynamic_array<ListenerType> Listeners;
 
-  void operator()(ArgTypes&&... Args)
+  void operator()(ArgTypes... Args)
   {
     for(auto& Listener : Slice(&Listeners))
     {
@@ -58,7 +58,7 @@ void AddListener(event<ArgTypes...>* Event, typename event<ArgTypes...>::Listene
 template<typename... ArgTypes>
 bool RemoveListener(event<ArgTypes...>* Event, typename event<ArgTypes...>::ListenerType Listener)
 {
-  size_t ListenerIndex = SliceCountUntil(Slice(&Event->Listeners), Listener);
+  size_t ListenerIndex = SliceCountUntil(AsConst(Slice(&Event->Listeners)), Listener);
   if(ListenerIndex < 0)
     return false;
   RemoveAt(&Event->Listeners, ListenerIndex);

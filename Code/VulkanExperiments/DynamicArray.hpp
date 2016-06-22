@@ -152,7 +152,7 @@ template<typename T>
 bool
 RemoveFirst(dynamic_array<T>* Array, const T& Needle)
 {
-  auto Index = SliceCountUntil(Slice(Array), Needle);
+  auto Index = SliceCountUntil(AsConst(Slice(Array)), Needle);
   if(Index == INVALID_INDEX)
     return false;
 
