@@ -13,7 +13,7 @@
 
 
 auto
-::MemCopyBytes(void* Destination, void const* Source, size_t NumBytes)
+::MemCopyBytes(size_t NumBytes, void* Destination, void const* Source)
   -> void
 {
   // Using memmove so that Destination and Source may overlap.
@@ -21,21 +21,21 @@ auto
 }
 
 auto
-MemSetBytes(void* Destination, int Value, size_t NumBytes)
+::MemSetBytes(size_t NumBytes, void* Destination, int Value)
   -> void
 {
   std::memset(Destination, Value, NumBytes);
 }
 
 auto
-MemEqualBytes(void const* A, void const* B, size_t NumBytes)
+::MemEqualBytes(size_t NumBytes, void const* A, void const* B)
   -> bool
 {
-  return MemCompareBytes(A, B, NumBytes) == 0;
+  return MemCompareBytes(NumBytes, A, B) == 0;
 }
 
 auto
-MemCompareBytes(void const* A, void const* B, size_t NumBytes)
+::MemCompareBytes(size_t NumBytes, void const* A, void const* B)
   -> int
 {
   return std::memcmp(A, B, NumBytes);

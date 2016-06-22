@@ -347,16 +347,16 @@ _defer_impl<decltype(PRE_Concat2(_DeferFunc, __LINE__))> PRE_Concat2(_Defer, __L
 //
 
 void
-MemCopyBytes(void* Destination, void const* Source, size_t NumBytes);
+MemCopyBytes(size_t NumBytes, void* Destination, void const* Source);
 
 void
-MemSetBytes(void* Destination, int Value, size_t NumBytes);
+MemSetBytes(size_t NumBytes, void* Destination, int Value);
 
 bool
-MemEqualBytes(void const* A, void const* B, size_t NumBytes);
+MemEqualBytes(size_t NumBytes, void const* A, void const* B);
 
 int
-MemCompareBytes(void const* A, void const* B, size_t NumBytes);
+MemCompareBytes(size_t NumBytes, void const* A, void const* B);
 
 //
 // Typed Copy
@@ -365,7 +365,7 @@ MemCompareBytes(void const* A, void const* B, size_t NumBytes);
 template<typename T, bool IsPlainOldData = false>
 struct impl_mem_copy
 {
-  static void Do(T* Destination, T const* Source, size_t Num)
+  static void Do(size_t Num, T* Destination, T const* Source)
   {
     for(size_t Index = 0; Index < Num; ++Index)
     {
@@ -379,15 +379,15 @@ struct impl_mem_copy<T, false>
 {
   static constexpr void Do(T* Destination, T const* Source, size_t Num)
   {
-    MemCopyBytes(Reinterpret<void*>(Destination), Reinterpret<void const*>(Source), Num * sizeof(T));
+    MemCopyBytes(Num * sizeof(T), Reinterpret<void*>(Destination), Reinterpret<void const*>(Source));
   }
 };
 
 template<typename T>
 constexpr void
-MemCopy(T* Destination, T const* Source, size_t Num)
+MemCopy(size_t Num, T* Destination, T const* Source)
 {
-  impl_mem_copy<T, IsPOD<T>()>::Do(Destination, Source, Num);
+  impl_mem_copy<T, IsPOD<T>()>::Do(Num, Destination, Source);
 }
 
 //
@@ -397,7 +397,7 @@ MemCopy(T* Destination, T const* Source, size_t Num)
 template<typename T, bool IsPlainOldData = false>
 struct impl_mem_move
 {
-  static void Do(T* Destination, T const* Source, size_t Num)
+  static void Do(size_t Num, T* Destination, T const* Source)
   {
     for(size_t Index = 0; Index < Num; ++Index)
     {
@@ -409,28 +409,63 @@ struct impl_mem_move
 template<typename T>
 struct impl_mem_move<T, false>
 {
-  static constexpr void Do(T* Destination, T const* Source, size_t Num)
+  static constexpr void Do(size_t Num, T* Destination, T const* Source)
   {
-    MemCopyBytes(Reinterpret<void*>(Destination), Reinterpret<void const*>(Source), Num * sizeof(T));
+    MemCopyBytes(Num * sizeof(T), Reinterpret<void*>(Destination), Reinterpret<void const*>(Source));
   }
 };
 
 template<typename T>
 constexpr void
-MemMove(T* Destination, T const* Source, size_t Num)
+MemMove(size_t Num, T* Destination, T const* Source)
 {
-  impl_mem_move<T, IsPOD<T>()>::Do(Destination, Source, Num);
+  impl_mem_move<T, IsPOD<T>()>::Do(Num, Destination, Source);
+}
+
+//
+// Typed Set
+//
+
+template<typename T, bool IsPlainOldData = false>
+struct impl_mem_set
+{
+  static void Do(size_t Num, T* Destination, T Value)
+  {
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      Destination[Index] = Value;
+    }
+  }
+};
+
+template<typename T>
+struct impl_mem_set<T, false>
+{
+  static constexpr void Do(size_t Num, T* Destination, T Value)
+  {
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      MemCopyBytes(Destination + Index, &Value, sizeof(T));
+    }
+  }
+};
+
+template<typename T>
+void
+MemSet(T* Destination, T Value, size_t Num)
+{
+  impl_mem_set<T, IsPOD<T>()>::Do(Num, Destination, Move(Value));
 }
 
 
 //
-// Default Construction
+// Typed Default Construction
 //
 
 template<typename T, bool IsPOD = false>
 struct impl_mem_default_construct
 {
-  static void Do(T* Elements, size_t Num)
+  static void Do(size_t Num, T* Elements)
   {
     for(size_t Index = 0; Index < Num; ++Index)
     {
@@ -442,17 +477,50 @@ struct impl_mem_default_construct
 template<typename T>
 struct impl_mem_default_construct<T, true>
 {
-  static void Do(T* Elements, size_t Num)
+  static void Do(size_t Num, T* Elements)
   {
-    MemSetBytes(Elements, 0, Num * sizeof(T));
+    MemSetBytes(Num * sizeof(T), Elements, 0);
   }
 };
 
 template<typename T>
 constexpr void
-MemDefaultConstruct(T* Elements, size_t Num)
+MemDefaultConstruct(size_t Num, T* Elements)
 {
-  impl_mem_default_construct<T, IsPOD<T>()>::Do(Elements, Num);
+  impl_mem_default_construct<T, IsPOD<T>()>::Do(Num, Elements);
+}
+
+//
+// Typed Construction With Arguments
+//
+
+template<typename T, bool IsPOD = false>
+struct impl_mem_construct
+{
+  template<typename... ArgTypes>
+  static void Do(T* Ptr, size_t Num, ArgTypes&&... Args)
+  {
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      new (Ptr + Index) T(Forward<ArgTypes>(Args)...);
+    }
+  }
+};
+
+template<typename T>
+struct impl_mem_construct<T, true>
+{
+  static void Do(size_t Num, T* Ptr, T Value)
+  {
+    MemSet(Num, Ptr, Move(Value));
+  }
+};
+
+template<typename T, typename... ArgTypes>
+constexpr void
+MemConstruct(size_t Num, T* Elements, ArgTypes&&... Args)
+{
+  impl_mem_construct<T, IsPOD<T>()>::Do(Num, Elements, Forward<ArgTypes>(Args)...);
 }
 
 //
@@ -462,7 +530,7 @@ MemDefaultConstruct(T* Elements, size_t Num)
 template<typename T, bool IsPOD = false>
 struct impl_mem_destruct
 {
-  static void Do(T* Elements, size_t Num)
+  static void Do(size_t Num, T* Elements)
   {
     for(size_t Index = 0; Index < Num; ++Index)
     {
@@ -474,7 +542,7 @@ struct impl_mem_destruct
 template<typename T>
 struct impl_mem_destruct<T, true>
 {
-  static void Do(T* Elements, size_t Num)
+  static void Do(size_t Num, T* Elements)
   {
     // Nothing to do for PODs
   }
@@ -482,9 +550,9 @@ struct impl_mem_destruct<T, true>
 
 template<typename T>
 constexpr void
-MemDestruct(T* Elements, size_t Num)
+MemDestruct(size_t Num, T* Elements)
 {
-  impl_mem_destruct<T, IsPOD<T>()>::Do(Elements, Num);
+  impl_mem_destruct<T, IsPOD<T>()>::Do(Num, Elements);
 }
 
 // ==================================
@@ -772,7 +840,7 @@ template<typename T>
 void
 SliceDefaultConstruct(slice<T> Target)
 {
-  MemDefaultConstruct(Target.Ptr, Target.Num);
+  MemDefaultConstruct(Target.Num, Target.Ptr);
 }
 
 template<typename T>
@@ -780,7 +848,7 @@ size_t
 SliceCopyConstruct(slice<T> Target, slice<T const> Source)
 {
   size_t Amount = Min(Target.Num, Source.Num);
-  MemCopy(Target.Ptr, SourcePtr Amount);
+  MemCopy(Amount, Target.Ptr, SourcePtr);
   return Amount;
 }
 
@@ -789,7 +857,7 @@ size_t
 SliceMoveConstruct(slice<T> Target, slice<T const> Source)
 {
   size_t Amount = Min(Target.Num, Source.Num);
-  MemMove(Target.Ptr, SourcePtr Amount);
+  MemMove(Amount, Target.Ptr, SourcePtr);
   return Amount;
 }
 
@@ -797,7 +865,7 @@ template<typename T>
 void
 SliceDestruct(slice<T> Target)
 {
-  MemDestruct(Target.Ptr, Target.Num);
+  MemDestruct(Target.Num, Target.Ptr);
 }
 
 template<typename T>

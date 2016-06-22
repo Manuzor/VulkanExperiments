@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Allocator.hpp"
+#include "ContainerUtils.hpp"
 
 #include <Backbone.hpp>
 
@@ -73,32 +74,35 @@ Init(dynamic_array<T>* Array, allocator_interface* Allocator)
 
 template<typename T>
 void
+Clear(dynamic_array<T>* Array)
+{
+  if(Array->Num)
+  {
+    ShrinkBy(Array, Array->Num);
+  }
+}
+
+template<typename T>
+void
 Finalize(dynamic_array<T>* Array)
 {
-  SliceDeallocate(Array->Allocator, AllocatedMemory(Array));
+  Clear(Array);
+  if(Array->Capacity)
+  {
+    Array->Allocator->Deallocate(Array->Ptr);
+    Array->Capacity = 0;
+  }
 }
 
 template<typename T>
 void
 Reserve(dynamic_array<T>* Array, size_t MinBytesToReserve)
 {
-  auto BytesToReserve = Max(MinBytesToReserve, DynamicArrayMinimumCapacity);
-  if(Array->Capacity >= BytesToReserve)
-    return;
-
-  auto OldAllocatedMemory = AllocatedMemory(Array);
-  auto OldUsedMemory = Slice(Array);
-  auto NewAllocatedMemory = SliceAllocate<T>(Array->Allocator, BytesToReserve);
-  auto NewUsedMemory = Slice(NewAllocatedMemory, 0, Array->Num);
-
-  Assert(NewAllocatedMemory.Num == BytesToReserve);
-
-  // Move from the old memory.
-  SliceMove(NewUsedMemory, SliceAsConst(OldUsedMemory));
-
-  // Destruct and free the old memory.
-  SliceDestruct(OldUsedMemory);
-  SliceDeallocate(Array->Allocator, OldAllocatedMemory);
+  auto NewAllocatedMemory = ContainerReserve(Array->Allocator,
+                                             Array->Ptr, Array->Num,
+                                             Array->Capacity,
+                                             MinBytesToReserve,
+                                             DynamicArrayMinimumCapacity);
 
   // Update array members.
   Array->Ptr = NewAllocatedMemory.Ptr;
@@ -137,27 +141,11 @@ ShrinkBy(dynamic_array<T>* Array, size_t Amount)
 
 template<typename T>
 void
-Clear(dynamic_array<T>* Array)
-{
-  ShrinkBy(Array, Array->Num);
-}
-
-template<typename T>
-void
 RemoveAt(dynamic_array<T>* Array, size_t Index, size_t CountToRemove = 1)
 {
-  BoundsCheck(CountToRemove >= 0);
-  BoundsCheck(Index >= 0);
-  BoundsCheck(Index + CountToRemove <= Array->Num);
-
-  const size_t EndIndex = Index + CountToRemove;
-  auto Hole = Slice(Slice(Array), Index, EndIndex);
-  SliceDestruct(Hole);
-
-  auto From = Slice(Slice(Array), EndIndex, Array->Num);
-  auto To   = Slice(Slice(Array), Index, Array->Num - CountToRemove);
-  SliceMove(To, SliceAsConst(From));
-  Array->Num -= CountToRemove;
+  auto NewData = ContainerRemoveAt(Slice(Array), Index, CountToRemove);
+  Assert(NewData.Num == Array->Num - CountToRemove);
+  Array->Num = NewData.Num;
 }
 
 template<typename T>

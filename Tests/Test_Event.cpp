@@ -9,7 +9,7 @@ TEST_CASE("Event", "[Event]")
   test_allocator _Allocator;
   allocator_interface* Allocator = &_Allocator;
 
-  Event<int> IntEvent;
+  event<int> IntEvent;
   Init(&IntEvent, Allocator);
   Defer(&, Finalize(&IntEvent));
 

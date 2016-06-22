@@ -6,24 +6,24 @@
 
 // TODO Replace with a custom implementation?
 template<typename TypeSpec>
-using Delegate = std::function<TypeSpec>;
+using delegate = std::function<TypeSpec>;
 
 template<typename TypeSpec>
-constexpr bool operator==(const Delegate<TypeSpec>& A, const Delegate<TypeSpec>& B)
+constexpr bool operator==(const delegate<TypeSpec>& A, const delegate<TypeSpec>& B)
 {
-  return MemEqualBytes(&A, &B, sizeof(Delegate<TypeSpec>));
+  return MemEqualBytes(sizeof(delegate<TypeSpec>), &A, &B);
 }
 
 template<typename TypeSpec>
-constexpr bool operator!=(const Delegate<TypeSpec>& A, const Delegate<TypeSpec>& B)
+constexpr bool operator!=(const delegate<TypeSpec>& A, const delegate<TypeSpec>& B)
 {
   return !(A == B);
 }
 
 template<typename... ArgTypes>
-struct Event
+struct event
 {
-  using ListenerType = Delegate<void(ArgTypes...)>;
+  using ListenerType = delegate<void(ArgTypes...)>;
 
   dynamic_array<ListenerType> Listeners;
 
@@ -38,29 +38,29 @@ struct Event
 };
 
 template<typename... ArgTypes>
-void Init(Event<ArgTypes...>* Self, allocator_interface* Allocator)
+void Init(event<ArgTypes...>* Event, allocator_interface* Allocator)
 {
-  Init(&Self->Listeners, Allocator);
+  Init(&Event->Listeners, Allocator);
 }
 
 template<typename... ArgTypes>
-void Finalize(Event<ArgTypes...>* Self)
+void Finalize(event<ArgTypes...>* Event)
 {
-  Finalize(&Self->Listeners);
+  Finalize(&Event->Listeners);
 }
 
 template<typename... ArgTypes>
-void AddListener(Event<ArgTypes...>* This, typename Event<ArgTypes...>::ListenerType Listener)
+void AddListener(event<ArgTypes...>* Event, typename event<ArgTypes...>::ListenerType Listener)
 {
-  Expand(&This->Listeners) = Move(Listener);
+  Expand(&Event->Listeners) = Move(Listener);
 }
 
 template<typename... ArgTypes>
-bool RemoveListener(Event<ArgTypes...>* This, typename Event<ArgTypes...>::ListenerType Listener)
+bool RemoveListener(event<ArgTypes...>* Event, typename event<ArgTypes...>::ListenerType Listener)
 {
-  size_t ListenerIndex = SliceCountUntil(Slice(&This->Listeners), Listener);
+  size_t ListenerIndex = SliceCountUntil(Slice(&Event->Listeners), Listener);
   if(ListenerIndex < 0)
     return false;
-  RemoveAt(&This->Listeners, ListenerIndex);
+  RemoveAt(&Event->Listeners, ListenerIndex);
   return true;
 }
