@@ -77,13 +77,14 @@ SetDeadZones(input_value_properties* Properties, float BothValues);
 using input_event = event<input_id, input_slot*>;
 
 // TODO(Manu): Implement ActionEvent so that users can listen to a specific action.
-struct input_context
+class input_context
 {
+public:
   struct slot_mapping
   {
     input_id SourceSlotId; // When this slots' value is changed, the TargetSlotId will be changed.
     input_id TargetSlotId; // This is the slot which value will be changed if SourceSlotId's value changes.
-    float Scale;          // A factor used when mapping slots.
+    float Scale;           // A factor used when mapping slots.
   };
 
   input_context* Parent;
@@ -102,6 +103,8 @@ struct input_context
   // Convenient indexing operator that returns nullptr or the ptr to the
   // input_slot that corresponds to SlotId.
   input_slot* operator[](input_id SlotId);
+
+  virtual ~input_context() = 0;
 };
 
 void
@@ -146,7 +149,7 @@ EndInputFrame(input_context* Context);
 // System Input Slots.
 //
 
-namespace XInput
+namespace x_input
 {
   extern input_id Unknown;
 
@@ -179,7 +182,7 @@ namespace XInput
   extern input_id YRightStick;
 };
 
-namespace Mouse
+namespace mouse
 {
   extern input_id Unknown;
 
@@ -212,7 +215,7 @@ namespace Mouse
   extern input_id ExtraButton2_DoubleClick;
 }
 
-namespace Keyboard
+namespace keyboard
 {
   extern input_id Unknown;
 

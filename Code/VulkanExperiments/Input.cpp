@@ -84,6 +84,10 @@ auto
 // input_context
 //
 
+input_context::~input_context()
+{
+}
+
 input_slot*
 input_context::operator[](input_id SlotId)
 {
@@ -191,8 +195,6 @@ auto
   return true;
 }
 
-#include "Input_SystemInputSlots.hpp"
-
 /// Applies special settings for the given input slot, if there are any, and
 /// returns an adjusted value.
 auto
@@ -200,8 +202,6 @@ auto
   -> float
 {
   float NewValue = RawValue;
-
-  auto Str = XInput::Unknown;
 
   auto Properties = Get(&Context->ValueProperties, SlotId);
   if(Properties == nullptr)
@@ -261,7 +261,7 @@ auto
 // System Input Slots
 //
 
-namespace XInput
+namespace x_input
 {
   input_id Unknown = SliceFromString("XInput_Unknown");
 
@@ -294,7 +294,7 @@ namespace XInput
   input_id YRightStick  = SliceFromString("XInput_YRightStick");
 }
 
-namespace Mouse
+namespace mouse
 {
   input_id Unknown = SliceFromString("Mouse_Unknown");
 
@@ -327,7 +327,7 @@ namespace Mouse
   input_id ExtraButton2_DoubleClick = SliceFromString("Mouse_ExtraButton2_DoubleClick");
 }
 
-namespace Keyboard
+namespace keyboard
 {
   input_id Unknown = SliceFromString("Keyboard_Unknown");
 

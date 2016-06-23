@@ -6,15 +6,17 @@
 
 log_data* GlobalLog = nullptr;
 
-void
-LogInit(log_data* Log, allocator_interface* Allocator)
+auto
+::LogInit(log_data* Log, allocator_interface* Allocator)
+  -> void
 {
   Log->MessageBuffer.Allocator = Allocator;
   Log->Sinks.Allocator = Allocator;
 }
 
-void
-LogIndent(log_data* Log, int By)
+auto
+::LogIndent(log_data* Log, int By)
+  -> void
 {
   if(Log)
   {
@@ -23,8 +25,9 @@ LogIndent(log_data* Log, int By)
   }
 }
 
-void
-LogDedent(log_data* Log, int By)
+auto
+::LogDedent(log_data* Log, int By)
+  -> void
 {
   if(Log)
   {
@@ -33,8 +36,9 @@ LogDedent(log_data* Log, int By)
   }
 }
 
-static void
+static auto
 LogMessageDispatch_Helper(log_data* Log, log_level LogLevel, slice<char const> Message)
+  -> void
 {
   if(LogLevel == log_level::ScopeEnd)
   {
@@ -57,8 +61,9 @@ LogMessageDispatch_Helper(log_data* Log, log_level LogLevel, slice<char const> M
   }
 }
 
-void
-LogMessageDispatch(log_level LogLevel, char const* Message, ...)
+auto
+::LogMessageDispatch(log_level LogLevel, char const* Message, ...)
+  -> void
 {
   if(GlobalLog == nullptr)
     return;
@@ -70,8 +75,9 @@ LogMessageDispatch(log_level LogLevel, char const* Message, ...)
   LogMessageDispatch_Helper(GlobalLog, LogLevel, SlicedMessage);
 }
 
-void
-LogMessageDispatch(log_level LogLevel, slice<char const> Message, ...)
+auto
+::LogMessageDispatch(log_level LogLevel, slice<char const> Message, ...)
+  -> void
 {
   if(GlobalLog == nullptr)
     return;
@@ -83,8 +89,9 @@ LogMessageDispatch(log_level LogLevel, slice<char const> Message, ...)
 }
 
 
-void
-LogMessageDispatch(log_data* Log, log_level LogLevel, char const* Message, ...)
+auto
+::LogMessageDispatch(log_level LogLevel, log_data* Log, char const* Message, ...)
+  -> void
 {
   if(Log == nullptr)
     return;
@@ -96,8 +103,9 @@ LogMessageDispatch(log_data* Log, log_level LogLevel, char const* Message, ...)
   LogMessageDispatch_Helper(Log, LogLevel, SlicedMessage);
 }
 
-void
-LogMessageDispatch(log_data* Log, log_level LogLevel, slice<char const> Message, ...)
+auto
+::LogMessageDispatch(log_level LogLevel, log_data* Log, slice<char const> Message, ...)
+  -> void
 {
   if(Log == nullptr)
     return;
@@ -108,8 +116,9 @@ LogMessageDispatch(log_data* Log, log_level LogLevel, slice<char const> Message,
   LogMessageDispatch_Helper(Log, LogLevel, Message);
 }
 
-void
-StdoutLogSink(log_sink_args Args)
+auto
+::StdoutLogSink(log_sink_args Args)
+  -> void
 {
   switch(Args.LogLevel)
   {
@@ -138,8 +147,9 @@ StdoutLogSink(log_sink_args Args)
   }
 }
 
-void
-VisualStudioLogSink(log_sink_args Args)
+auto
+::VisualStudioLogSink(log_sink_args Args)
+  -> void
 {
   switch(Args.LogLevel)
   {

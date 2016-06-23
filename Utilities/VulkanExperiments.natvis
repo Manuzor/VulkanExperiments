@@ -14,6 +14,21 @@
     </Expand>
   </Type>
 
+  <Type Name="slice&lt;char&gt;">
+    <AlternativeType Name="slice&lt;char const&gt;" />
+    <AlternativeType Name="slice&lt;wchar_t&gt;" />
+    <AlternativeType Name="slice&lt;wchar_t const&gt;" />
+    <DisplayString Condition="Ptr == nullptr">{{ Null }}</DisplayString>
+    <DisplayString Condition="Num == 0">{{ Empty }}</DisplayString>
+    <DisplayString>{Ptr,[Num]s8}</DisplayString>
+    <StringView>Ptr,[Num]s8</StringView>
+    <Expand>
+      <Item Name="Num">Num</Item>
+      <Item Name="Ptr">Ptr</Item>
+      <Item Name="OnePastLast" Condition="Ptr &amp;&amp; Num">*(Ptr + Num)</Item>
+    </Expand>
+  </Type>
+
   <Type Name="dynamic_array&lt;*&gt;">
     <DisplayString Condition="Ptr == nullptr">{{ Null }}</DisplayString>
     <DisplayString Condition="Num == 0">{{ Empty }}</DisplayString>

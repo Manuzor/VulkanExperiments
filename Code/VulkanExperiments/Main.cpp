@@ -1,13 +1,17 @@
+
+#include "DynamicArray.hpp"
+#include "Log.hpp"
+#include "Input.hpp"
+#include "Win32_Input.hpp"
+
 #include <Backbone.hpp>
 #include <Backbone.cpp>
-
-#include <Windows.h>
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.h>
 
-#include "DynamicArray.hpp"
-#include "Log.hpp"
+#include <Windows.h>
+
 
 struct vulkan_data
 {
@@ -181,6 +185,9 @@ int WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
   auto SinkSlots = ExpandBy(&GlobalLog->Sinks, 2);
   SinkSlots[0] = log_sink(StdoutLogSink);
   SinkSlots[1] = log_sink(VisualStudioLogSink);
+
+  x_input_dll XInput;
+  Win32LoadXInput(&XInput, GlobalLog);
 
   vulkan_data Vulkan;
 

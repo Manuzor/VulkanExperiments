@@ -56,6 +56,7 @@
                  + ' /LIBPATH:"$VS2015Path$\VC\lib\amd64"'
                  + ' /LIBPATH:"$Windows10SDKPath$\Lib\$Windows10SDKVersion$\um\x64"'
                  + ' /LIBPATH:"$Windows10SDKPath$\Lib\$Windows10SDKVersion$\ucrt\x64"'
+                 + ' user32.lib'
 .Libraries = {}
 
 
