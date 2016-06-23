@@ -1,5 +1,6 @@
 
 /Build/
+*.sublime-project
 *.sublime-workspace
 *.fdb
 

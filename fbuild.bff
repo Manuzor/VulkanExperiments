@@ -110,3 +110,17 @@ VSSolution( 'GenerateVisualStudioSolution' )
   .SolutionBuildProject = 'VulkanExperiments-Proj'
   .ExtraFiles = { 'Utilities/VulkanExperiments.natvis' }
 }
+
+//
+// Generate a Sublime Text Project File.
+//
+Exec( 'GenerateSublimeProject' )
+{
+  .ThePythonScript = '$RepoRoot$/Utilities/GenerateSublimeProject.py'
+  .ExecExecutable = 'C:\Windows\py.exe'
+  .ExecArguments = '-3 $ThePythonScript$ $BuildPath$/System.bff'
+  .ExecInput = '$ThePythonScript$'
+  .ExecOutput = 'VulkanExperiments.sublime-project'
+  .ExecWorkingDir = '$RepoRoot$'
+  .ExecUseStdOutAsOutput = true
+}
