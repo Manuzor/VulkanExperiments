@@ -11,7 +11,7 @@
     .ProjectInputPaths = { '$ProjectBasePath$' }
     .LocalDebuggerCommand = '$Output$'
     .LocalDebuggerWorkingDirectory = '$RepoRoot$/Build'
-    .IncludeSearchPath + '$VulkanSDK$/Include;'
+    .IncludeSearchPath + '$VulkanSDKPath$/Include;'
   }
 
   // VulkanExperiments
@@ -20,7 +20,7 @@
 
     ObjectList( 'VulkanExperiments-Lib' )
     {
-      .CompilerOptions + ' /I"$VulkanSDK$/Include"'
+      .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
       .CompilerInputPath = '$SourcePath$'
       .CompilerOutputPath = '$BuildPath$/VulkanExperiments'
     }

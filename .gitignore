@@ -3,5 +3,7 @@
 *.sublime-project
 *.sublime-workspace
 *.fdb
+__pycache__
+*.pyc
 
 /Workspace/
