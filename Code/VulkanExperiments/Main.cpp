@@ -162,7 +162,7 @@ CreateVulkanInstance(allocator_interface* TempAllocator, vulkan* Vulkan)
     CreateInfo.enabledLayerCount = Cast<uint>(LayerNames.Num);
     CreateInfo.ppEnabledLayerNames = LayerNames.Ptr;
 
-    Verify(vkCreateInstance(&CreateInfo, nullptr, &Vulkan->Instance));
+    Verify(vkCreateInstance(&CreateInfo, nullptr, &Vulkan->InstanceHandle));
   }
 
   return true;
