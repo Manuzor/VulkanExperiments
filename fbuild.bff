@@ -111,6 +111,11 @@ VSSolution( 'GenerateVisualStudioSolution' )
   .ExtraFiles = { 'Utilities/VulkanExperiments.natvis' }
 }
 
+Alias( 'vs' )
+{
+  .Targets = { 'GenerateVisualStudioSolution' }
+}
+
 //
 // Generate a Sublime Text Project File.
 //
@@ -123,4 +128,9 @@ Exec( 'GenerateSublimeProject' )
   .ExecOutput = 'VulkanExperiments.sublime-project'
   .ExecWorkingDir = '$RepoRoot$'
   .ExecUseStdOutAsOutput = true
+}
+
+Alias( 'subl' )
+{
+  .Targets = { 'GenerateSublimeProject' }
 }

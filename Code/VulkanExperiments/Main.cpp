@@ -13,14 +13,19 @@
 #include <Windows.h>
 
 
-struct vulkan_data
+struct vulkan
 {
   bool IsPrepared;
 
   HMODULE DLL;
   slice<char> DLLName;
 
-  VkInstance Instance;
+  VkInstance InstanceHandle;
+};
+
+struct vulkan_device
+{
+  VkDevice DeviceHandle;
 };
 
 struct window_construction_data
@@ -42,7 +47,7 @@ struct window_data
   int ClientWidth;
   int ClientHeight;
 
-  vulkan_data* Vulkan;
+  vulkan* Vulkan;
 };
 
 window_data
@@ -66,7 +71,7 @@ Verify(VkResult Result)
 }
 
 bool
-CreateVulkanInstance(allocator_interface* TempAllocator, vulkan_data* Vulkan)
+CreateVulkanInstance(allocator_interface* TempAllocator, vulkan* Vulkan)
 {
   //
   // Load DLL
@@ -189,7 +194,7 @@ int WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
   x_input_dll XInput;
   Win32LoadXInput(&XInput, GlobalLog);
 
-  vulkan_data Vulkan;
+  vulkan Vulkan;
 
   if(!CreateVulkanInstance(&Mallocator, &Vulkan))
   {
