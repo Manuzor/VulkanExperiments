@@ -49,7 +49,7 @@ Manifest["Meta"]["LastInitTime"] = str(datetime.now())
 # Repo Stuff
 #
 Manifest["Repo"] = {}
-Manifest["Repo"]["Path"] = str(RepoRoot)
+Manifest["Repo"]["Path"] = RepoRoot.as_posix()
 
 
 #
@@ -58,7 +58,7 @@ Manifest["Repo"]["Path"] = str(RepoRoot)
 Manifest["VS2015"] = {}
 
 VS2015Path = SystemInfo.VisualStudio2015Path(os.environ)
-Manifest["VS2015"]["Path"] = str(VS2015Path)
+Manifest["VS2015"]["Path"] = VS2015Path.as_posix()
 
 
 #
@@ -69,10 +69,10 @@ Manifest["Windows10SDK"] = {}
 Windows10SDKPath, Windows10SDKVersion = SystemInfo.Windows10SDKPathAndLatestVersion(os.environ)
 
 assert Windows10SDKPath.exists(), "Unable to find Windows 10 SDK."
-Manifest["Windows10SDK"]["Path"] = str(Windows10SDKPath)
+Manifest["Windows10SDK"]["Path"] = Windows10SDKPath.as_posix()
 
 assert Windows10SDKVersion, "Unable to find any installed Windows 10 SDK version. Something must be seriously wrong."
-Manifest["Windows10SDK"]["Version"] = str(Windows10SDKVersion)
+Manifest["Windows10SDK"]["Version"] = Windows10SDKVersion
 
 
 #
@@ -81,7 +81,7 @@ Manifest["Windows10SDK"]["Version"] = str(Windows10SDKVersion)
 Manifest["VulkanSDK"] = {}
 
 VulkanSDKPath = SystemInfo.VulkanSDKPath(os.environ)
-Manifest["VulkanSDK"]["Path"] = str(VulkanSDKPath)
+Manifest["VulkanSDK"]["Path"] = VulkanSDKPath.as_posix()
 
 #
 # Write The File

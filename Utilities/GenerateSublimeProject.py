@@ -68,7 +68,8 @@ FileTemplate = """{{
     {{
       "path": "{Windows10SDK[Path]}/Include/{Windows10SDK[Version]}",
       "name": "Windows Kit {Windows10SDK[Version]}",
-      "file_include_patterns": [ "*.h" ]
+      "file_include_patterns": [ "*.h" ],
+      "folder_exclude_patterns": [ "__pycache__" ],
     }},
     {{
       "path": "{VS2015[Path]}/VC",
