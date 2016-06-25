@@ -1,4 +1,4 @@
-rem @echo off
+@echo off
 rem Call this script to copy the appropriate DLLs into the krepel build
 rem directory. Especially useful after a `build.bat clean`.
 rem Note: You might want to change the variable `From` below.
