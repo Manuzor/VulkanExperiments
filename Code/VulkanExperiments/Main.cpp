@@ -1,32 +1,15 @@
-
 #include "DynamicArray.hpp"
 #include "Log.hpp"
 #include "Input.hpp"
 #include "Win32_Input.hpp"
 
+#include "VulkanHelper.hpp"
+
 #include <Backbone.hpp>
 #include <Backbone.cpp>
 
-#define VK_USE_PLATFORM_WIN32_KHR
-#include <vulkan/vulkan.h>
-
 #include <Windows.h>
 
-
-struct vulkan
-{
-  bool IsPrepared;
-
-  HMODULE DLL;
-  slice<char> DLLName;
-
-  VkInstance InstanceHandle;
-};
-
-struct vulkan_device
-{
-  VkDevice DeviceHandle;
-};
 
 struct window_construction_data
 {
@@ -50,7 +33,9 @@ struct window_data
   vulkan* Vulkan;
 };
 
-window_data
+#if 0
+
+static window_data
 Win32CreateWindow(allocator_interface* Allocator, const window_construction_data& Args,
                   log_data* Log = nullptr)
 {
@@ -58,67 +43,129 @@ Win32CreateWindow(allocator_interface* Allocator, const window_construction_data
   return window_data();
 }
 
-void
+static void
 Win32DestroyWindow(allocator_interface* Allocator, const window_data& Window)
 {
   // TODO
 }
 
-void
+#endif
+
+#if 0
+static void
 Verify(VkResult Result)
 {
   Assert(Result == VK_SUCCESS);
 }
 
-bool
-CreateVulkanInstance(allocator_interface* TempAllocator, vulkan* Vulkan)
+static bool
+CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
 {
-  //
-  // Load DLL
-  //
-  {
-    LogBeginScope("Loading Vulkan DLL.");
-    Defer(=, LogEndScope(""));
+  Assert(Vulkan->DLL);
+  Assert(Vulkan->vkCreateInstance);
+  Assert(Vulkan->vkEnumerateInstanceLayerProperties);
+  Assert(Vulkan->vkEnumerateInstanceExtensionProperties);
 
-    char const* FileName = "vulkan-1.dll";
-    Vulkan->DLL = LoadLibraryA(FileName);
-    if(Vulkan->DLL)
+  //
+  // Instance Layers
+  //
+  dynamic_array<char const*> LayerNames = {};
+  Init(&LayerNames, TempAllocator);
+  Defer(&LayerNames, Finalize(&LayerNames));
+  {
+    uint32 LayerCount;
+    Verify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
+
+    dynamic_array<VkLayerProperties> LayerProperties;
+    Init(&LayerProperties, TempAllocator);
+    Defer(&LayerProperties, Finalize(&LayerProperties));
+    ExpandBy(&LayerProperties, LayerCount);
+    Verify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, LayerProperties.Ptr));
+
+    LogBeginScope("Explicitly enabled instance layers:");
+    Defer(, LogEndScope("=========="));
+    for(auto& Property : Slice(&LayerProperties))
     {
-      fixed_block<KiB(1), char> BufferMemory;
-      auto Buffer = Slice(BufferMemory);
-      auto CharCount = GetModuleFileNameA(Vulkan->DLL, Buffer.Ptr, Cast<DWORD>(Buffer.Num));
-      Vulkan->DLLName = Slice(Buffer, DWORD(0), CharCount);
-      LogInfo("Loaded Vulkan DLL: %*s", Vulkan->DLLName.Num, Vulkan->DLLName.Ptr);
-    }
-    else
-    {
-      LogError("Failed to load DLL: %s", FileName);
-      return false;
+      auto LayerName = SliceFromString(Property.layerName);
+      if(LayerName == SliceFromString("VK_LAYER_LUNARG_standard_validation"))
+      {
+        Expand(&LayerNames) = LayerName.Ptr;
+      }
+      else
+      {
+        LogInfo("[ ] %s", LayerName.Ptr);
+        continue;
+      }
+
+      LogInfo("[x] %s", LayerName.Ptr);
     }
   }
 
   //
-  // Load Crucial Function Pointers
+  // Instance Extensions
   //
-  PFN_vkCreateInstance vkCreateInstance = {};
+  dynamic_array<char const*> ExtensionNames = {};
+  Init(&ExtensionNames, TempAllocator);
+  Defer(&LayerNames, Finalize(&LayerNames));
   {
-    LogBeginScope("First Stage of loading Vulkan function pointers.");
-    Defer(=, LogEndScope(""));
+    // Required extensions:
+    bool SurfaceExtensionFound = false;
+    bool PlatformSurfaceExtensionFound = false;
 
-    // vkCreateInstance
+    uint ExtensionCount;
+    Verify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
+
+    dynamic_array<VkExtensionProperties> ExtensionProperties;
+    Init(&ExtensionProperties, TempAllocator);
+    Defer(&ExtensionProperties, Finalize(&ExtensionProperties));
+    ExpandBy(&ExtensionProperties, ExtensionCount);
+    Verify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, ExtensionProperties.Ptr));
+
+    LogBeginScope("Explicitly enabled instance extensions:");
+    Defer(, LogEndScope("=========="));
+
+    for(auto& Property : Slice(&ExtensionProperties))
     {
-      auto Func = GetProcAddress(Vulkan->DLL, "vkCreateInstance");
-      if(Func)
+      auto ExtensionName = SliceFromString(Property.extensionName);
+      if(ExtensionName == SliceFromString(VK_KHR_SURFACE_EXTENSION_NAME))
       {
-        // TODO Cast and save the function pointer somewhere.
-        vkCreateInstance = Reinterpret<decltype(vkCreateInstance)>(Func);
+        Expand(&ExtensionNames) = VK_KHR_SURFACE_EXTENSION_NAME;
+        SurfaceExtensionFound = true;
+      }
+      else if(ExtensionName == SliceFromString(VK_KHR_WIN32_SURFACE_EXTENSION_NAME))
+      {
+        Expand(&ExtensionNames) = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
+        PlatformSurfaceExtensionFound = true;
+      }
+      else if(ExtensionName == SliceFromString(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
+      {
+        Expand(&ExtensionNames) = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
       }
       else
       {
-        LogError("Unable to load function Vulkan DLL: vkCreateInstance");
-        return false;
+        LogInfo("  [ ] %s", ExtensionName.Ptr);
+        continue;
       }
+
+      LogInfo("  [x] %s", ExtensionName.Ptr);
     }
+
+    bool Success = true;
+
+    if(!SurfaceExtensionFound)
+    {
+      LogError("Failed to load required extension: %s", VK_KHR_SURFACE_EXTENSION_NAME);
+      Success = false;
+    }
+
+    if(!PlatformSurfaceExtensionFound)
+    {
+      LogError("Failed to load required extension: %s", VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+      Success = false;
+    }
+
+    if(!Success)
+      return false;
   }
 
   //
@@ -127,22 +174,6 @@ CreateVulkanInstance(allocator_interface* TempAllocator, vulkan* Vulkan)
   {
     LogBeginScope("Creating Vulkan instance.");
     Defer(, LogEndScope(""));
-
-    // Instance Layers
-    dynamic_array<char const*> LayerNames = {};
-    Init(&LayerNames, TempAllocator);
-    Defer(&LayerNames, Finalize(&LayerNames));
-    {
-      // TODO
-    }
-
-    // Instance Extensions
-    dynamic_array<char const*> ExtensionNames = {};
-    Init(&ExtensionNames, TempAllocator);
-    Defer(&LayerNames, Finalize(&LayerNames));
-    {
-      // TODO
-    }
 
     VkApplicationInfo ApplicationInfo = {};
     ApplicationInfo.pApplicationName = "Vulkan Experiments";
@@ -156,10 +187,10 @@ CreateVulkanInstance(allocator_interface* TempAllocator, vulkan* Vulkan)
     VkInstanceCreateInfo CreateInfo = {};
     CreateInfo.pApplicationInfo = &ApplicationInfo;
 
-    CreateInfo.enabledExtensionCount = Cast<uint>(ExtensionNames.Num);
+    CreateInfo.enabledExtensionCount = Cast<uint32>(ExtensionNames.Num);
     CreateInfo.ppEnabledExtensionNames = ExtensionNames.Ptr;
 
-    CreateInfo.enabledLayerCount = Cast<uint>(LayerNames.Num);
+    CreateInfo.enabledLayerCount = Cast<uint32>(LayerNames.Num);
     CreateInfo.ppEnabledLayerNames = LayerNames.Ptr;
 
     Verify(vkCreateInstance(&CreateInfo, nullptr, &Vulkan->InstanceHandle));
@@ -168,7 +199,10 @@ CreateVulkanInstance(allocator_interface* TempAllocator, vulkan* Vulkan)
   return true;
 }
 
-void Win32SetupConsole(char const* Title)
+#endif
+
+static void
+Win32SetupConsole(char const* Title)
 {
   AllocConsole();
   AttachConsole(GetCurrentProcessId());
@@ -176,17 +210,20 @@ void Win32SetupConsole(char const* Title)
   SetConsoleTitleA(Title);
 }
 
-int WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
-            LPSTR CommandLine, int ShowCode)
+int
+WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
+        LPSTR CommandLine, int ShowCode)
 {
   Win32SetupConsole("Vulkan Experiments Console");
 
   mallocator Mallocator = {};
+  allocator_interface* Allocator = &Mallocator;
   log_data Log = {};
   GlobalLog = &Log;
   Defer(=, GlobalLog = nullptr);
 
-  LogInit(GlobalLog, &Mallocator);
+  Init(GlobalLog, Allocator);
+  Defer(=, Finalize(GlobalLog));
   auto SinkSlots = ExpandBy(&GlobalLog->Sinks, 2);
   SinkSlots[0] = log_sink(StdoutLogSink);
   SinkSlots[1] = log_sink(VisualStudioLogSink);
@@ -196,11 +233,14 @@ int WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
   vulkan Vulkan;
 
-  if(!CreateVulkanInstance(&Mallocator, &Vulkan))
-  {
-    LogError("Failed to create vulkan instance.");
+  if(!LoadVulkanDLL(&Vulkan))
     return 1;
-  }
+
+  // if(!CreateVulkanInstance(&Vulkan, Allocator))
+  //   return 2;
+
+  if(!LoadInstanceFunctions(&Vulkan))
+    return 3;
 
   // TODO Create and open window.
 
