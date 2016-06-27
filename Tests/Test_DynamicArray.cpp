@@ -1,5 +1,5 @@
 #include "TestHeader.hpp"
-#include <VulkanExperiments/DynamicArray.hpp>
+#include <Core/DynamicArray.hpp>
 
 
 TEST_CASE("Dynamic Array Basics", "[dynamic_array]")

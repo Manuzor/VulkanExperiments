@@ -1,0 +1,43 @@
+{
+  //
+  // Base Infos
+  //
+
+  .ProjectName = 'Application'
+  .SourcePath = '$RepoRoot$/Code/Application'
+
+
+  //
+  // Rules
+  //
+
+  VCXProject( '$ProjectName$-Proj' )
+  {
+    .Output = '$RepoRoot$/Build/$ProjectName$.exe'
+    .OutputDirectory = '$RepoRoot$/Build'
+
+    .ProjectOutput = 'Workspace/VisualStudio/$ProjectName$.vcxproj'
+    .ProjectInputPaths = { '$SourcePath$' }
+    .LocalDebuggerCommand = '$Output$'
+    .LocalDebuggerWorkingDirectory = '$RepoRoot$/Build'
+    .IncludeSearchPath + '$VulkanSDKPath$/Include;'
+  }
+
+  ObjectList( '$ProjectName$-Lib' )
+  {
+    .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
+    .CompilerInputPath = '$SourcePath$'
+    .CompilerOutputPath = '$BuildPath$/$ProjectName$'
+  }
+
+  Executable( '$ProjectName$' )
+  {
+    .Libraries + '$ProjectName$-Lib'
+               + 'Core-Lib'
+    .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
+    .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
+  }
+
+  Alias( '$ProjectName$-x64-Debug' )   { .Targets = '$ProjectName$' }
+  Alias( '$ProjectName$-x64-Release' ) { .Targets = '$ProjectName$' }
+}

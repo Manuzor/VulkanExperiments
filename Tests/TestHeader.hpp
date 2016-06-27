@@ -1,6 +1,6 @@
 #pragma once
 
-#include <VulkanExperiments/Allocator.hpp>
+#include <Core/Allocator.hpp>
 
 #include "catch.hpp"
 

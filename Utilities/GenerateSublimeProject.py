@@ -14,6 +14,36 @@ if Manifest is None:
   print("Unable to load repo manifest: ", str(ManifestPath), file=sys.stderr)
   print("Maybe re-run the init script?", file=sys.stderr)
 
+BuildRules = [
+  {
+    "Name": "Core",
+    "Arg": "Core",
+  },
+  {
+    "Name": "Tests: Build Only",
+    "Arg": "Tests",
+  },
+  {
+    "Name": "Tests: Build and Run",
+    "Arg": "Tests-Run",
+  },
+  {
+    "Name": "Application",
+    "Arg": "Application",
+  },
+  {
+    "Name": "Generate Sublime Text Project",
+    "Arg": "subl",
+  },
+  {
+    "Name": "Generate Visual Studio Solution",
+    "Arg": "vs",
+  },
+  {
+    "Name": "Clean",
+    "Arg": "-clean",
+  },
+]
 
 FileTemplate = """{{
   "build_systems":
@@ -22,40 +52,12 @@ FileTemplate = """{{
       "cmd":
       [
         "${{folder}}/Utilities/FASTBuild/FBuild.exe",
-        "-ide",
-        "VulkanExperiments"
+        "-ide"
       ],
       "file_regex": "([A-z]:.*?)\\\\(([0-9]+)(?:,\\\\s*[0-9]+)?\\\\)",
       "name": "VulkanExperiments",
       "variants":
-      [
-        {{
-          "cmd":
-          [
-            "${{folder}}/Utilities/FASTBuild/FBuild.exe",
-            "-ide",
-            "Tests"
-          ],
-          "name": "Tests: Build Only"
-        }},
-        {{
-          "cmd":
-          [
-            "${{folder}}/Utilities/FASTBuild/FBuild.exe",
-            "-ide",
-            "Tests-Run"
-          ],
-          "name": "Tests: Build and Run"
-        }},
-        {{
-          "cmd":
-          [
-            "${{folder}}/Utilities/FASTBuild/FBuild.exe",
-            "-ide",
-            "-clean"
-          ],
-          "name": "Rebuild"
-        }}
+      [{BuildRules}
       ],
       "working_dir": "${{folder}}"
     }}
@@ -87,5 +89,19 @@ FileTemplate = """{{
 #
 # Print The Result
 #
-Formatted = FileTemplate.format(**Manifest)
+FormattedBuildRules = ""
+for Rule in BuildRules:
+  Template = """
+        {{
+          "cmd":
+          [
+            "${{folder}}/Utilities/FASTBuild/FBuild.exe",
+            "-ide",
+            "{Arg}"
+          ],
+          "name": "{Name}"
+        }},"""
+  FormattedBuildRules += Template.format(**Rule)
+
+Formatted = FileTemplate.format(BuildRules=FormattedBuildRules, **Manifest)
 print(Formatted, end='\n')

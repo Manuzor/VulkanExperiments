@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CoreAPI.hpp"
 #include "DynamicArray.hpp"
 
 #include <functional>

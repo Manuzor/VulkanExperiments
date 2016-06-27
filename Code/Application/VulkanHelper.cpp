@@ -1,6 +1,7 @@
 #include "VulkanHelper.hpp"
 
-#include "Log.hpp"
+#include <Core/Log.hpp>
+
 
 template<typename T>
 bool

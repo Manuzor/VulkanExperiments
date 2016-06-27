@@ -25,6 +25,7 @@
   Executable( 'Tests' )
   {
     .Libraries + 'Tests-Lib'
+               + 'Core-Lib'
     .LinkerOptions + ' /PDB:$BuildPath$/Tests.pdb'
     .LinkerOutput = '$BuildPath$/Tests.exe'
   }

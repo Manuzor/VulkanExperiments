@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 
-log_data* GlobalLog = nullptr;
+CORE_API log_data* GlobalLog = nullptr;
 
 auto
 ::Init(log_data* Log, allocator_interface* Allocator)

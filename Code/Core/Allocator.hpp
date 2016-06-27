@@ -1,10 +1,10 @@
 #pragma once
 
+#include "CoreAPI.hpp"
 #include <Backbone.hpp>
 
-#include <new>
 
-class allocator_interface
+class CORE_API allocator_interface
 {
 public:
   virtual ~allocator_interface() {}
@@ -13,10 +13,11 @@ public:
   virtual bool Deallocate(void* Memory) = 0;
 };
 
-class mallocator : public allocator_interface
+class CORE_API mallocator : public allocator_interface
 {
-  void* Allocate(size_t NumBytes, size_t Alignment) override;
-  bool Deallocate(void* Memory) override;
+public:
+  virtual void* Allocate(size_t NumBytes, size_t Alignment) override;
+  virtual bool Deallocate(void* Memory) override;
 };
 
 template<typename T>

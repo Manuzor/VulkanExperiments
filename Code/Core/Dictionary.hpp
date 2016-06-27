@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CoreAPI.hpp"
 #include "Allocator.hpp"
 #include "ContainerUtils.hpp"
 

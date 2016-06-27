@@ -86,7 +86,8 @@
 // Targets
 //
 
-#include "Code/VulkanExperiments/fbuild.bff"
+#include "Code/Core/fbuild.bff"
+#include "Code/Application/fbuild.bff"
 #include "Tests/fbuild.bff"
 
 //
@@ -95,7 +96,7 @@
 
 Alias( 'all' )
 {
-  .Targets = { 'VulkanExperiments', 'Tests' }
+  .Targets = { 'Core', 'Application', 'Tests' }
 }
 
 //
@@ -106,8 +107,8 @@ VSSolution( 'GenerateVisualStudioSolution' )
 {
   .SolutionOutput = 'Workspace/VisualStudio/VulkanExperiments.sln'
   .SolutionConfigs = .ProjectConfigs
-  .SolutionProjects = { 'VulkanExperiments-Proj', 'Tests-Proj' }
-  .SolutionBuildProject = 'VulkanExperiments-Proj'
+  .SolutionProjects = { 'Core-Proj', 'Application-Proj', 'Tests-Proj' }
+  .SolutionBuildProject = 'Application-Proj'
   .ExtraFiles = { 'Utilities/VulkanExperiments.natvis' }
 }
 
