@@ -7,11 +7,21 @@
 log_data* GlobalLog = nullptr;
 
 auto
-::LogInit(log_data* Log, allocator_interface* Allocator)
+::Init(log_data* Log, allocator_interface* Allocator)
   -> void
 {
   Log->MessageBuffer.Allocator = Allocator;
+  Log->TempBuffer.Allocator = Allocator;
   Log->Sinks.Allocator = Allocator;
+}
+
+auto
+::Finalize(log_data* Log)
+  -> void
+{
+  Finalize(&Log->MessageBuffer);
+  Finalize(&Log->TempBuffer);
+  Finalize(&Log->Sinks);
 }
 
 auto
@@ -34,6 +44,35 @@ auto
     Log->Indentation -= By;
     Assert(Log->Indentation >= 0);
   }
+}
+
+static bool
+FormatLogMessage(dynamic_array<char>* MessageBuffer, char const* Format, va_list Args)
+{
+  Clear(MessageBuffer);
+  Reserve(MessageBuffer, 1);
+
+  int Result = ::vsnprintf(MessageBuffer->Ptr, MessageBuffer->Capacity, Format, Args);
+
+  if(Result < 0)
+  {
+    // TODO Handle this somehow?
+    // An error occurred.
+    return false;
+  }
+
+  if(Result < MessageBuffer->Capacity)
+  {
+    MessageBuffer->Num = Cast<size_t>(Result);
+    MessageBuffer->Ptr[Result + 1] = '\0';
+    return true;
+  }
+
+  Reserve(MessageBuffer, Cast<size_t>(Result + 1));
+
+  Result = ::vsnprintf(MessageBuffer->Ptr, MessageBuffer->Capacity, Format, Args);
+
+  return Result >= 0 || Result < MessageBuffer->Capacity;
 }
 
 static auto
@@ -61,6 +100,12 @@ LogMessageDispatch_Helper(log_data* Log, log_level LogLevel, slice<char const> M
   }
 }
 
+static bool
+SliceIsZeroTerminated(slice<char const> String)
+{
+  return String && String.Ptr + String.Num == '\0';
+}
+
 auto
 ::LogMessageDispatch(log_level LogLevel, char const* Message, ...)
   -> void
@@ -68,11 +113,13 @@ auto
   if(GlobalLog == nullptr)
     return;
 
-  Clear(&GlobalLog->MessageBuffer);
-  // TODO Format message
+  va_list Args;
+  va_start(Args, Message);
+  FormatLogMessage(&GlobalLog->MessageBuffer, Message, Args);
+  va_end(Args);
 
-  auto SlicedMessage = SliceFromString(Message);
-  LogMessageDispatch_Helper(GlobalLog, LogLevel, SlicedMessage);
+  auto FormattedMessage = AsConst(Slice(&GlobalLog->MessageBuffer));
+  LogMessageDispatch_Helper(GlobalLog, LogLevel, FormattedMessage);
 }
 
 auto
@@ -82,10 +129,27 @@ auto
   if(GlobalLog == nullptr)
     return;
 
-  Clear(&GlobalLog->MessageBuffer);
-  // TODO Format message
+  char const* MessagePtr;
+  if(SliceIsZeroTerminated(Message))
+  {
+    MessagePtr = Message.Ptr;
+  }
+  else
+  {
+    Clear(&GlobalLog->TempBuffer);
+    auto ZeroTerminatedMessage = ExpandBy(&GlobalLog->TempBuffer, Message.Num + 1);
+    SliceCopy(ZeroTerminatedMessage, Message);
+    ZeroTerminatedMessage[ZeroTerminatedMessage.Num - 1] = '\0';
+    MessagePtr = ZeroTerminatedMessage.Ptr;
+  }
 
-  LogMessageDispatch_Helper(GlobalLog, LogLevel, Message);
+  va_list Args;
+  va_start(Args, Message);
+  FormatLogMessage(&GlobalLog->MessageBuffer, MessagePtr, Args);
+  va_end(Args);
+
+  auto FormattedMessage = AsConst(Slice(&GlobalLog->MessageBuffer));
+  LogMessageDispatch_Helper(GlobalLog, LogLevel, FormattedMessage);
 }
 
 
@@ -96,11 +160,13 @@ auto
   if(Log == nullptr)
     return;
 
-  Clear(&Log->MessageBuffer);
-  // TODO Format message
+  va_list Args;
+  va_start(Args, Message);
+  FormatLogMessage(&Log->MessageBuffer, Message, Args);
+  va_end(Args);
 
-  auto SlicedMessage = SliceFromString(Message);
-  LogMessageDispatch_Helper(Log, LogLevel, SlicedMessage);
+  auto FormattedMessage = AsConst(Slice(&GlobalLog->MessageBuffer));
+  LogMessageDispatch_Helper(Log, LogLevel, FormattedMessage);
 }
 
 auto
@@ -110,10 +176,27 @@ auto
   if(Log == nullptr)
     return;
 
-  Clear(&Log->MessageBuffer);
-  // TODO Format message
+  char const* MessagePtr;
+  if(SliceIsZeroTerminated(Message))
+  {
+    MessagePtr = Message.Ptr;
+  }
+  else
+  {
+    Clear(&Log->TempBuffer);
+    auto ZeroTerminatedMessage = ExpandBy(&Log->TempBuffer, Message.Num + 1);
+    SliceCopy(ZeroTerminatedMessage, Message);
+    ZeroTerminatedMessage[ZeroTerminatedMessage.Num - 1] = '\0';
+    MessagePtr = ZeroTerminatedMessage.Ptr;
+  }
 
-  LogMessageDispatch_Helper(Log, LogLevel, Message);
+  va_list Args;
+  va_start(Args, Message);
+  FormatLogMessage(&Log->MessageBuffer, MessagePtr, Args);
+  va_end(Args);
+
+  auto FormattedMessage = AsConst(Slice(&GlobalLog->MessageBuffer));
+  LogMessageDispatch_Helper(Log, LogLevel, FormattedMessage);
 }
 
 auto

@@ -28,6 +28,7 @@ using log_sink = std::function<void(log_sink_args)>;
 struct log_data
 {
   dynamic_array<char> MessageBuffer;
+  dynamic_array<char> TempBuffer;
   dynamic_array<log_sink> Sinks;
   int Indentation;
 };
@@ -35,7 +36,10 @@ struct log_data
 extern log_data* GlobalLog;
 
 void
-LogInit(log_data* Log, allocator_interface* Allocator);
+Init(log_data* Log, allocator_interface* Allocator);
+
+void
+Finalize(log_data* Log);
 
 void
 LogIndent(log_data* Log, int By = 1);
