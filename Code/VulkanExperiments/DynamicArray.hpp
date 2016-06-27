@@ -87,8 +87,9 @@ void
 Finalize(dynamic_array<T>* Array)
 {
   Clear(Array);
-  if(Array->Capacity)
+  if(Array->Capacity > 0)
   {
+    Assert(Array->Allocator);
     Array->Allocator->Deallocate(Array->Ptr);
     Array->Capacity = 0;
   }
