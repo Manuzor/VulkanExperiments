@@ -64,7 +64,6 @@ FormatLogMessage(dynamic_array<char>* MessageBuffer, char const* Format, va_list
   if(Result < MessageBuffer->Capacity)
   {
     MessageBuffer->Num = Cast<size_t>(Result);
-    MessageBuffer->Ptr[Result + 1] = '\0';
     return true;
   }
 
@@ -72,7 +71,13 @@ FormatLogMessage(dynamic_array<char>* MessageBuffer, char const* Format, va_list
 
   Result = ::vsnprintf(MessageBuffer->Ptr, MessageBuffer->Capacity, Format, Args);
 
-  return Result >= 0 || Result < MessageBuffer->Capacity;
+  if(Result >= 0 || Result < MessageBuffer->Capacity)
+  {
+    MessageBuffer->Num = Cast<size_t>(Result);
+    return true;
+  }
+
+  return false;
 }
 
 static auto
