@@ -103,7 +103,6 @@ auto
   TRY_LOAD(vkAllocateCommandBuffers);
   TRY_LOAD(vkAllocateDescriptorSets);
   TRY_LOAD(vkAllocateMemory);
-  TRY_LOAD(vkAllocationFunction);
   TRY_LOAD(vkBeginCommandBuffer);
   TRY_LOAD(vkBindBufferMemory);
   TRY_LOAD(vkBindImageMemory);
@@ -170,7 +169,6 @@ auto
   TRY_LOAD(vkCreateGraphicsPipelines);
   TRY_LOAD(vkCreateImage);
   TRY_LOAD(vkCreateImageView);
-  TRY_LOAD(vkCreateInstance);
   TRY_LOAD(vkCreatePipelineCache);
   TRY_LOAD(vkCreatePipelineLayout);
   TRY_LOAD(vkCreateQueryPool);
@@ -230,7 +228,6 @@ auto
   TRY_LOAD(vkGetImageMemoryRequirements);
   TRY_LOAD(vkGetImageSparseMemoryRequirements);
   TRY_LOAD(vkGetImageSubresourceLayout);
-  TRY_LOAD(vkGetInstanceProcAddr);
   TRY_LOAD(vkGetPhysicalDeviceDisplayPlanePropertiesKHR);
   TRY_LOAD(vkGetPhysicalDeviceDisplayPropertiesKHR);
   TRY_LOAD(vkGetPhysicalDeviceFeatures);
@@ -249,8 +246,6 @@ auto
   TRY_LOAD(vkGetQueryPoolResults);
   TRY_LOAD(vkGetRenderAreaGranularity);
   TRY_LOAD(vkGetSwapchainImagesKHR);
-  TRY_LOAD(vkInternalAllocationNotification);
-  TRY_LOAD(vkInternalFreeNotification);
   TRY_LOAD(vkInvalidateMappedMemoryRanges);
   TRY_LOAD(vkMapMemory);
   TRY_LOAD(vkMergePipelineCaches);
@@ -258,7 +253,6 @@ auto
   TRY_LOAD(vkQueuePresentKHR);
   TRY_LOAD(vkQueueSubmit);
   TRY_LOAD(vkQueueWaitIdle);
-  TRY_LOAD(vkReallocationFunction);
   TRY_LOAD(vkResetCommandBuffer);
   TRY_LOAD(vkResetCommandPool);
   TRY_LOAD(vkResetDescriptorPool);

@@ -50,7 +50,6 @@ Win32DestroyWindow(allocator_interface* Allocator, const window_data& Window)
 
 #endif
 
-#if 0
 static void
 Verify(VkResult Result)
 {
@@ -75,7 +74,7 @@ CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
     uint32 LayerCount;
     Verify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
 
-    dynamic_array<VkLayerProperties> LayerProperties;
+    dynamic_array<VkLayerProperties> LayerProperties = {};
     Init(&LayerProperties, TempAllocator);
     Defer(&LayerProperties, Finalize(&LayerProperties));
     ExpandBy(&LayerProperties, LayerCount);
@@ -88,7 +87,7 @@ CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
       auto LayerName = SliceFromString(Property.layerName);
       if(LayerName == SliceFromString("VK_LAYER_LUNARG_standard_validation"))
       {
-        Expand(&LayerNames) = LayerName.Ptr;
+        Expand(&LayerNames) = "VK_LAYER_LUNARG_standard_validation";
       }
       else
       {
@@ -105,7 +104,7 @@ CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
   //
   dynamic_array<char const*> ExtensionNames = {};
   Init(&ExtensionNames, TempAllocator);
-  Defer(&LayerNames, Finalize(&LayerNames));
+  Defer(&ExtensionNames, Finalize(&ExtensionNames));
   {
     // Required extensions:
     bool SurfaceExtensionFound = false;
@@ -114,7 +113,7 @@ CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
     uint ExtensionCount;
     Verify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
-    dynamic_array<VkExtensionProperties> ExtensionProperties;
+    dynamic_array<VkExtensionProperties> ExtensionProperties = {};
     Init(&ExtensionProperties, TempAllocator);
     Defer(&ExtensionProperties, Finalize(&ExtensionProperties));
     ExpandBy(&ExtensionProperties, ExtensionCount);
@@ -192,13 +191,11 @@ CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
     CreateInfo.enabledLayerCount = Cast<uint32>(LayerNames.Num);
     CreateInfo.ppEnabledLayerNames = LayerNames.Ptr;
 
-    Verify(vkCreateInstance(&CreateInfo, nullptr, &Vulkan->InstanceHandle));
+    Verify(Vulkan->vkCreateInstance(&CreateInfo, nullptr, &Vulkan->InstanceHandle));
   }
 
   return true;
 }
-
-#endif
 
 static void
 Win32SetupConsole(char const* Title)
@@ -235,8 +232,8 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
   if(!LoadVulkanDLL(&Vulkan))
     return 1;
 
-  // if(!CreateVulkanInstance(&Vulkan, Allocator))
-  //   return 2;
+  if(!CreateVulkanInstance(&Vulkan, Allocator))
+    return 2;
 
   if(!LoadInstanceFunctions(&Vulkan))
     return 3;

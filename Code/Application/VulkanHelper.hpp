@@ -20,7 +20,6 @@ struct vulkan
   PFN_vkAllocateCommandBuffers vkAllocateCommandBuffers;
   PFN_vkAllocateDescriptorSets vkAllocateDescriptorSets;
   PFN_vkAllocateMemory vkAllocateMemory;
-  PFN_vkAllocationFunction vkAllocationFunction;
   PFN_vkBeginCommandBuffer vkBeginCommandBuffer;
   PFN_vkBindBufferMemory vkBindBufferMemory;
   PFN_vkBindImageMemory vkBindImageMemory;
@@ -168,8 +167,6 @@ struct vulkan
   PFN_vkGetQueryPoolResults vkGetQueryPoolResults;
   PFN_vkGetRenderAreaGranularity vkGetRenderAreaGranularity;
   PFN_vkGetSwapchainImagesKHR vkGetSwapchainImagesKHR;
-  PFN_vkInternalAllocationNotification vkInternalAllocationNotification;
-  PFN_vkInternalFreeNotification vkInternalFreeNotification;
   PFN_vkInvalidateMappedMemoryRanges vkInvalidateMappedMemoryRanges;
   PFN_vkMapMemory vkMapMemory;
   PFN_vkMergePipelineCaches vkMergePipelineCaches;
@@ -177,7 +174,6 @@ struct vulkan
   PFN_vkQueuePresentKHR vkQueuePresentKHR;
   PFN_vkQueueSubmit vkQueueSubmit;
   PFN_vkQueueWaitIdle vkQueueWaitIdle;
-  PFN_vkReallocationFunction vkReallocationFunction;
   PFN_vkResetCommandBuffer vkResetCommandBuffer;
   PFN_vkResetCommandPool vkResetCommandPool;
   PFN_vkResetDescriptorPool vkResetDescriptorPool;
