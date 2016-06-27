@@ -10,6 +10,7 @@
     .ProjectOutput = 'Workspace/VisualStudio/$ProjectName$.vcxproj'
     .ProjectInputPaths = { '$ProjectBasePath$' }
     .LocalDebuggerCommand = '$Output$'
+    .LocalDebuggerCommandArguments = '--break'
     .LocalDebuggerWorkingDirectory = '$RepoRoot$/Build'
     //.IncludeSearchPath + '??'
   }

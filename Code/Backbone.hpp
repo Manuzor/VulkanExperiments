@@ -906,15 +906,32 @@ SliceDestruct(slice<T> Target)
   MemDestruct(Target.Num, Target.Ptr);
 }
 
-template<typename T>
+template<typename T, typename NeedleType>
 size_t
-SliceCountUntil(slice<T const> Haystack, const T& Needle)
+SliceCountUntil(slice<T const> Haystack, const NeedleType& Needle)
 {
   size_t Index = 0;
 
   for(auto& Straw : Haystack)
   {
     if(Straw == Needle)
+      return Index;
+    ++Index;
+  }
+
+  return INVALID_INDEX;
+}
+
+/// Counts up until \c Predicate(ElementOfHaystack, Needle) returns \c true.
+template<typename T, typename NeedleType, typename PredicateType>
+size_t
+SliceCountUntil(slice<T const> Haystack, const NeedleType& Needle, PredicateType Predicate)
+{
+  size_t Index = 0;
+
+  for(auto& Straw : Haystack)
+  {
+    if(Predicate(Straw, Needle))
       return Index;
     ++Index;
   }
