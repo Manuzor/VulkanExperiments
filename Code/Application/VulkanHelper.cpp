@@ -95,7 +95,7 @@ auto
 
   #define TRY_LOAD(Name) if(!LoadHelper(Vulkan, #Name, &Vulkan->##Name)) \
   { \
-    LogError("Failed to load procedure: %s", #Name); \
+    LogWarning("Failed to load procedure: %s", #Name); \
     Success = false; \
   }
 

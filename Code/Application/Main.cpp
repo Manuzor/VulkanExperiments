@@ -67,16 +67,12 @@ CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
   //
   // Instance Layers
   //
-  dynamic_array<char const*> LayerNames = {};
-  Init(&LayerNames, TempAllocator);
-  Defer(&LayerNames, Finalize(&LayerNames));
+  scoped_array<char const*> LayerNames{ TempAllocator };
   {
     uint32 LayerCount;
     Verify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
 
-    dynamic_array<VkLayerProperties> LayerProperties = {};
-    Init(&LayerProperties, TempAllocator);
-    Defer(&LayerProperties, Finalize(&LayerProperties));
+    scoped_array<VkLayerProperties> LayerProperties = { TempAllocator };
     ExpandBy(&LayerProperties, LayerCount);
     Verify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, LayerProperties.Ptr));
 
@@ -102,9 +98,7 @@ CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
   //
   // Instance Extensions
   //
-  dynamic_array<char const*> ExtensionNames = {};
-  Init(&ExtensionNames, TempAllocator);
-  Defer(&ExtensionNames, Finalize(&ExtensionNames));
+  scoped_array<char const*> ExtensionNames{ TempAllocator };
   {
     // Required extensions:
     bool SurfaceExtensionFound = false;
@@ -113,9 +107,7 @@ CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
     uint ExtensionCount;
     Verify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
-    dynamic_array<VkExtensionProperties> ExtensionProperties = {};
-    Init(&ExtensionProperties, TempAllocator);
-    Defer(&ExtensionProperties, Finalize(&ExtensionProperties));
+    scoped_array<VkExtensionProperties> ExtensionProperties = { TempAllocator };
     ExpandBy(&ExtensionProperties, ExtensionCount);
     Verify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, ExtensionProperties.Ptr));
 
@@ -185,10 +177,10 @@ CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
     VkInstanceCreateInfo CreateInfo = {};
     CreateInfo.pApplicationInfo = &ApplicationInfo;
 
-    CreateInfo.enabledExtensionCount = Cast<uint32>(ExtensionNames.Num);
+    CreateInfo.enabledExtensionCount = Cast<uint32_t>(ExtensionNames.Num);
     CreateInfo.ppEnabledExtensionNames = ExtensionNames.Ptr;
 
-    CreateInfo.enabledLayerCount = Cast<uint32>(LayerNames.Num);
+    CreateInfo.enabledLayerCount = Cast<uint32_t>(LayerNames.Num);
     CreateInfo.ppEnabledLayerNames = LayerNames.Ptr;
 
     Verify(Vulkan->vkCreateInstance(&CreateInfo, nullptr, &Vulkan->InstanceHandle));

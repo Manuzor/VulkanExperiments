@@ -161,3 +161,22 @@ RemoveFirst(dynamic_array<T>* Array, const T& Needle)
   RemoveAt(Array, Index);
   return true;
 }
+
+template<typename T>
+struct scoped_array : public dynamic_array<T>
+{
+  scoped_array() = default;
+  scoped_array(allocator_interface* NewAllocator) { Init(NewAllocator); }
+  ~scoped_array() { Finalize(); }
+
+  void Init(allocator_interface* NewAllocator)
+  {
+    *this = {};
+    ::Init(this, NewAllocator);
+  }
+
+  void Finalize()
+  {
+    ::Finalize(this);
+  }
+};
