@@ -18,7 +18,7 @@ template<typename T>
 bool
 LoadHelper(vulkan* Vulkan, char const* FuncName, T** OutPtrToProcPtr)
 {
-  auto ProcPtr = Vulkan->vkGetInstanceProcAddr(Vulkan->InstanceHandle, FuncName);
+  auto ProcPtr = Vulkan->F.vkGetInstanceProcAddr(Vulkan->InstanceHandle, FuncName);
   if(ProcPtr)
   {
     *OutPtrToProcPtr = Reinterpret<T*>(ProcPtr);
@@ -31,7 +31,7 @@ template<typename T>
 bool
 LoadHelper(vulkan_device* Device, char const* FuncName, T** OutPtrToProcPtr)
 {
-  auto ProcPtr = Device->Vulkan->vkGetDeviceProcAddr(Device->DeviceHandle, FuncName);
+  auto ProcPtr = Device->Vulkan->F.vkGetDeviceProcAddr(Device->DeviceHandle, FuncName);
   if(ProcPtr)
   {
     *OutPtrToProcPtr = Reinterpret<T*>(ProcPtr);
@@ -55,36 +55,35 @@ auto
     return false;
   }
 
-  fixed_block<KiB(1), char> BufferMemory;
-  auto Buffer = Slice(BufferMemory);
+  auto Buffer = Slice(Vulkan->DLLNameBuffer);
   auto CharCount = GetModuleFileNameA(Vulkan->DLL, Buffer.Ptr, Cast<DWORD>(Buffer.Num));
   Vulkan->DLLName = Slice(Buffer, DWORD(0), CharCount);
   LogInfo("Loaded Vulkan DLL: %*s", Coerce<int>(Vulkan->DLLName.Num), Vulkan->DLLName.Ptr);
 
 
-  Vulkan->vkCreateInstance = Reinterpret<decltype(Vulkan->vkCreateInstance)>(GetProcAddress(Vulkan->DLL, "vkCreateInstance"));
-  if(Vulkan->vkCreateInstance == nullptr)
+  Vulkan->F.vkCreateInstance = Reinterpret<decltype(Vulkan->F.vkCreateInstance)>(GetProcAddress(Vulkan->DLL, "vkCreateInstance"));
+  if(Vulkan->F.vkCreateInstance == nullptr)
   {
     LogError("Failed to load vkCreateInstance!!");
     return false;
   }
 
-  Vulkan->vkGetInstanceProcAddr = Reinterpret<decltype(Vulkan->vkGetInstanceProcAddr)>(GetProcAddress(Vulkan->DLL, "vkGetInstanceProcAddr"));
-  if(Vulkan->vkGetInstanceProcAddr == nullptr)
+  Vulkan->F.vkGetInstanceProcAddr = Reinterpret<decltype(Vulkan->F.vkGetInstanceProcAddr)>(GetProcAddress(Vulkan->DLL, "vkGetInstanceProcAddr"));
+  if(Vulkan->F.vkGetInstanceProcAddr == nullptr)
   {
     LogError("Failed to load vkGetInstanceProcAddr!!");
     return false;
   }
 
-  Vulkan->vkEnumerateInstanceLayerProperties = Reinterpret<decltype(Vulkan->vkEnumerateInstanceLayerProperties)>(GetProcAddress(Vulkan->DLL, "vkEnumerateInstanceLayerProperties"));
-  if(Vulkan->vkEnumerateInstanceLayerProperties == nullptr)
+  Vulkan->F.vkEnumerateInstanceLayerProperties = Reinterpret<decltype(Vulkan->F.vkEnumerateInstanceLayerProperties)>(GetProcAddress(Vulkan->DLL, "vkEnumerateInstanceLayerProperties"));
+  if(Vulkan->F.vkEnumerateInstanceLayerProperties == nullptr)
   {
     LogError("Failed to load vkEnumerateInstanceLayerProperties!!");
     return false;
   }
 
-  Vulkan->vkEnumerateInstanceExtensionProperties = Reinterpret<decltype(Vulkan->vkEnumerateInstanceExtensionProperties)>(GetProcAddress(Vulkan->DLL, "vkEnumerateInstanceExtensionProperties"));
-  if(Vulkan->vkEnumerateInstanceExtensionProperties == nullptr)
+  Vulkan->F.vkEnumerateInstanceExtensionProperties = Reinterpret<decltype(Vulkan->F.vkEnumerateInstanceExtensionProperties)>(GetProcAddress(Vulkan->DLL, "vkEnumerateInstanceExtensionProperties"));
+  if(Vulkan->F.vkEnumerateInstanceExtensionProperties == nullptr)
   {
     LogError("Failed to load vkEnumerateInstanceExtensionProperties!!");
     return false;
@@ -102,7 +101,7 @@ auto
   LogBeginScope("Loading Vulkan instance procedures.");
   Defer(=, LogEndScope(""));
 
-  #define TRY_LOAD(Name) if(!LoadHelper(Vulkan, #Name, &Vulkan->##Name)) \
+  #define TRY_LOAD(Name) if(!LoadHelper(Vulkan, #Name, &Vulkan->F.##Name)) \
   { \
     LogWarning("Failed to load procedure: %s", #Name); \
   }
@@ -281,10 +280,10 @@ auto
   LogBeginScope("Loading Vulkan device procedures.");
   Defer(=, LogEndScope(""));
 
-  #define TRY_LOAD(Name) if(!LoadHelper(Device, #Name, &Device->##Name)) \
+  #define TRY_LOAD(Name) if(!LoadHelper(Device, #Name, &Device->F.##Name)) \
   { \
     LogWarning("Unable to load device function: %s", #Name); \
-    Device->##Name = Device->Vulkan->##Name; \
+    Device->F.##Name = Device->Vulkan->F.##Name; \
   }
 
   TRY_LOAD(vkGetDeviceProcAddr);

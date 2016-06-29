@@ -60,9 +60,9 @@ static bool
 VulkanCreateInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
 {
   Assert(Vulkan->DLL);
-  Assert(Vulkan->vkCreateInstance);
-  Assert(Vulkan->vkEnumerateInstanceLayerProperties);
-  Assert(Vulkan->vkEnumerateInstanceExtensionProperties);
+  Assert(Vulkan->F.vkCreateInstance);
+  Assert(Vulkan->F.vkEnumerateInstanceLayerProperties);
+  Assert(Vulkan->F.vkEnumerateInstanceExtensionProperties);
 
   //
   // Instance Layers
@@ -70,11 +70,11 @@ VulkanCreateInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
   scoped_array<char const*> LayerNames{ TempAllocator };
   {
     uint32 LayerCount;
-    Verify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
+    Verify(Vulkan->F.vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
 
     scoped_array<VkLayerProperties> LayerProperties = { TempAllocator };
     ExpandBy(&LayerProperties, LayerCount);
-    Verify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, LayerProperties.Ptr));
+    Verify(Vulkan->F.vkEnumerateInstanceLayerProperties(&LayerCount, LayerProperties.Ptr));
 
     LogBeginScope("Explicitly enabled instance layers:");
     Defer(, LogEndScope("=========="));
@@ -105,11 +105,11 @@ VulkanCreateInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
     bool PlatformSurfaceExtensionFound = false;
 
     uint32_t ExtensionCount;
-    Verify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
+    Verify(Vulkan->F.vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
     scoped_array<VkExtensionProperties> ExtensionProperties = { TempAllocator };
     ExpandBy(&ExtensionProperties, ExtensionCount);
-    Verify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, ExtensionProperties.Ptr));
+    Verify(Vulkan->F.vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, ExtensionProperties.Ptr));
 
     LogBeginScope("Explicitly enabled instance extensions:");
     Defer(, LogEndScope("=========="));
@@ -183,7 +183,7 @@ VulkanCreateInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
     CreateInfo.enabledLayerCount = Cast<uint32_t>(LayerNames.Num);
     CreateInfo.ppEnabledLayerNames = LayerNames.Ptr;
 
-    Verify(Vulkan->vkCreateInstance(&CreateInfo, nullptr, &Vulkan->InstanceHandle));
+    Verify(Vulkan->F.vkCreateInstance(&CreateInfo, nullptr, &Vulkan->InstanceHandle));
   }
 
   return true;
@@ -193,7 +193,7 @@ static void
 VulkanDestroyInstance(vulkan* Vulkan)
 {
   VkAllocationCallbacks const* AllocationCallbacks = nullptr;
-  Vulkan->vkDestroyInstance(Vulkan->InstanceHandle, AllocationCallbacks);
+  Vulkan->F.vkDestroyInstance(Vulkan->InstanceHandle, AllocationCallbacks);
 }
 
 static void
@@ -239,13 +239,13 @@ VulkanSetupDebugging(vulkan* Vulkan)
   LogBeginScope("Setting up Vulkan debugging.");
   Defer(, LogEndScope("Finished debug setup."));
 
-  if(Vulkan->vkCreateDebugReportCallbackEXT != nullptr)
+  if(Vulkan->F.vkCreateDebugReportCallbackEXT != nullptr)
   {
     VkDebugReportCallbackCreateInfoEXT DebugSetupInfo = {};
     DebugSetupInfo.pfnCallback = &VulkanDebugCallback;
     DebugSetupInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
 
-    Verify(Vulkan->vkCreateDebugReportCallbackEXT(Vulkan->InstanceHandle,
+    Verify(Vulkan->F.vkCreateDebugReportCallbackEXT(Vulkan->InstanceHandle,
                                                   &DebugSetupInfo,
                                                   nullptr,
                                                   &Vulkan->DebugCallbackHandle));
@@ -261,9 +261,9 @@ VulkanSetupDebugging(vulkan* Vulkan)
 static void
 VulkanCleanupDebugging(vulkan* Vulkan)
 {
-  if(Vulkan->vkDestroyDebugReportCallbackEXT && Vulkan->DebugCallbackHandle)
+  if(Vulkan->F.vkDestroyDebugReportCallbackEXT && Vulkan->DebugCallbackHandle)
   {
-    Vulkan->vkDestroyDebugReportCallbackEXT(Vulkan->InstanceHandle, Vulkan->DebugCallbackHandle, nullptr);
+    Vulkan->F.vkDestroyDebugReportCallbackEXT(Vulkan->InstanceHandle, Vulkan->DebugCallbackHandle, nullptr);
   }
 }
 
@@ -272,7 +272,7 @@ bool
 VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAllocator)
 {
   uint32_t GpuCount;
-  Verify(Vulkan->vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
+  Verify(Vulkan->F.vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
                                             &GpuCount, nullptr));
   if(GpuCount == 0)
   {
@@ -285,7 +285,7 @@ VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAll
   scoped_array<VkPhysicalDevice> Gpus{ TempAllocator };
   ExpandBy(&Gpus, GpuCount);
 
-  Verify(Vulkan->vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
+  Verify(Vulkan->F.vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
                                             &GpuCount, Gpus.Ptr));
 
   // Use the first Physical Device for now.
@@ -299,15 +299,15 @@ VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAll
     LogBeginScope("Querying for physical device and queue properties.");
     Defer(, LogEndScope("Retrieved physical device and queue properties."));
 
-    Vulkan->vkGetPhysicalDeviceProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Properties);
-    Vulkan->vkGetPhysicalDeviceMemoryProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.MemoryProperties);
-    Vulkan->vkGetPhysicalDeviceFeatures(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Features);
+    Vulkan->F.vkGetPhysicalDeviceProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Properties);
+    Vulkan->F.vkGetPhysicalDeviceMemoryProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.MemoryProperties);
+    Vulkan->F.vkGetPhysicalDeviceFeatures(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Features);
 
     uint32_t QueueCount;
-    Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, nullptr);
+    Vulkan->F.vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, nullptr);
     Clear(&Vulkan->Gpu.QueueProperties);
     ExpandBy(&Vulkan->Gpu.QueueProperties, QueueCount);
-    Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, Vulkan->Gpu.QueueProperties.Ptr);
+    Vulkan->F.vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, Vulkan->Gpu.QueueProperties.Ptr);
   }
 
   return true;
