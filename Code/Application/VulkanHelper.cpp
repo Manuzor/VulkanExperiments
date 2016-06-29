@@ -3,6 +3,17 @@
 #include <Core/Log.hpp>
 
 
+void
+Init(vulkan* Vulkan, allocator_interface* Allocator)
+{
+  Init(&Vulkan->Gpu.QueueProperties, Allocator);
+}
+
+void Finalize(vulkan* Vulkan)
+{
+  Finalize(&Vulkan->Gpu.QueueProperties);
+}
+
 template<typename T>
 bool
 LoadHelper(vulkan* Vulkan, char const* FuncName, T** OutPtrToProcPtr)
@@ -20,7 +31,7 @@ template<typename T>
 bool
 LoadHelper(vulkan_device* Device, char const* FuncName, T** OutPtrToProcPtr)
 {
-  auto ProcPtr = Device->OwningInstance->vkGetDeviceProcAddr(Device->DeviceHandle, FuncName);
+  auto ProcPtr = Device->Vulkan->vkGetDeviceProcAddr(Device->DeviceHandle, FuncName);
   if(ProcPtr)
   {
     *OutPtrToProcPtr = Reinterpret<T*>(ProcPtr);
@@ -30,7 +41,7 @@ LoadHelper(vulkan_device* Device, char const* FuncName, T** OutPtrToProcPtr)
 }
 
 auto
-::LoadVulkanDLL(vulkan* Vulkan)
+::VulkanLoadDLL(vulkan* Vulkan)
   -> bool
 {
   LogBeginScope("Loading Vulkan DLL.");
@@ -83,20 +94,17 @@ auto
 }
 
 auto
-::LoadInstanceFunctions(vulkan* Vulkan)
-  -> bool
+::VulkanLoadInstanceFunctions(vulkan* Vulkan)
+  -> void
 {
   Assert(Vulkan->DLL);
 
   LogBeginScope("Loading Vulkan instance procedures.");
   Defer(=, LogEndScope(""));
 
-  bool Success = true;
-
   #define TRY_LOAD(Name) if(!LoadHelper(Vulkan, #Name, &Vulkan->##Name)) \
   { \
     LogWarning("Failed to load procedure: %s", #Name); \
-    Success = false; \
   }
 
   TRY_LOAD(vkAcquireNextImageKHR);
@@ -264,12 +272,10 @@ auto
   TRY_LOAD(vkWaitForFences);
 
   #undef TRY_LOAD
-
-  return Success;
 }
 
 auto
-::LoadAsManyDeviceFunctionsAsPossible(vulkan_device* Device)
+::VulkanLoadDeviceFunctions(vulkan_device* Device)
   -> void
 {
   LogBeginScope("Loading Vulkan device procedures.");
@@ -278,7 +284,7 @@ auto
   #define TRY_LOAD(Name) if(!LoadHelper(Device, #Name, &Device->##Name)) \
   { \
     LogWarning("Unable to load device function: %s", #Name); \
-    Device->##Name = Device->OwningInstance->##Name; \
+    Device->##Name = Device->Vulkan->##Name; \
   }
 
   TRY_LOAD(vkGetDeviceProcAddr);

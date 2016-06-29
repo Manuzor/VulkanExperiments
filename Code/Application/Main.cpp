@@ -57,7 +57,7 @@ Verify(VkResult Result)
 }
 
 static bool
-CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
+VulkanCreateInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
 {
   Assert(Vulkan->DLL);
   Assert(Vulkan->vkCreateInstance);
@@ -104,7 +104,7 @@ CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
     bool SurfaceExtensionFound = false;
     bool PlatformSurfaceExtensionFound = false;
 
-    uint ExtensionCount;
+    uint32_t ExtensionCount;
     Verify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
     scoped_array<VkExtensionProperties> ExtensionProperties = { TempAllocator };
@@ -190,12 +190,127 @@ CreateVulkanInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
 }
 
 static void
+VulkanDestroyInstance(vulkan* Vulkan)
+{
+  VkAllocationCallbacks const* AllocationCallbacks = nullptr;
+  Vulkan->vkDestroyInstance(Vulkan->InstanceHandle, AllocationCallbacks);
+}
+
+static void
 Win32SetupConsole(char const* Title)
 {
   AllocConsole();
   AttachConsole(GetCurrentProcessId());
   freopen("CON", "w", stdout);
   SetConsoleTitleA(Title);
+}
+
+VKAPI_ATTR
+VkBool32 VKAPI_CALL
+VulkanDebugCallback(
+  VkDebugReportFlagsEXT      Flags,
+  VkDebugReportObjectTypeEXT ObjectType,
+  uint64_t                   Object,
+  size_t                     Location,
+  int32_t                    MessageCode,
+  char const*                pLayerPrefix,
+  char const*                pMessage,
+  void*                      pUserData)
+{
+  if(Flags & VK_DEBUG_REPORT_ERROR_BIT_EXT)
+  {
+    LogError("[%s] Code %d: %s", pLayerPrefix, MessageCode, pMessage);
+  }
+  else if(Flags & VK_DEBUG_REPORT_WARNING_BIT_EXT)
+  {
+    LogWarning("[%s] Code %d: %s", pLayerPrefix, MessageCode, pMessage);
+  }
+  else
+  {
+    LogInfo("[%s] Code %d: %s", pLayerPrefix, MessageCode, pMessage);
+  }
+
+  return false;
+}
+
+static bool
+VulkanSetupDebugging(vulkan* Vulkan)
+{
+  LogBeginScope("Setting up Vulkan debugging.");
+  Defer(, LogEndScope("Finished debug setup."));
+
+  if(Vulkan->vkCreateDebugReportCallbackEXT != nullptr)
+  {
+    VkDebugReportCallbackCreateInfoEXT DebugSetupInfo = {};
+    DebugSetupInfo.pfnCallback = &VulkanDebugCallback;
+    DebugSetupInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
+
+    Verify(Vulkan->vkCreateDebugReportCallbackEXT(Vulkan->InstanceHandle,
+                                                  &DebugSetupInfo,
+                                                  nullptr,
+                                                  &Vulkan->DebugCallbackHandle));
+    return true;
+  }
+  else
+  {
+    LogWarning("Unable to set up debugging: vkCreateDebugReportCallbackEXT is nullptr");
+    return false;
+  }
+}
+
+static void
+VulkanCleanupDebugging(vulkan* Vulkan)
+{
+  if(Vulkan->vkDestroyDebugReportCallbackEXT && Vulkan->DebugCallbackHandle)
+  {
+    Vulkan->vkDestroyDebugReportCallbackEXT(Vulkan->InstanceHandle, Vulkan->DebugCallbackHandle, nullptr);
+  }
+}
+
+
+bool
+VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAllocator)
+{
+  uint32_t GpuCount;
+  Verify(Vulkan->vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
+                                            &GpuCount, nullptr));
+  if(GpuCount == 0)
+  {
+    LogError("No GPUs found.");
+    return false;
+  }
+
+  LogInfo("Found %u physical device(s).", GpuCount);
+
+  scoped_array<VkPhysicalDevice> Gpus{ TempAllocator };
+  ExpandBy(&Gpus, GpuCount);
+
+  Verify(Vulkan->vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
+                                            &GpuCount, Gpus.Ptr));
+
+  // Use the first Physical Device for now.
+  uint32_t const GpuIndex = 0;
+  Vulkan->Gpu.GpuHandle = Gpus[GpuIndex];
+
+  //
+  // Properties
+  //
+  {
+    LogBeginScope("Querying for physical device and queue properties.");
+    Defer(, LogEndScope("Retrieved physical device and queue properties."));
+
+    Vulkan->vkGetPhysicalDeviceProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Properties);
+    Vulkan->vkGetPhysicalDeviceMemoryProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.MemoryProperties);
+    Vulkan->vkGetPhysicalDeviceFeatures(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Features);
+
+    uint32_t QueueCount;
+    Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, nullptr);
+    Clear(&Vulkan->Gpu.QueueProperties);
+    ExpandBy(&Vulkan->Gpu.QueueProperties, QueueCount);
+    Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, Vulkan->Gpu.QueueProperties.Ptr);
+  }
+
+  return true;
 }
 
 int
@@ -219,18 +334,34 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
   x_input_dll XInput;
   Win32LoadXInput(&XInput, GlobalLog);
 
-  vulkan Vulkan;
+  {
+    auto Vulkan = Allocate<vulkan>(Allocator);
+    MemDefaultConstruct(1, Vulkan);
+    Defer(=, Deallocate(Allocator, Vulkan));
 
-  if(!LoadVulkanDLL(&Vulkan))
-    return 1;
+    Init(Vulkan, Allocator);
+    Defer(=, Finalize(Vulkan));
 
-  if(!CreateVulkanInstance(&Vulkan, Allocator))
-    return 2;
+    if(!VulkanLoadDLL(Vulkan))
+      return 1;
 
-  if(!LoadInstanceFunctions(&Vulkan))
-    return 3;
+    if(!VulkanCreateInstance(Vulkan, Allocator))
+      return 2;
+    Defer(=, VulkanDestroyInstance(Vulkan));
 
-  // TODO Create and open window.
+    VulkanLoadInstanceFunctions(Vulkan);
+
+    VulkanSetupDebugging(Vulkan);
+    Defer(=, VulkanCleanupDebugging(Vulkan));
+
+    if(!VulkanChooseAndSetupPhysicalDevices(Vulkan, Allocator))
+      return 4;
+
+    // TODO Create and open window.
+
+    // if(!VulkanInitializeForGraphics(&Vulkan, Instance, Window.WindowHandle))
+    //   return 5;
+  }
 
   return 0;
 }
