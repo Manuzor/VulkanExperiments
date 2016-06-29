@@ -20,6 +20,10 @@ BuildRules = [
     "Arg": "Core",
   },
   {
+    "Name": "Application",
+    "Arg": "Application",
+  },
+  {
     "Name": "Tests: Build Only",
     "Arg": "Tests",
   },
@@ -28,19 +32,15 @@ BuildRules = [
     "Arg": "Tests-Run",
   },
   {
-    "Name": "Application",
-    "Arg": "Application",
-  },
-  {
-    "Name": "Generate Sublime Text Project",
+    "Name": "Generate: Sublime Text Project",
     "Arg": "subl",
   },
   {
-    "Name": "Generate Visual Studio Solution",
+    "Name": "Generate: Visual Studio Solution",
     "Arg": "vs",
   },
   {
-    "Name": "Clean",
+    "Name": "Rebuild All",
     "Arg": "-clean",
   },
 ]
