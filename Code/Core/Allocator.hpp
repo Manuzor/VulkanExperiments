@@ -25,8 +25,9 @@ slice<T>
 SliceAllocate(allocator_interface* Allocator, size_t Num)
 {
   // TODO Alignment
-  auto Ptr = Allocator->Allocate(Num * sizeof(T), 1);
-  return Slice(Num, Reinterpret<T*>(Ptr));
+  enum { Alignment = __alignof(T) };
+  auto Memory = Allocator->Allocate(Num * sizeof(T), Alignment);
+  return Slice(Num, Reinterpret<T*>(Memory));
 }
 
 template<typename T>
@@ -34,4 +35,22 @@ void
 SliceDeallocate(allocator_interface* Allocator, slice<T> Slice)
 {
   Allocator->Deallocate(Slice.Ptr);
+}
+
+template<typename T>
+T*
+Allocate(allocator_interface* Allocator)
+{
+  // TODO Alignment
+  enum { Alignment = __alignof(T) };
+  auto Memory = Allocator->Allocate(sizeof(T), Alignment);
+  auto Ptr = Reinterpret<T*>(Memory);
+  return Ptr;
+}
+
+template<typename T>
+void
+Deallocate(allocator_interface* Allocator, T* Object)
+{
+  Allocator->Deallocate(Object);
 }
