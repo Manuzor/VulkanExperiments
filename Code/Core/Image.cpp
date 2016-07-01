@@ -22,16 +22,16 @@ ImageValidateSubImageIndices(image const* Image, uint32 MipLevel, uint32 Face, u
   }
 }
 
-static image::sub_image const*
-ImageSubImage(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
+image::sub_image const*
+ImageInternalSubImage(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
 {
   ImageValidateSubImageIndices(Image, MipLevel, Face, ArrayIndex);
   auto Index = MipLevel + Image->NumMipLevels * (Face + Image->NumFaces * ArrayIndex);
   return &Image->InternalSubImages[Index];
 }
 
-static image::sub_image*
-ImageSubImage(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
+image::sub_image*
+ImageInternalSubImage(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
 {
   ImageValidateSubImageIndices(Image, MipLevel, Face, ArrayIndex);
   auto Index = MipLevel + Image->NumMipLevels * (Face + Image->NumFaces * ArrayIndex);
@@ -106,7 +106,7 @@ ImageAllocateData(image* Image)
     {
       for (uint32 MipLevel = 0; MipLevel < Image->NumMipLevels; MipLevel++)
       {
-        image::sub_image* SubImage = ImageSubImage(Image, MipLevel, Face, ArrayIndex);
+        image::sub_image* SubImage = ImageInternalSubImage(Image, MipLevel, Face, ArrayIndex);
 
         SubImage->DataOffset = DataSize;
 
@@ -141,19 +141,19 @@ ImageRowPitch(image const* Image, uint32 MipLevel)
     Assert(false);
   }
 
-  return ImageSubImage(Image, MipLevel, 0, 0)->RowPitch;
+  return ImageInternalSubImage(Image, MipLevel, 0, 0)->RowPitch;
 }
 
 auto
 ImageDepthPitch(image const* Image, uint32 MipLevel)
   -> uint32
 {
-  return ImageSubImage(Image, MipLevel, 0, 0)->DepthPitch;
+  return ImageInternalSubImage(Image, MipLevel, 0, 0)->DepthPitch;
 }
 
 auto
 ImageDataOffSet(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
   -> uint32
 {
-  return ImageSubImage(Image, MipLevel, Face, ArrayIndex)->DataOffset;
+  return ImageInternalSubImage(Image, MipLevel, Face, ArrayIndex)->DataOffset;
 }

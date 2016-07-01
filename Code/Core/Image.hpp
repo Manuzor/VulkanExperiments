@@ -62,3 +62,97 @@ ImageDepthPitch(image const* Image, uint32 MipLevel = 0);
 /// \brief Returns the position in bytes in the data array of the given sub-image.
 uint32
 ImageDataOffSet(image const* Image, uint32 MipLevel = 0, uint32 Face = 0, uint32 ArrayIndex = 0);
+
+image::sub_image const*
+ImageInternalSubImage(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex);
+
+image::sub_image*
+ImageInternalSubImage(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex);
+
+
+template<typename T>
+T const*
+ImageDataPointer(image const* Image)
+{
+  return Reinterpret<T const*>(&Image->Data[0]);
+}
+
+template<typename T>
+T*
+ImageDataPointer(image* Image)
+{
+  return const_cast<T*>(ImageDataPointer<T>(AsPtrToConst(Image)));
+}
+
+template<typename T>
+T const*
+ImageSubImagePointer(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
+{
+  return Reinterpret<T const*>(&Image->Data[ImageInternalSubImage(MipLevel, Face, ArrayIndex)->DataOffset]);
+}
+
+template<typename T>
+T*
+ImageSubImagePointer(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
+{
+  return const_cast<T*>(ImageSubImagePointer<T>(AsPtrToConst(Image), MipLevel, Face, ArrayIndex));
+}
+
+template<typename T>
+T const*
+ImagePixelPointer(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex, uint32 X, uint32 Y, uint32 Z)
+{
+  if(ImageFormatType(Image->Format) != image_format_type::LINEAR)
+  {
+    LogError("Pixel pointer can only be retrieved for linear formats.");
+    Assert(false);
+  }
+  BoundsCheck(X < Image->Width);
+  BoundsCheck(Y < Image->Heighth);
+  BoundsCheck(Z < Image->Depth);
+
+  uint8 const* Ptr = ImageSubImagePointer<uint8>(Image, MipLevel, Face, ArrayIndex);
+
+  Ptr += Z * ImageDepthPitch(Image, MipLevel);
+  Ptr += Y * ImageRowPitch(Image, MipLevel);
+  Ptr += X * ImageFormatBitsPerPixel(Image->Format) / 8;
+
+  return Reinterpret<T const*>(Ptr);
+}
+
+template<typename T>
+T*
+ImagePixelPointer(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex, uint32 X, uint32 Y, uint32 Z)
+{
+  return const_cast<T*>(ImagePixelPointer<T>(AsPtrToConst(Image), MipLevel, Face, ArrayIndex, X, Y, Z));
+}
+
+
+template<typename T>
+T const*
+ImageBlockPointer(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex, uint32 BlockX, uint32 BlockY, uint32 Z)
+{
+  if(ImageFormatType(Image->Format) != image_format_type::BLOCK_COMPRESSED)
+  {
+    LogError("Block pointer can only be retrieved for block compressed formats.");
+    Assert(false);
+  }
+
+  uint8 const* BasePointer = ImageSubImagePointer<uint8>(Image, MipLevel, Face, ArrayIndex);
+
+  BasePointer += Z * ImageDepthPitch(Image, MipLevel);
+
+  uint32 const BlockSize = 4;
+  uint32 const NumBlocksX = ImageWidth(Image, MipLevel) / BlockSize;
+  uint32 const BlockIndex = BlockX + NumBlocksX * BlockY;
+
+  BasePointer += BlockIndex * BlockSize * BlockSize * ImageFormatBitsPerPixel(Image->Format) / 8;
+  return Reinterpret<T const*>(BasePointer);
+}
+
+template<typename T>
+T*
+ImageBlockPointer(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex, uint32 BlockX, uint32 BlockY, uint32 Z)
+{
+  return const_cast<T*>(ImageBlockPointer<T>(AsPtrToConst(Image), MipLevel, Face, ArrayIndex, BlockX, BlockY, Z));
+}
