@@ -1,6 +1,11 @@
 #pragma once
 
-#include "Image.hpp"
+#include "Allocator.hpp"
+#include "DynamicArray.hpp"
+
+#include <Backbone.hpp>
+
+struct image;
 
 class image_loader_interface
 {
