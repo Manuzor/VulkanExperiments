@@ -179,3 +179,15 @@ ImageFormatType(image_format Format);
 
 image_format
 ImageFormatFromPixelMask(uint32 RedMask, uint32 GreenMask, uint32 BlueMask, uint32 AlphaMask);
+
+uint32
+ImageFormatToDxgiFormat(image_format Format);
+
+image_format
+ImageFormatFromDxgiFormat(uint32 DxgiFormat);
+
+uint32
+ImageFormatToFourCc(image_format Format);
+
+image_format
+ImageFormatFromFourCc(uint32 FourCc);

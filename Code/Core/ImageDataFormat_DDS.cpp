@@ -111,7 +111,7 @@ constexpr uint32 DdsDxt10FourCc = 0x30315844;
 
 
 static size_t
-ConsumeAndReadInto(slice<void>* Data, slice<void> Result)
+ConsumeAndReadInto(slice<void const>* Data, slice<void> Result)
 {
   auto Amount = Min(Result.Num, Data->Num);
   if(Amount == 0)
@@ -128,7 +128,7 @@ ConsumeAndReadInto(slice<void>* Data, slice<void> Result)
 
 template<typename T>
 bool
-ConsumeAndReadInto(slice<void>* Data, T* Result)
+ConsumeAndReadInto(slice<void const>* Data, T* Result)
 {
   if(Data->Num < sizeof(T))
     return false;
@@ -141,7 +141,7 @@ ConsumeAndReadInto(slice<void>* Data, T* Result)
 }
 
 auto
-image_loader_dds::LoadImageFromData(slice<void> RawImageData, image* ResultImage)
+image_loader_dds::LoadImageFromData(slice<void const> RawImageData, image* ResultImage)
   -> bool
 {
   if(!RawImageData)
@@ -197,7 +197,7 @@ image_loader_dds::LoadImageFromData(slice<void> RawImageData, image* ResultImage
   }
 
   bool IsDxt10 = false;
-  // dds_header_dxt10 HeaderDxt10;
+  dds_header_dxt10 HeaderDxt10;
 
   image_format format = image_format::UNKNOWN;
 
@@ -225,7 +225,6 @@ image_loader_dds::LoadImageFromData(slice<void> RawImageData, image* ResultImage
   }
   else if((FileHeader.Ddspf.Flags & ddpf_flags::FOURCC) != 0)
   {
-    #if 0
     if(FileHeader.Ddspf.FourCC == DdsDxt10FourCc)
     {
       if(ConsumeAndReadInto(&RawImageData, &HeaderDxt10))
@@ -235,7 +234,7 @@ image_loader_dds::LoadImageFromData(slice<void> RawImageData, image* ResultImage
       }
       IsDxt10 = true;
 
-      format = ezImageFormatMappings::FromDxgiFormat(HeaderDxt10.DxgiFormat);
+      format = ImageFormatFromDxgiFormat(HeaderDxt10.DxgiFormat);
 
       if(format == image_format::UNKNOWN)
       {
@@ -245,7 +244,7 @@ image_loader_dds::LoadImageFromData(slice<void> RawImageData, image* ResultImage
     }
     else
     {
-      format = ezImageFormatMappings::FromFourCc(FileHeader.Ddspf.FourCC);
+      format = ImageFormatFromFourCc(FileHeader.Ddspf.FourCC);
 
       if(format == image_format::UNKNOWN)
       {
@@ -257,9 +256,6 @@ image_loader_dds::LoadImageFromData(slice<void> RawImageData, image* ResultImage
         return false;
       }
     }
-    #endif
-    // Not implemented.
-    Assert(false);
   }
   else
   {

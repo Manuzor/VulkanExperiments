@@ -13,13 +13,11 @@
 
   VCXProject( '$ProjectName$-Proj' )
   {
-    .Output = '$RepoRoot$/Build/$ProjectName$.exe'
+    .Output = '$RepoRoot$/Build/$ProjectName$.dll'
     .OutputDirectory = '$RepoRoot$/Build'
 
     .ProjectOutput = 'Workspace/VisualStudio/$ProjectName$.vcxproj'
     .ProjectInputPaths = { '$SourcePath$' }
-    .LocalDebuggerCommand = '$Output$'
-    .LocalDebuggerWorkingDirectory = '$RepoRoot$/Build'
   }
 
   ObjectList( '$ProjectName$-Lib' )

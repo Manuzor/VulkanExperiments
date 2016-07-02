@@ -1,12 +1,13 @@
 #pragma once
 
 #include "CoreAPI.hpp"
-#include "ImageLoaderInterface.hpp"
+#include "ImageLoader.hpp"
 
 
 class image_loader_dds : public image_loader_interface
 {
-  virtual bool LoadImageFromData(slice<void> RawImageData, image* ResultImage) override;
+public:
+  virtual bool LoadImageFromData(slice<void const> RawImageData, image* ResultImage) override;
   virtual bool WriteImageToArray(image* Image, dynamic_array<uint8> const* RawImageData) override;
 };
 

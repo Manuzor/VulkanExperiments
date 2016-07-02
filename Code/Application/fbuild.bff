@@ -19,7 +19,7 @@
     .ProjectOutput = 'Workspace/VisualStudio/$ProjectName$.vcxproj'
     .ProjectInputPaths = { '$SourcePath$' }
     .LocalDebuggerCommand = '$Output$'
-    .LocalDebuggerWorkingDirectory = '$RepoRoot$/Build'
+    .LocalDebuggerWorkingDirectory = '$RepoRoot$'
     .IncludeSearchPath + '$VulkanSDKPath$/Include;'
   }
 

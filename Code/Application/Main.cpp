@@ -5,6 +5,9 @@
 #include <Core/Input.hpp>
 #include <Core/Win32_Input.hpp>
 
+#include <Core/Image.hpp>
+#include <Core/ImageLoader.hpp>
+
 #include <Backbone.hpp>
 
 #include <Windows.h>
