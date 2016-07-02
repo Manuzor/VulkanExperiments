@@ -1,7 +1,10 @@
 #include "ImageFormat.hpp"
 
+#include "Log.hpp"
+
 struct image_format_meta
 {
+  image_format      Format;
   char const*       Name;
   uint32            BitsPerPixel;
   uint32            RedMask;
@@ -18,7 +21,7 @@ static void
 InitImageFormatMetaDataMap()
 {
   #define DEFINE_FORMAT(Name, BPP, RedMask, GreenMask, BlueMask, AlphaMask, TypeName)\
-    ImageFormatMetaData[Cast<size_t>(image_format::Name)] = { #Name, BPP, RedMask, GreenMask, BlueMask, AlphaMask, image_format_type::TypeName };
+    ImageFormatMetaData[Cast<size_t>(image_format::Name)] = { image_format::Name, #Name, BPP, RedMask, GreenMask, BlueMask, AlphaMask, image_format_type::TypeName };
 
   DEFINE_FORMAT(UNKNOWN, 0, 0, 0, 0, 0, UNKNOWN);
 
@@ -200,8 +203,28 @@ ImageFormatType(image_format Format)
 }
 
 image_format
-ImageFormatFromPixelMask(uint32 RedMask, uint32 GreenMask, uint32 BlueMask, uint32 AlphaMask)
+ImageFormatFromPixelMask(uint32 RedMask, uint32 GreenMask, uint32 BlueMask, uint32 AlphaMask,
+                         uint32 BitsPerPixel)
 {
+  if(!ImageFormatMetaDataMapIsInitialized)
+  {
+    InitImageFormatMetaDataMap();
+    ImageFormatMetaDataMapIsInitialized = true;
+  }
+
+  for(auto& Candidate : ImageFormatMetaData)
+  {
+    if(Candidate.RedMask == RedMask &&
+       Candidate.GreenMask == GreenMask &&
+       Candidate.BlueMask == BlueMask &&
+       Candidate.AlphaMask == AlphaMask)
+    {
+      if(Candidate.BitsPerPixel == BitsPerPixel)
+        return Candidate.Format;
+      LogWarning("%s matches the pixel mask but does not match with the requested bits per pixel.", Candidate.Name);
+    }
+  }
+
   return image_format::UNKNOWN;
 }
 

@@ -1171,7 +1171,7 @@ template<size_t N, typename t_element>
 t_element*
 end(fixed_block<N, t_element>& Block)
 {
-  return begin(Block) + Block.N;
+  return begin(Block) + N;
 }
 
 /// C++11 range API
@@ -1187,7 +1187,7 @@ template<size_t N, typename t_element>
 t_element*
 end(fixed_block<N, t_element> const& Block)
 {
-  return begin(Block) + Block.N;
+  return begin(Block) + N;
 }
 
 template<size_t N, typename t_element>

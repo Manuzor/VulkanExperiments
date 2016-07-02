@@ -178,7 +178,8 @@ image_format_type
 ImageFormatType(image_format Format);
 
 image_format
-ImageFormatFromPixelMask(uint32 RedMask, uint32 GreenMask, uint32 BlueMask, uint32 AlphaMask);
+ImageFormatFromPixelMask(uint32 RedMask, uint32 GreenMask, uint32 BlueMask, uint32 AlphaMask,
+                         uint32 BitsPerPixel);
 
 uint32
 ImageFormatToDxgiFormat(image_format Format);

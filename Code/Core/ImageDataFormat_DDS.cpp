@@ -206,20 +206,13 @@ image_loader_dds::LoadImageFromData(slice<void const> RawImageData, image* Resul
   {
     format = ImageFormatFromPixelMask(
       FileHeader.Ddspf.RBitMask, FileHeader.Ddspf.GBitMask,
-      FileHeader.Ddspf.BBitMask, FileHeader.Ddspf.ABitMask);
+      FileHeader.Ddspf.BBitMask, FileHeader.Ddspf.ABitMask,
+      FileHeader.Ddspf.RGBBitCount);
 
     if(format == image_format::UNKNOWN)
     {
-      LogError("The pixel mask specified was not recognized (R: %x, G: %x, B: %x, A: %x).",
-        FileHeader.Ddspf.RBitMask, FileHeader.Ddspf.GBitMask, FileHeader.Ddspf.BBitMask, FileHeader.Ddspf.ABitMask);
-      return false;
-    }
-
-    // Verify that the format we found is correct
-    if(ImageFormatBitsPerPixel(format) != FileHeader.Ddspf.RGBBitCount)
-    {
-      LogError("The number of bits per pixel specified in the file (%d) does not match the expected value of %d for the format '%s'.",
-        FileHeader.Ddspf.RGBBitCount, ImageFormatBitsPerPixel(format), ImageFormatName(format));
+      LogError("The pixel mask specified was not recognized (R: %x, G: %x, B: %x, A: %x, Bpp: %x).",
+        FileHeader.Ddspf.RBitMask, FileHeader.Ddspf.GBitMask, FileHeader.Ddspf.BBitMask, FileHeader.Ddspf.ABitMask, FileHeader.Ddspf.RGBBitCount);
       return false;
     }
   }
