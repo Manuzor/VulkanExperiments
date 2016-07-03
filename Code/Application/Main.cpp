@@ -9,6 +9,8 @@
 #include <Core/Image.hpp>
 #include <Core/ImageLoader.hpp>
 
+#include <Core/MathVector.hpp>
+
 #include <Backbone.hpp>
 
 #include <Windows.h>
