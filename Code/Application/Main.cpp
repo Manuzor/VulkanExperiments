@@ -42,6 +42,7 @@ struct window
   int ClientWidth;
   int ClientHeight;
 
+  win32_input_context* Input;
   vulkan* Vulkan;
 };
 
@@ -453,9 +454,6 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
   SinkSlots[0] = log_sink(StdoutLogSink);
   SinkSlots[1] = log_sink(VisualStudioLogSink);
 
-  x_input_dll XInput;
-  Win32LoadXInput(&XInput, GlobalLog);
-
   {
     auto Vulkan = Allocate<vulkan>(Allocator);
     MemDefaultConstruct(1, Vulkan);
@@ -486,36 +484,82 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     WindowSetup.ClientHeight = 768;
     auto Window = Win32CreateWindow(Allocator, &WindowSetup);
 
-    if(Window)
+    if(Window == nullptr)
+      return 5;
+
+    Defer(=, Win32DestroyWindow(Allocator, Window));
+
+    //
+    // Input Setup
+    //
+    x_input_dll XInput = {};
+    win32_input_context SystemInput = {};
     {
-      Defer(=, Win32DestroyWindow(Allocator, Window));
+      Win32LoadXInput(&XInput, GlobalLog);
+      Init(&SystemInput, Allocator);
 
-      // TODO: Input.
-
-      // if(!VulkanInitializeForGraphics(&Vulkan, Instance, Window->WindowHandle))
-      //   return 5;
+      Win32RegisterAllMouseSlots(&SystemInput);
+      Win32RegisterAllXInputSlots(&SystemInput);
+      Win32RegisterAllKeyboardSlots(&SystemInput);
 
       //
-      // Main Loop
+      // Input Mappings
       //
-      ::GlobalRunning = true;
+      RegisterInputSlot(&SystemInput, input_type::Button, InputId("Quit"));
+      AddInputSlotMapping(&SystemInput, keyboard::Escape, InputId("Quit"));
+      AddInputSlotMapping(&SystemInput, x_input::Start, InputId("Quit"));
+    }
+    Defer(&SystemInput, Finalize(&SystemInput));
 
-      stopwatch FrameTimer = {};
-      StopwatchStart(&FrameTimer);
+    Window->Input = &SystemInput;
 
-      float DeltaSeconds = 0.016f; // Assume 16 milliseconds for the first frame.
+    // if(!VulkanInitializeForGraphics(&Vulkan, Instance, Window->WindowHandle))
+    //   return 5;
 
-      while(::GlobalRunning)
+    //
+    // Main Loop
+    //
+    ::GlobalRunning = true;
+
+    stopwatch FrameTimer = {};
+    StopwatchStart(&FrameTimer);
+
+    float DeltaSeconds = 0.016f; // Assume 16 milliseconds for the first frame.
+
+    while(::GlobalRunning)
+    {
+      BeginInputFrame(&SystemInput);
       {
         Win32MessagePump();
-        RedrawWindow(Window->WindowHandle, nullptr, nullptr, RDW_INTERNALPAINT);
+        Win32PollXInput(&XInput, &SystemInput);
+      }
+      EndInputFrame(&SystemInput);
 
-        // Update frame timer.
+      // "Game" logic
+      {
+        auto QuitId = InputId("Quit");
+        if(ButtonIsDown(SystemInput[QuitId]))
         {
-          StopwatchStop(&FrameTimer);
-          DeltaSeconds = Cast<float>(TimeAsSeconds(StopwatchTime(&FrameTimer)));
-          StopwatchStart(&FrameTimer);
+          ::GlobalRunning = false;
+          break;
         }
+      }
+
+      if(::GlobalIsResizeRequested)
+      {
+        LogBeginScope("Resizing swapchain");
+        // TODO: Do the resizing here.
+        ::GlobalIsResizeRequested = false;
+        LogEndScope("Finished resizing swapchain");
+      }
+
+      RedrawWindow(Window->WindowHandle, nullptr, nullptr, RDW_INTERNALPAINT);
+
+      // Update frame timer.
+      {
+        StopwatchStop(&FrameTimer);
+        DeltaSeconds = Cast<float>(TimeAsSeconds(StopwatchTime(&FrameTimer)));
+        StopwatchStart(&FrameTimer);
       }
     }
   }
@@ -546,10 +590,11 @@ Win32MainWindowCallback(HWND WindowHandle, UINT Message,
           Message >= WM_MOUSEFIRST && Message <= WM_MOUSELAST ||
           Message == WM_INPUT)
   {
-    // TODO(Manu): Deal with the return value?
-    // TODO
-    // Win32ProcessInputMessage(WindowHandle, Message, WParam, LParam,
-    //                          Window->Input);
+    if(Window->Input)
+    {
+      // TODO(Manu): Deal with the return value?
+      Win32ProcessInputMessage(WindowHandle, Message, WParam, LParam, Window->Input);
+    }
   }
   else if(Message == WM_SIZE)
   {

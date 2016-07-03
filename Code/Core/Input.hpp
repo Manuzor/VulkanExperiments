@@ -8,6 +8,9 @@
 
 using input_id = slice<char const>;
 
+/// Creates an input_id from a C-string.
+input_id CORE_API
+InputId(char const* InputName);
 
 enum class input_type
 {
@@ -118,10 +121,10 @@ void CORE_API
 RegisterInputSlot(input_context* Context, input_type Type, input_id SlotId);
 
 bool CORE_API
-AddInputSlotMapping(input_context* Context, input_id SlotId, input_id TriggerId, float Scale = 1.0f);
+AddInputSlotMapping(input_context* Context, input_id SourceSlotId, input_id TargetSlotId, float Scale = 1.0f);
 
 bool CORE_API
-RemoveInputTrigger(input_context* Context, input_id SlotId, input_id TriggerId);
+RemoveInputTrigger(input_context* Context, input_id SourceSlotId, input_id TargetSlotId);
 
 /// Overload for booleans.
 ///
