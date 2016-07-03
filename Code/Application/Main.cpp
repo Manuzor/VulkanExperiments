@@ -12,46 +12,143 @@
 
 #include <Windows.h>
 
+static bool GlobalRunning = false;
+static bool GlobalIsResizeRequested = false;
+static int GlobalResizeRequest_Width = 0;
+static int GlobalResizeRequest_Height = 0;
 
-struct window_construction_data
+static LRESULT WINAPI
+Win32MainWindowCallback(HWND WindowHandle, UINT Message,
+                        WPARAM WParam, LPARAM LParam);
+
+struct window_setup
 {
   HINSTANCE ProcessHandle;
-  slice<char> WindowClassName;
+  char const* WindowClassName;
   int ClientWidth;
   int ClientHeight;
 
+  bool HasCustomWindowX;
   int WindowX;
+
+  bool HasCustomWindowY;
   int WindowY;
 };
 
-struct window_data
+struct window
 {
-  HWND Handle;
-  int PositionX;
-  int PositionY;
+  HWND WindowHandle;
   int ClientWidth;
   int ClientHeight;
 
   vulkan* Vulkan;
 };
 
-#if 0
 
-static window_data
-Win32CreateWindow(allocator_interface* Allocator, const window_construction_data& Args,
+static window*
+Win32CreateWindow(allocator_interface* Allocator, window_setup const* Args,
                   log_data* Log = nullptr)
 {
-  // TODO
-  return window_data();
+  if(Args->ProcessHandle == INVALID_HANDLE_VALUE)
+  {
+    LogError("Need a valid process handle.");
+    return nullptr;
+  }
+
+  if(Args->WindowClassName == nullptr)
+  {
+    LogError("Need a window class name.");
+    return nullptr;
+  }
+
+  if(Args->ClientWidth == 0)
+  {
+    LogError("Need a window client width.");
+    return nullptr;
+  }
+
+  if(Args->ClientHeight == 0)
+  {
+    LogError("Need a window client height.");
+    return nullptr;
+  }
+
+  WNDCLASSA WindowClass = {};
+  WindowClass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+  WindowClass.lpfnWndProc = &Win32MainWindowCallback;
+  WindowClass.hInstance = Args->ProcessHandle;
+  WindowClass.lpszClassName = Args->WindowClassName;
+
+  if(!RegisterClassA(&WindowClass))
+  {
+    LogError("Failed to register window class: %s", WindowClass.lpszClassName);
+    return nullptr;
+  }
+
+  DWORD const WindowStyleEx = 0;
+  DWORD const WindowStyle = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
+
+  RECT WindowRect = {};
+  WindowRect.right = Args->ClientWidth;
+  WindowRect.bottom = Args->ClientHeight;
+  AdjustWindowRectEx(&WindowRect, WindowStyle, FALSE, WindowStyleEx);
+
+  WindowRect.right -= WindowRect.left;
+  WindowRect.bottom -= WindowRect.top;
+
+  // Apply user translation
+  WindowRect.left = Args->HasCustomWindowX ? Cast<LONG>(Args->WindowX) : 0;
+  WindowRect.right += WindowRect.left;
+  WindowRect.top = Args->HasCustomWindowY ? Cast<LONG>(Args->WindowY) : 0;
+  WindowRect.bottom += WindowRect.top;
+
+
+  RECT WindowWorkArea = {};
+  SystemParametersInfoW(SPI_GETWORKAREA, 0, &WindowWorkArea, 0);
+  WindowRect.left   += WindowWorkArea.left;
+  WindowRect.right  += WindowWorkArea.left;
+  WindowRect.top    += WindowWorkArea.top;
+  WindowRect.bottom += WindowWorkArea.top;
+
+  HWND WindowHandle;
+  auto const WindowX = Args->HasCustomWindowX ? WindowRect.left : CW_USEDEFAULT;
+  auto const WindowY = Args->HasCustomWindowY ? WindowRect.top : CW_USEDEFAULT;
+  auto const WindowWidth = WindowRect.right - WindowRect.left;
+  auto const WindowHeight = WindowRect.bottom - WindowRect.top;
+  WindowHandle = CreateWindowExA(WindowStyleEx,             // _In_     DWORD     dwExStyle
+                                 WindowClass.lpszClassName, // _In_opt_ LPCWSTR   lpClassName
+                                 "The Title Text",          // _In_opt_ LPCWSTR   lpWindowName
+                                 WindowStyle,               // _In_     DWORD     dwStyle
+                                 WindowX, WindowY,          // _In_     int       X, Y
+                                 WindowWidth, WindowHeight, // _In_     int       nWidth, nHeight
+                                 nullptr,                   // _In_opt_ HWND      hWndParent
+                                 nullptr,                   // _In_opt_ HMENU     hMenu
+                                 Args->ProcessHandle,       // _In_opt_ HINSTANCE hInstance
+                                 nullptr);                  // _In_opt_ LPVOID    lpParam
+
+  if(WindowHandle == nullptr)
+  {
+    LogError("Failed to create window.");
+    return nullptr;
+  }
+
+  auto Window = Allocate<window>(Allocator);
+  MemDefaultConstruct(1, Window);
+  Window->WindowHandle = WindowHandle;
+  Window->ClientWidth = Args->ClientWidth;
+  Window->ClientHeight = Args->ClientHeight;
+
+  SetWindowLongPtr(Window->WindowHandle, GWLP_USERDATA, Reinterpret<LONG_PTR>(Window));
+
+  return Window;
 }
 
 static void
-Win32DestroyWindow(allocator_interface* Allocator, const window_data& Window)
+Win32DestroyWindow(allocator_interface* Allocator, window* Window)
 {
-  // TODO
+  // TODO: Close the window somehow?
+  Deallocate(Allocator, Window);
 }
-
-#endif
 
 static void
 Verify(VkResult Result)
@@ -316,6 +413,27 @@ VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAll
   return true;
 }
 
+void Win32MessagePump()
+{
+  MSG Message;
+  while(PeekMessageA(&Message, nullptr, 0, 0, PM_REMOVE))
+  {
+    switch(Message.message)
+    {
+      case WM_QUIT:
+      {
+        ::GlobalRunning = false;
+      } break;
+
+      default:
+      {
+        TranslateMessage(&Message);
+        DispatchMessageA(&Message);
+      } break;
+    }
+  }
+}
+
 int
 WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         LPSTR CommandLine, int ShowCode)
@@ -360,11 +478,93 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     if(!VulkanChooseAndSetupPhysicalDevices(Vulkan, Allocator))
       return 4;
 
-    // TODO Create and open window.
+    window_setup WindowSetup = {};
+    WindowSetup.ProcessHandle = Instance;
+    WindowSetup.WindowClassName = "VulkanExperimentsWindowClass";
+    WindowSetup.ClientWidth = 768;
+    WindowSetup.ClientHeight = 768;
+    auto Window = Win32CreateWindow(Allocator, &WindowSetup);
 
-    // if(!VulkanInitializeForGraphics(&Vulkan, Instance, Window.WindowHandle))
-    //   return 5;
+    if(Window)
+    {
+      Defer(=, Win32DestroyWindow(Allocator, Window));
+
+      // TODO: Input.
+
+      // if(!VulkanInitializeForGraphics(&Vulkan, Instance, Window->WindowHandle))
+      //   return 5;
+
+      ::GlobalRunning = true;
+
+      while(::GlobalRunning)
+      {
+        Win32MessagePump();
+        RedrawWindow(Window->WindowHandle, nullptr, nullptr, RDW_INTERNALPAINT);
+      }
+    }
   }
 
   return 0;
+}
+
+LRESULT
+Win32MainWindowCallback(HWND WindowHandle, UINT Message,
+                        WPARAM WParam, LPARAM LParam)
+{
+  auto Window = Reinterpret<window*>(GetWindowLongPtr(WindowHandle, GWLP_USERDATA));
+  if(Window == nullptr)
+    return DefWindowProcA(WindowHandle, Message, WParam, LParam);
+
+  Assert(Window->WindowHandle == WindowHandle);
+
+  auto Vulkan = Window->Vulkan;
+
+
+  LRESULT Result = 0;
+
+  if(Message == WM_CLOSE || Message == WM_DESTROY)
+  {
+    PostQuitMessage(0);
+  }
+  else if(Message >= WM_KEYFIRST   && Message <= WM_KEYLAST ||
+          Message >= WM_MOUSEFIRST && Message <= WM_MOUSELAST ||
+          Message == WM_INPUT)
+  {
+    // TODO(Manu): Deal with the return value?
+    // Win32ProcessInputMessage(WindowHandle, Message, WParam, LParam,
+    //                          Window->Input);
+  }
+  else if(Message == WM_SIZE)
+  {
+    if(Vulkan && WParam != SIZE_MINIMIZED)
+    {
+      ::GlobalIsResizeRequested = true;
+      ::GlobalResizeRequest_Width = LParam & 0xffff;
+      ::GlobalResizeRequest_Height = (LParam & 0xffff0000) >> 16;
+    }
+  }
+  else if(Message == WM_PAINT)
+  {
+    PAINTSTRUCT Paint;
+
+    RECT Rect;
+    bool MustBeginEndPaint = !!GetUpdateRect(WindowHandle, &Rect, FALSE);
+
+    if(MustBeginEndPaint)
+      BeginPaint(WindowHandle, &Paint);
+
+    // if(Vulkan && Vulkan.IsPrepared)
+    // {
+    //   Vulkan.Draw();
+    // }
+
+    if(MustBeginEndPaint)
+      EndPaint(WindowHandle, &Paint);
+  }
+  else
+  {
+    Result = DefWindowProcA(WindowHandle, Message, WParam, LParam);
+  }
+
+  return Result;
 }
