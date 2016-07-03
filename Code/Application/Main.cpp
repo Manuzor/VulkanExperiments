@@ -4,6 +4,7 @@
 #include <Core/Log.hpp>
 #include <Core/Input.hpp>
 #include <Core/Win32_Input.hpp>
+#include <Core/Time.hpp>
 
 #include <Core/Image.hpp>
 #include <Core/ImageLoader.hpp>
@@ -494,12 +495,27 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       // if(!VulkanInitializeForGraphics(&Vulkan, Instance, Window->WindowHandle))
       //   return 5;
 
+      //
+      // Main Loop
+      //
       ::GlobalRunning = true;
+
+      stopwatch FrameTimer = {};
+      StopwatchStart(&FrameTimer);
+
+      float DeltaSeconds = 0.016f; // Assume 16 milliseconds for the first frame.
 
       while(::GlobalRunning)
       {
         Win32MessagePump();
         RedrawWindow(Window->WindowHandle, nullptr, nullptr, RDW_INTERNALPAINT);
+
+        // Update frame timer.
+        {
+          StopwatchStop(&FrameTimer);
+          DeltaSeconds = Cast<float>(TimeAsSeconds(StopwatchTime(&FrameTimer)));
+          StopwatchStart(&FrameTimer);
+        }
       }
     }
   }
@@ -531,6 +547,7 @@ Win32MainWindowCallback(HWND WindowHandle, UINT Message,
           Message == WM_INPUT)
   {
     // TODO(Manu): Deal with the return value?
+    // TODO
     // Win32ProcessInputMessage(WindowHandle, Message, WParam, LParam,
     //                          Window->Input);
   }
@@ -553,6 +570,7 @@ Win32MainWindowCallback(HWND WindowHandle, UINT Message,
     if(MustBeginEndPaint)
       BeginPaint(WindowHandle, &Paint);
 
+    // TODO
     // if(Vulkan && Vulkan.IsPrepared)
     // {
     //   Vulkan.Draw();
