@@ -131,7 +131,7 @@ V*
 GetOrCreate(dictionary<K, V>* Dict, IndexType KeyIndex)
 {
   auto ArrayIndex = SliceCountUntil(AsConst(Keys(Dict)), KeyIndex);
-  if(ArrayIndex >= 0)
+  if(ArrayIndex != INVALID_INDEX)
     return &Values(Dict)[ArrayIndex];
 
   Reserve(Dict, Dict->Capacity + 1);
