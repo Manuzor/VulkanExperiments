@@ -339,6 +339,9 @@ template<typename ReturnType = double, typename T>
 constexpr ReturnType
 Sqrt(T Value) { return (ReturnType)Sqrt((double)Value); }
 
+float
+InvSqrt(float Value);
+
 // Project a value from [LowerBound, UpperBound] to [0, 1]
 // Example:
 //   auto Result = NormalizeValue<float>(15, 10, 30); // == 0.25f
@@ -352,10 +355,16 @@ NormalizeValue(t_value_type Value, t_lower_bound_type LowerBound, t_upper_bound_
 }
 
 bool
-AreNearlyEqual(double A, double B, double Epsilon);
+AreNearlyEqual(double A, double B, double Epsilon = 1e-4);
 
 bool
-AreNearlyEqual(float A, float B, float Epsilon);
+AreNearlyEqual(float A, float B, float Epsilon = 1e-4f);
+
+inline bool
+IsNearlyZero(double A, double Epsilon = 1e-4) { return AreNearlyEqual(A, 0, Epsilon); }
+
+inline bool
+IsNearlyZero(float A, float Epsilon = 1e-4f) { return AreNearlyEqual(A, 0, Epsilon); }
 
 template<typename t_a, typename t_b>
 inline void
@@ -1084,7 +1093,10 @@ AngleBetween(angle A, angle B);
 
 /// Checks whether A and B are nearly equal with the given Epsilon.
 bool
-AreNearlyEqual(angle A, angle B, angle Epsilon = angle{ 0.0001f });
+AreNearlyEqual(angle A, angle B, angle Epsilon = angle{ 1e-4f });
+
+inline bool
+IsNearlyZero(angle A, angle Epsilon = angle{ 1e-4f }) { return AreNearlyEqual(A, angle{ 0 }, Epsilon); }
 
 //
 // Trigonometric Functions

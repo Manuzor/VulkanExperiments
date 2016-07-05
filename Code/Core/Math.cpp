@@ -1,6 +1,42 @@
 #include "Math.hpp"
 
 auto
+MatrixMultiply(mat4x4 A, mat4x4 B)
+  -> mat4x4
+{
+  mat4x4 Result;
+
+  Result[0][0] = A[0][0] * B[0][0] + A[0][1] * B[1][0] + A[0][2] * B[2][0] + A[0][3] * B[3][0];
+  Result[0][1] = A[0][0] * B[0][1] + A[0][1] * B[1][1] + A[0][2] * B[2][1] + A[0][3] * B[3][1];
+  Result[0][2] = A[0][0] * B[0][2] + A[0][1] * B[1][2] + A[0][2] * B[2][2] + A[0][3] * B[3][2];
+  Result[0][3] = A[0][0] * B[0][3] + A[0][1] * B[1][3] + A[0][2] * B[2][3] + A[0][3] * B[3][3];
+
+  Result[1][0] = A[1][0] * B[0][0] + A[1][1] * B[1][0] + A[1][2] * B[2][0] + A[1][3] * B[3][0];
+  Result[1][1] = A[1][0] * B[0][1] + A[1][1] * B[1][1] + A[1][2] * B[2][1] + A[1][3] * B[3][1];
+  Result[1][2] = A[1][0] * B[0][2] + A[1][1] * B[1][2] + A[1][2] * B[2][2] + A[1][3] * B[3][2];
+  Result[1][3] = A[1][0] * B[0][3] + A[1][1] * B[1][3] + A[1][2] * B[2][3] + A[1][3] * B[3][3];
+
+  Result[2][0] = A[2][0] * B[0][0] + A[2][1] * B[1][0] + A[2][2] * B[2][0] + A[2][3] * B[3][0];
+  Result[2][1] = A[2][0] * B[0][1] + A[2][1] * B[1][1] + A[2][2] * B[2][1] + A[2][3] * B[3][1];
+  Result[2][2] = A[2][0] * B[0][2] + A[2][1] * B[1][2] + A[2][2] * B[2][2] + A[2][3] * B[3][2];
+  Result[2][3] = A[2][0] * B[0][3] + A[2][1] * B[1][3] + A[2][2] * B[2][3] + A[2][3] * B[3][3];
+
+  Result[3][0] = A[3][0] * B[0][0] + A[3][1] * B[1][0] + A[3][2] * B[2][0] + A[3][3] * B[3][0];
+  Result[3][1] = A[3][0] * B[0][1] + A[3][1] * B[1][1] + A[3][2] * B[2][1] + A[3][3] * B[3][1];
+  Result[3][2] = A[3][0] * B[0][2] + A[3][1] * B[1][2] + A[3][2] * B[2][2] + A[3][3] * B[3][2];
+  Result[3][3] = A[3][0] * B[0][3] + A[3][1] * B[1][3] + A[3][2] * B[2][3] + A[3][3] * B[3][3];
+
+  return Result;
+}
+
+auto
+operator *(mat4x4 A, mat4x4 B)
+  -> mat4x4
+{
+  return MatrixMultiply(A, B);
+}
+
+auto
 ::Length(vec2 A)
   -> float
 {
@@ -24,114 +60,128 @@ auto
   return Result;
 }
 
+auto
+Length(quaternion Quat)
+  -> float
+{
+  auto Result = Sqrt(LengthSquared(Quat));
+  return Result;
+}
+
 
 auto
-::Normalized(vec2 V)
+::Normalized(vec2 Vec)
   -> vec2
 {
-  auto Result = V / Length(V);
+  auto Result = Vec / Length(Vec);
   return Result;
 }
 
 auto
-::Normalized(vec3 V)
+::Normalized(vec3 Vec)
   -> vec3
 {
-  auto Result = V / Length(V);
+  auto Result = Vec / Length(Vec);
   return Result;
 }
 
 auto
-::Normalized(vec4 V)
+::Normalized(vec4 Vec)
   -> vec4
 {
-  auto Result = V / Length(V);
+  auto Result = Vec / Length(Vec);
   return Result;
 }
 
 auto
-::Normalize(vec2* V)
+::Normalize(vec2* Vec)
   -> void
 {
-  *V = Normalized(*V);
+  *Vec = Normalized(*Vec);
 }
 
 auto
-::Normalize(vec3* V)
+::Normalize(vec3* Vec)
   -> void
 {
-  *V = Normalized(*V);
+  *Vec = Normalized(*Vec);
 }
 
 auto
-::Normalize(vec4* V)
+::Normalize(vec4* Vec)
   -> void
 {
-  *V = Normalized(*V);
+  *Vec = Normalized(*Vec);
 }
 
 auto
-::SafeNormalize(vec2* V)
-  -> void
+::SafeNormalized(vec2 Vec, float Epsilon)
+  -> vec2
 {
-  if(IsNearlyZero(*V))
-  {
-    *V = ZeroVector2;
-  }
-  else
-  {
-    Normalize(V);
-  }
+  return IsNearlyZero(Vec, Epsilon) ? ZeroVector2 : Normalized(Vec);
 }
 
 auto
-::SafeNormalize(vec3* V)
-  -> void
+::SafeNormalized(vec3 Vec, float Epsilon)
+  -> vec3
 {
-  if(IsNearlyZero(*V))
-  {
-    *V = ZeroVector3;
-  }
-  else
-  {
-    Normalize(V);
-  }
+  return IsNearlyZero(Vec, Epsilon) ? ZeroVector3 : Normalized(Vec);
 }
 
 auto
-::SafeNormalize(vec4* V)
-  -> void
+::SafeNormalized(vec4 Vec, float Epsilon)
+  -> vec4
 {
-  if(IsNearlyZero(*V))
-  {
-    *V = ZeroVector4;
-  }
-  else
-  {
-    Normalize(V);
-  }
+  return IsNearlyZero(Vec, Epsilon) ? ZeroVector4 : Normalized(Vec);
 }
 
 auto
-::Quaternion(float Data[4])
+::SafeNormalize(vec2* Vec, float Epsilon)
+  -> void
+{
+  *Vec = SafeNormalized(*Vec, Epsilon);
+}
+
+auto
+::SafeNormalize(vec3* Vec, float Epsilon)
+  -> void
+{
+  *Vec = SafeNormalized(*Vec, Epsilon);
+}
+
+auto
+::SafeNormalize(vec4* Vec, float Epsilon)
+  -> void
+{
+  *Vec = SafeNormalized(*Vec, Epsilon);
+}
+
+auto
+::Normalized(quaternion Quat)
   -> quaternion
 {
-  quaternion Result;
-  MemCopy(4, &Result.Data[0], &Data[0]);
-  return Result;
+  auto Len = Length(Quat);
+  return { Quat.X / Len, Quat.Y / Len, Quat.Z / Len, Quat.W / Len };
 }
 
 auto
-Quaternion(float X, float Y, float Z, float W)
+::SafeNormalized(quaternion Quat, float Epsilon)
   -> quaternion
 {
-  quaternion Result;
-  Result.X = X;
-  Result.Y = Y;
-  Result.Z = Z;
-  Result.W = W;
-  return Result;
+  auto Len = Length(Quat);
+  if(Len > Epsilon)
+    return { Quat.X / Len, Quat.Y / Len, Quat.Z / Len, Quat.W / Len };
+
+  return IdentityQuaternion;
 }
+
+auto
+::SafeNormalize(quaternion* Quat, float Epsilon)
+  -> void
+{
+  *Quat = SafeNormalized(*Quat, Epsilon);
+}
+
 
 auto
 ::Quaternion(vec3 Axis, angle Angle)
@@ -147,6 +197,64 @@ auto
   Quat.Z = Sine * Axis.Z;
 
   return Quat;
+}
+
+auto
+::Quaternion(mat4x4 Mat)
+  -> quaternion
+{
+  if(IsNearlyZero(ScaledXAxis(Mat)) || IsNearlyZero(ScaledYAxis(Mat)) || IsNearlyZero(ScaledZAxis(Mat)))
+  {
+    return IdentityQuaternion;
+  }
+
+  quaternion Result;
+
+  float HalfInvSqrt;
+
+  // Check diagonal (trace)
+  const float Trace = Mat[0][0] + Mat[1][1] + Mat[2][2];
+
+  if(Trace > 0.0f)
+  {
+    float InvS = InvSqrt(Trace + 1.0f);
+    Result.W = 0.5f * (1.0f / InvS);
+    HalfInvSqrt = 0.5f * InvS;
+
+    Result.X = (Mat[1][2] - Mat[2][1]) * HalfInvSqrt;
+    Result.Y = (Mat[2][0] - Mat[0][2]) * HalfInvSqrt;
+    Result.Z = (Mat[0][1] - Mat[1][0]) * HalfInvSqrt;
+  }
+  else
+  {
+    // diagonal is negative
+    int Index = 0;
+
+    if(Mat[1][1] > Mat[0][0])
+      Index = 1;
+
+    if(Mat[2][2] > Mat[Index][Index])
+      Index = 2;
+
+    int const Next[3] = { 1, 2, 0 };
+    int const j = Next[Index];
+    int const k = Next[j];
+
+    HalfInvSqrt = Mat[Index][Index] - Mat[j][j] - Mat[k][k] + 1.0f;
+
+    float InvS = InvSqrt(HalfInvSqrt);
+
+    Result.Data[Index] = 0.5f * (1.0f / InvS);
+
+    HalfInvSqrt = 0.5f * InvS;
+
+    Result.Data[3] = (Mat[j][k] - Mat[k][j]) * HalfInvSqrt;
+    Result.Data[j] = (Mat[Index][j] + Mat[j][Index]) * HalfInvSqrt;
+    Result.Data[k] = (Mat[Index][k] + Mat[k][Index]) * HalfInvSqrt;
+  }
+
+  SafeNormalize(&Result);
+  return Result;
 }
 
 auto
@@ -176,7 +284,190 @@ auto
 }
 
 auto
-::ToRotationMatrix(quaternion Quat)
+::TransformDirection(mat4x4 Mat, vec4 Vec)
+  -> vec4
+{
+  vec4 Result;
+
+  Result.Data[0] = Mat[0][0] * Vec.Data[0] + Mat[1][0] * Vec.Data[1] + Mat[2][0] * Vec.Data[2] + Mat[3][0] * Vec.Data[3];
+  Result.Data[1] = Mat[0][1] * Vec.Data[0] + Mat[1][1] * Vec.Data[1] + Mat[2][1] * Vec.Data[2] + Mat[3][1] * Vec.Data[3];
+  Result.Data[2] = Mat[0][2] * Vec.Data[0] + Mat[1][2] * Vec.Data[1] + Mat[2][2] * Vec.Data[2] + Mat[3][2] * Vec.Data[3];
+  Result.Data[3] = Mat[0][3] * Vec.Data[0] + Mat[1][3] * Vec.Data[1] + Mat[2][3] * Vec.Data[2] + Mat[3][3] * Vec.Data[3];
+
+  return Result;
+}
+
+auto
+::TransformDirection(mat4x4 Mat, vec3 Vec)
+  -> vec3
+{
+  return Vec3FromXYZ(TransformDirection(Mat, Vec4(Vec, 0)));
+}
+
+auto
+::TransformPosition(mat4x4 Mat, vec3 Vec)
+  -> vec3
+{
+  return Vec3FromXYZ(TransformDirection(Mat, Vec4(Vec, 1)));
+}
+
+auto
+::InverseTransformDirection(mat4x4 Mat, vec4 Vec)
+  -> vec4
+{
+  vec4 Result;
+
+  auto Inverted = SafeInverted(Mat);
+
+  Result.Data[0] = Inverted[0][0] * Vec.Data[0] + Inverted[1][0] * Vec.Data[1] + Inverted[2][0] * Vec.Data[2] + Inverted[3][0] * Vec.Data[3];
+  Result.Data[1] = Inverted[0][1] * Vec.Data[0] + Inverted[1][1] * Vec.Data[1] + Inverted[2][1] * Vec.Data[2] + Inverted[3][1] * Vec.Data[3];
+  Result.Data[2] = Inverted[0][2] * Vec.Data[0] + Inverted[1][2] * Vec.Data[1] + Inverted[2][2] * Vec.Data[2] + Inverted[3][2] * Vec.Data[3];
+  Result.Data[3] = Inverted[0][3] * Vec.Data[0] + Inverted[1][3] * Vec.Data[1] + Inverted[2][3] * Vec.Data[2] + Inverted[3][3] * Vec.Data[3];
+
+  return Result;
+}
+
+auto
+::InverseTransformDirection(mat4x4 Mat, vec3 Vec)
+  -> vec3
+{
+  return Vec3FromXYZ(InverseTransformDirection(Mat, Vec4(Vec, 0)));
+}
+
+auto
+::InverseTransformPosition(mat4x4 Mat, vec3 Vec)
+  -> vec3
+{
+  return Vec3FromXYZ(InverseTransformDirection(Mat, Vec4(Vec, 1)));
+}
+
+auto
+::Mat4x4(float const(&Col0)[4],
+         float const(&Col1)[4],
+         float const(&Col2)[4],
+         float const(&Col3)[4])
+  -> mat4x4
+{
+  mat4x4 Result;
+  MemCopy(4, &Result.M00, &Col0[0]);
+  MemCopy(4, &Result.M10, &Col1[0]);
+  MemCopy(4, &Result.M20, &Col2[0]);
+  MemCopy(4, &Result.M30, &Col3[0]);
+  return Result;
+}
+
+auto
+::Mat4x4(mat4x4::float4x4 const& Data)
+  -> mat4x4
+{
+  mat4x4 Result;
+  MemCopy(4 * 4, &Result.M00, &Data[0][0]);
+  return Result;
+}
+
+auto
+::Mat4x4Perspective(angle HalfFOVY, float Width, float Height, float NearPlane, float FarPlane)
+  -> mat4x4
+{
+  auto A = 1.0f / Tan(HalfFOVY);
+  auto B = Width / Tan(HalfFOVY) / Height;
+  auto C = ((NearPlane == FarPlane) ? 1.0f : FarPlane / (FarPlane - NearPlane));
+  auto D = -NearPlane * ((NearPlane == FarPlane) ? 1.0f : FarPlane / (FarPlane - NearPlane));
+
+  return {
+    A, 0, 0, 0,
+    0, B, 0, 0,
+    0, 0, C, 1,
+    0, 0, D, 0,
+  };
+}
+
+auto
+::Mat4x4Orthogonal(float Width, float Height, float ZScale, float ZOffset)
+  -> mat4x4
+{
+  auto A = Width  ? (1.0f / Width) : 1.0f;
+  auto B = Height ? (1.0f / Height) : 1.0f;
+  auto C = ZScale;
+  auto D = ZOffset * ZScale;
+
+  return {
+    A, 0, 0, 0,
+    0, B, 0, 0,
+    0, 0, C, 0,
+    0, 0, D, 1,
+  };
+}
+
+auto
+::Mat4x4LookAt(vec3 Target, vec3 Position, vec3 Up)
+  -> mat4x4
+{
+  auto Direction = Target - Position;
+  return Mat4x4LookDir(Direction, Position, Up);
+}
+
+auto
+::Mat4x4LookDir(vec3 Direction, vec3 Position, vec3 Up)
+  -> mat4x4
+{
+  SafeNormalize(&Direction);
+  auto Right = Direction ^ SafeNormalized(Up);
+  Up = Right ^ Direction;
+  return Mat4x4(Direction, Right, Up, Position);
+}
+
+auto
+::Mat4x4FromPositionRotation(vec3 Position, quaternion Rotation)
+  -> mat4x4
+{
+  return Mat4x4FromPositionRotationScale(Position, Rotation, UnitScaleVector3);
+}
+
+auto
+::Mat4x4FromPositionRotationScale(vec3 Position, quaternion Rotation, vec3 Scale)
+  -> mat4x4
+{
+  mat4x4 Result;
+
+  float const X2 = Rotation.X + Rotation.X;
+  float const Y2 = Rotation.Y + Rotation.Y;
+  float const Z2 = Rotation.Z + Rotation.Z;
+
+  float const XX2 = Rotation.X * X2;
+  float const YY2 = Rotation.Y * Y2;
+  float const ZZ2 = Rotation.Z * Z2;
+  float const XY2 = Rotation.X * Y2;
+  float const WZ2 = Rotation.W * Z2;
+  float const YZ2 = Rotation.Y * Z2;
+  float const WX2 = Rotation.W * X2;
+  float const XZ2 = Rotation.X * Z2;
+  float const WY2 = Rotation.W * Y2;
+
+  Result[0][0] = (1.0f - (YY2 + ZZ2)) * Scale.X;
+  Result[0][1] = (XY2 + WZ2) * Scale.X;
+  Result[0][2] = (XZ2 - WY2) * Scale.X;
+  Result[1][0] = (XY2 - WZ2) * Scale.Y;
+  Result[1][1] = (1.0f - (XX2 + ZZ2)) * Scale.Y;
+  Result[1][2] = (YZ2 + WX2) * Scale.Y;
+  Result[2][0] = (XZ2 + WY2) * Scale.Z;
+  Result[2][1] = (YZ2 - WX2) * Scale.Z;
+  Result[2][2] = (1.0f - (XX2 + YY2)) * Scale.Z;
+
+  Result[0][3] = 0.0f;
+  Result[1][3] = 0.0f;
+  Result[2][3] = 0.0f;
+  Result[3][3] = 1.0f;
+
+  Result[3][0] = Position.X;
+  Result[3][1] = Position.Y;
+  Result[3][2] = Position.Z;
+
+  return Result;
+}
+
+auto
+::Mat4x4(quaternion Quat)
   -> mat4x4
 {
   float const X2 = Quat.X + Quat.X;
@@ -204,30 +495,213 @@ auto
 }
 
 auto
-Mat4x4(mat4x4::float4x4 const& Data)
+::Transpose(mat4x4* Mat)
+  -> void
+{
+  *Mat = Transposed(*Mat);
+}
+
+auto
+::IsInvertible(mat4x4 Mat)
+  -> bool
+{
+  return !IsNearlyZero(Determinant(Mat));
+}
+
+auto
+::Inverted(mat4x4 Mat)
   -> mat4x4
 {
+  Assert(IsInvertible(Mat));
+  Assert(!IsNearlyZero(ScaledXAxis(Mat)) &&
+         !IsNearlyZero(ScaledYAxis(Mat)) &&
+         !IsNearlyZero(ScaledZAxis(Mat)));
+
   mat4x4 Result;
-  MemCopy(4 * 4, &Result.M00, &Data[0][0]);
+  float const InvDet = 1 / Determinant(Mat);
+
+  Result[0][0] = InvDet * (
+    Mat[1][2] * Mat[2][3] * Mat[3][1] - Mat[1][3] * Mat[2][2] * Mat[3][1] + Mat[1][3] * Mat[2][1] * Mat[3][2] -
+    Mat[1][1] * Mat[2][3] * Mat[3][2] - Mat[1][2] * Mat[2][1] * Mat[3][3] + Mat[1][1] * Mat[2][2] * Mat[3][3]);
+  Result[0][1] = InvDet * (
+    Mat[0][3] * Mat[2][2] * Mat[3][1] - Mat[0][2] * Mat[2][3] * Mat[3][1] - Mat[0][3] * Mat[2][1] * Mat[3][2] +
+    Mat[0][1] * Mat[2][3] * Mat[3][2] + Mat[0][2] * Mat[2][1] * Mat[3][3] - Mat[0][1] * Mat[2][2] * Mat[3][3]);
+  Result[0][2] = InvDet * (
+    Mat[0][2] * Mat[1][3] * Mat[3][1] - Mat[0][3] * Mat[1][2] * Mat[3][1] + Mat[0][3] * Mat[1][1] * Mat[3][2] -
+    Mat[0][1] * Mat[1][3] * Mat[3][2] - Mat[0][2] * Mat[1][1] * Mat[3][3] + Mat[0][1] * Mat[1][2] * Mat[3][3]);
+  Result[0][3] = InvDet * (
+    Mat[0][3] * Mat[1][2] * Mat[2][1] - Mat[0][2] * Mat[1][3] * Mat[2][1] - Mat[0][3] * Mat[1][1] * Mat[2][2] +
+    Mat[0][1] * Mat[1][3] * Mat[2][2] + Mat[0][2] * Mat[1][1] * Mat[2][3] - Mat[0][1] * Mat[1][2] * Mat[2][3]);
+  Result[1][0] = InvDet * (
+    Mat[1][3] * Mat[2][2] * Mat[3][0] - Mat[1][2] * Mat[2][3] * Mat[3][0] - Mat[1][3] * Mat[2][0] * Mat[3][2] +
+    Mat[1][0] * Mat[2][3] * Mat[3][2] + Mat[1][2] * Mat[2][0] * Mat[3][3] - Mat[1][0] * Mat[2][2] * Mat[3][3]);
+  Result[1][1] = InvDet * (
+    Mat[0][2] * Mat[2][3] * Mat[3][0] - Mat[0][3] * Mat[2][2] * Mat[3][0] + Mat[0][3] * Mat[2][0] * Mat[3][2] -
+    Mat[0][0] * Mat[2][3] * Mat[3][2] - Mat[0][2] * Mat[2][0] * Mat[3][3] + Mat[0][0] * Mat[2][2] * Mat[3][3]);
+  Result[1][2] = InvDet * (
+    Mat[0][3] * Mat[1][2] * Mat[3][0] - Mat[0][2] * Mat[1][3] * Mat[3][0] - Mat[0][3] * Mat[1][0] * Mat[3][2] +
+    Mat[0][0] * Mat[1][3] * Mat[3][2] + Mat[0][2] * Mat[1][0] * Mat[3][3] - Mat[0][0] * Mat[1][2] * Mat[3][3]);
+  Result[1][3] = InvDet * (
+    Mat[0][2] * Mat[1][3] * Mat[2][0] - Mat[0][3] * Mat[1][2] * Mat[2][0] + Mat[0][3] * Mat[1][0] * Mat[2][2] -
+    Mat[0][0] * Mat[1][3] * Mat[2][2] - Mat[0][2] * Mat[1][0] * Mat[2][3] + Mat[0][0] * Mat[1][2] * Mat[2][3]);
+  Result[2][0] = InvDet * (
+    Mat[1][1] * Mat[2][3] * Mat[3][0] - Mat[1][3] * Mat[2][1] * Mat[3][0] + Mat[1][3] * Mat[2][0] * Mat[3][1] -
+    Mat[1][0] * Mat[2][3] * Mat[3][1] - Mat[1][1] * Mat[2][0] * Mat[3][3] + Mat[1][0] * Mat[2][1] * Mat[3][3]);
+  Result[2][1] = InvDet * (
+    Mat[0][3] * Mat[2][1] * Mat[3][0] - Mat[0][1] * Mat[2][3] * Mat[3][0] - Mat[0][3] * Mat[2][0] * Mat[3][1] +
+    Mat[0][0] * Mat[2][3] * Mat[3][1] + Mat[0][1] * Mat[2][0] * Mat[3][3] - Mat[0][0] * Mat[2][1] * Mat[3][3]);
+  Result[2][2] = InvDet * (
+    Mat[0][1] * Mat[1][3] * Mat[3][0] - Mat[0][3] * Mat[1][1] * Mat[3][0] + Mat[0][3] * Mat[1][0] * Mat[3][1] -
+    Mat[0][0] * Mat[1][3] * Mat[3][1] - Mat[0][1] * Mat[1][0] * Mat[3][3] + Mat[0][0] * Mat[1][1] * Mat[3][3]);
+  Result[2][3] = InvDet * (
+    Mat[0][3] * Mat[1][1] * Mat[2][0] - Mat[0][1] * Mat[1][3] * Mat[2][0] - Mat[0][3] * Mat[1][0] * Mat[2][1] +
+    Mat[0][0] * Mat[1][3] * Mat[2][1] + Mat[0][1] * Mat[1][0] * Mat[2][3] - Mat[0][0] * Mat[1][1] * Mat[2][3]);
+  Result[3][0] = InvDet * (
+    Mat[1][2] * Mat[2][1] * Mat[3][0] - Mat[1][1] * Mat[2][2] * Mat[3][0] - Mat[1][2] * Mat[2][0] * Mat[3][1] +
+    Mat[1][0] * Mat[2][2] * Mat[3][1] + Mat[1][1] * Mat[2][0] * Mat[3][2] - Mat[1][0] * Mat[2][1] * Mat[3][2]);
+  Result[3][1] = InvDet * (
+    Mat[0][1] * Mat[2][2] * Mat[3][0] - Mat[0][2] * Mat[2][1] * Mat[3][0] + Mat[0][2] * Mat[2][0] * Mat[3][1] -
+    Mat[0][0] * Mat[2][2] * Mat[3][1] - Mat[0][1] * Mat[2][0] * Mat[3][2] + Mat[0][0] * Mat[2][1] * Mat[3][2]);
+  Result[3][2] = InvDet * (
+    Mat[0][2] * Mat[1][1] * Mat[3][0] - Mat[0][1] * Mat[1][2] * Mat[3][0] - Mat[0][2] * Mat[1][0] * Mat[3][1] +
+    Mat[0][0] * Mat[1][2] * Mat[3][1] + Mat[0][1] * Mat[1][0] * Mat[3][2] - Mat[0][0] * Mat[1][1] * Mat[3][2]);
+  Result[3][3] = InvDet * (
+    Mat[0][1] * Mat[1][2] * Mat[2][0] - Mat[0][2] * Mat[1][1] * Mat[2][0] + Mat[0][2] * Mat[1][0] * Mat[2][1] -
+    Mat[0][0] * Mat[1][2] * Mat[2][1] - Mat[0][1] * Mat[1][0] * Mat[2][2] + Mat[0][0] * Mat[1][1] * Mat[2][2]);
+
   return Result;
 }
 
 auto
-::Mat4x4(vec3 XAxis, vec3 YAxis, vec3 ZAxis, vec3 Position)
+::Invert(mat4x4* Mat)
+  -> void
+{
+  *Mat = Inverted(*Mat);
+}
+
+auto
+::SafeInverted(mat4x4 Mat)
   -> mat4x4
 {
-  mat4x4 Result;
-  Result.M00 = XAxis.X;
-  Result.M01 = XAxis.Y;
-  Result.M02 = XAxis.Z;
-  Result.M03 = 0;
-  Result.M10 = YAxis.X;
-  Result.M11 = YAxis.Y;
-  Result.M12 = YAxis.Z;
-  Result.M13 = 0;
-  Result.M20 = ZAxis.X;
-  Result.M21 = ZAxis.Y;
-  Result.M22 = ZAxis.Z;
-  Result.M23 = 0;
-  return Result;
+  if(!IsInvertible(Mat) ||
+     (IsNearlyZero(ScaledXAxis(Mat)) &&
+      IsNearlyZero(ScaledYAxis(Mat)) &&
+      IsNearlyZero(ScaledZAxis(Mat)))
+    )
+  {
+    return IdentityMatrix4x4;
+  }
+
+  return Inverted(Mat);
 }
+
+auto
+::SafeInvert(mat4x4* Mat)
+  -> void
+{
+  *Mat = SafeInverted(*Mat);
+}
+
+
+auto
+::Determinant(mat4x4 Mat)
+  -> float
+{
+  /*
+  _         _
+  |a, b, c, d|
+  |e, f, g, h|
+  |i, j, k, l|
+  |m, n, o ,p|
+  _         _
+  */
+
+  /*
+          |f, g, h|
+  DetA = a|j, k, l|
+          |n, o ,p|
+  */
+  float DetA = Mat[0][0] * (
+    (Mat[1][1] * (Mat[2][2] * Mat[3][3] - Mat[2][3] * Mat[3][2])) -
+    (Mat[1][2] * (Mat[2][1] * Mat[3][3] - Mat[2][3] * Mat[3][1])) +
+    (Mat[1][3] * (Mat[2][1] * Mat[3][2] - Mat[2][2] * Mat[3][1]))
+  );
+
+  /*
+          |e, g, h|
+  DetB = b|i, k, l|
+          |m, o ,p|
+  */
+  float DetB = Mat[0][1] * (
+    (Mat[1][0] * (Mat[2][2] * Mat[3][3] - Mat[2][3] * Mat[3][2])) -
+    (Mat[1][2] * (Mat[2][0] * Mat[3][3] - Mat[2][3] * Mat[3][0])) +
+    (Mat[1][3] * (Mat[2][0] * Mat[3][2] - Mat[2][2] * Mat[3][0]))
+  );
+
+  /*
+          |e, f, h|
+  DetC = c|i, j, l|
+          |m, n ,p|
+  */
+  float DetC = Mat[0][2] * (
+    (Mat[1][0] * (Mat[2][1] * Mat[3][3] - Mat[2][3] * Mat[3][1])) -
+    (Mat[1][1] * (Mat[2][0] * Mat[3][3] - Mat[2][3] * Mat[3][0])) +
+    (Mat[1][3] * (Mat[2][0] * Mat[3][1] - Mat[2][1] * Mat[3][0]))
+  );
+
+  /*
+          |e, f, g|
+  DetD = d|i, j, k|
+          |m, n ,o|
+  */
+  float DetD = Mat[0][3] * (
+    (Mat[1][0] * (Mat[2][1] * Mat[3][2] - Mat[2][2] * Mat[3][1])) -
+    (Mat[1][1] * (Mat[2][0] * Mat[3][2] - Mat[2][2] * Mat[3][0])) +
+    (Mat[1][2] * (Mat[2][0] * Mat[3][1] - Mat[2][1] * Mat[3][0]))
+  );
+
+  return DetA - DetB + DetC - DetD;
+}
+
+auto
+::ScaledXAxis(mat4x4 Mat)
+  -> vec3
+{
+  return Vec3FromXYZ(Mat.Col0);
+}
+
+auto
+::ScaledYAxis(mat4x4 Mat)
+  -> vec3
+{
+  return Vec3FromXYZ(Mat.Col1);
+}
+
+auto
+::ScaledZAxis(mat4x4 Mat)
+  -> vec3
+{
+  return Vec3FromXYZ(Mat.Col2);
+}
+
+auto
+::UnitXAxis(mat4x4 Mat)
+  -> vec3
+{
+  return Normalized(ScaledXAxis(Mat));
+}
+
+auto
+::UnitYAxis(mat4x4 Mat)
+  -> vec3
+{
+  return Normalized(ScaledYAxis(Mat));
+}
+
+auto
+::UnitZAxis(mat4x4 Mat)
+  -> vec3
+{
+  return Normalized(ScaledZAxis(Mat));
+}
+

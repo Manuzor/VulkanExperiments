@@ -9,7 +9,7 @@
 #include <Core/Image.hpp>
 #include <Core/ImageLoader.hpp>
 
-#include <Core/MathVector.hpp>
+#include <Core/Math.hpp>
 
 #include <Backbone.hpp>
 
