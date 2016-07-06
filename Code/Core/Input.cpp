@@ -5,7 +5,7 @@
 //
 
 auto
-InputId(char const* InputName)
+::InputId(char const* InputName)
   -> input_id
 {
   return SliceFromString(InputName);
@@ -259,7 +259,14 @@ auto
   {
     auto Slot = &Slots[Index];
     if(Slot->Frame < Context->CurrentFrame)
+    {
+      if(Slot->Type == input_type::Action)
+      {
+        Slot->Value = 0.0f;
+      }
+
       continue;
+    }
 
     auto Id = Ids[Index];
     Context->ChangeEvent(Id, Slot);

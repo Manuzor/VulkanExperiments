@@ -12,6 +12,11 @@ using input_id = slice<char const>;
 input_id CORE_API
 InputId(char const* InputName);
 
+/// Creates an input_id from a string literal.
+template<size_t N>
+input_id constexpr
+InputId(char const(&InputName)[N]) { return SliceFromString(InputName); }
+
 enum class input_type
 {
   INVALID,

@@ -11,6 +11,8 @@
 
 #include <Core/Math.hpp>
 
+#include <Core/Camera.hpp>
+
 #include <Backbone.hpp>
 
 #include <Windows.h>
@@ -438,6 +440,23 @@ void Win32MessagePump()
   }
 }
 
+struct
+{
+  input_id const Quit  = InputId("Quit");
+  input_id const Depth = InputId("Depth");
+
+  struct
+  {
+    input_id const MoveForward = InputId("MoveForward");
+    input_id const MoveRight   = InputId("MoveRight");
+    input_id const MoveUp      = InputId("MoveUp");
+    input_id const RelYaw      = InputId("RelYaw");
+    input_id const RelPitch    = InputId("RelPitch");
+    input_id const AbsYaw      = InputId("AbsYaw");
+    input_id const AbsPitch    = InputId("AbsPitch");
+  } Camera;
+} MyInputSlots;
+
 int
 WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         LPSTR CommandLine, int ShowCode)
@@ -500,6 +519,9 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       Win32LoadXInput(&XInput, GlobalLog);
       Init(&SystemInput, Allocator);
 
+      // Let's pretend the system is user 0 for now.
+      SystemInput.UserIndex = 0;
+
       Win32RegisterAllMouseSlots(&SystemInput);
       Win32RegisterAllXInputSlots(&SystemInput);
       Win32RegisterAllKeyboardSlots(&SystemInput);
@@ -507,9 +529,39 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       //
       // Input Mappings
       //
-      RegisterInputSlot(&SystemInput, input_type::Button, InputId("Quit"));
-      AddInputSlotMapping(&SystemInput, keyboard::Escape, InputId("Quit"));
-      AddInputSlotMapping(&SystemInput, x_input::Start, InputId("Quit"));
+      RegisterInputSlot(&SystemInput, input_type::Button, MyInputSlots.Quit);
+      AddInputSlotMapping(&SystemInput, keyboard::Escape, MyInputSlots.Quit);
+      AddInputSlotMapping(&SystemInput, x_input::Start, MyInputSlots.Quit);
+
+      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.MoveForward);
+      AddInputSlotMapping(&SystemInput, x_input::YLeftStick, MyInputSlots.Camera.MoveForward);
+      AddInputSlotMapping(&SystemInput, keyboard::W, MyInputSlots.Camera.MoveForward,  1);
+      AddInputSlotMapping(&SystemInput, keyboard::S, MyInputSlots.Camera.MoveForward, -1);
+
+      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.MoveRight);
+      AddInputSlotMapping(&SystemInput, x_input::XLeftStick, MyInputSlots.Camera.MoveRight);
+      AddInputSlotMapping(&SystemInput, keyboard::D, MyInputSlots.Camera.MoveRight,  1);
+      AddInputSlotMapping(&SystemInput, keyboard::A, MyInputSlots.Camera.MoveRight, -1);
+
+      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.MoveUp);
+      AddInputSlotMapping(&SystemInput, x_input::LeftTrigger,  MyInputSlots.Camera.MoveUp,  1);
+      AddInputSlotMapping(&SystemInput, x_input::RightTrigger, MyInputSlots.Camera.MoveUp, -1);
+      AddInputSlotMapping(&SystemInput, keyboard::E, MyInputSlots.Camera.MoveUp,  1);
+      AddInputSlotMapping(&SystemInput, keyboard::Q, MyInputSlots.Camera.MoveUp, -1);
+      auto MoveUpSlotProperties = GetOrCreate(&SystemInput.ValueProperties, MyInputSlots.Camera.MoveUp);
+      MoveUpSlotProperties->Exponent = 3.0f;
+
+      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.RelYaw);
+      AddInputSlotMapping(&SystemInput, x_input::XRightStick, MyInputSlots.Camera.RelYaw);
+
+      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.RelPitch);
+      AddInputSlotMapping(&SystemInput, x_input::YRightStick, MyInputSlots.Camera.RelPitch);
+
+      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.AbsYaw);
+      AddInputSlotMapping(&SystemInput, mouse::YDelta, MyInputSlots.Camera.AbsYaw);
+
+      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.AbsPitch);
+      AddInputSlotMapping(&SystemInput, mouse::XDelta, MyInputSlots.Camera.AbsPitch);
     }
     Defer(&SystemInput, Finalize(&SystemInput));
 
@@ -517,6 +569,19 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
     // if(!VulkanInitializeForGraphics(&Vulkan, Instance, Window->WindowHandle))
     //   return 5;
+
+    free_horizon_camera Cam = {};
+    Cam.FieldOfView = Degrees(90);
+    Cam.Width = 1280;
+    Cam.Height = 720;
+    Cam.NearPlane = 0.1f;
+    Cam.FarPlane = 1000.0f;
+    Cam.Transform = Transform(Vec3(2, 0, 0),
+                              IdentityQuaternion,
+                              UnitScaleVector3);
+
+    Cam.MovementSpeed = 7;
+    Cam.RotationSpeed = 3;
 
     //
     // Main Loop
@@ -537,16 +602,40 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       }
       EndInputFrame(&SystemInput);
 
-      // "Game" logic
+      //
+      // Check for Quit requests
+      //
+      if(ButtonIsDown(SystemInput[MyInputSlots.Quit]))
       {
-        auto QuitId = InputId("Quit");
-        if(ButtonIsDown(SystemInput[QuitId]))
-        {
-          ::GlobalRunning = false;
-          break;
-        }
+        ::GlobalRunning = false;
+        break;
       }
 
+      //
+      // Update camera
+      //
+      auto ForwardMovement = AxisValue(SystemInput[MyInputSlots.Camera.MoveForward]);
+      auto RightMovement = AxisValue(SystemInput[MyInputSlots.Camera.MoveRight]);
+      auto UpMovement = AxisValue(SystemInput[MyInputSlots.Camera.MoveUp]);
+      Cam.Transform.Translation += Cam.MovementSpeed * DeltaSeconds * (
+        ForwardVector(Cam.Transform) * ForwardMovement +
+        RightVector(Cam.Transform)   * RightMovement +
+        UpVector(Cam.Transform)      * UpMovement
+      );
+
+      Cam.InputYaw += AxisValue(SystemInput[MyInputSlots.Camera.RelYaw]) * Cam.RotationSpeed * DeltaSeconds;
+      Cam.InputYaw += AxisValue(SystemInput[MyInputSlots.Camera.AbsYaw]);
+      Cam.InputPitch += AxisValue(SystemInput[MyInputSlots.Camera.RelPitch]) * Cam.RotationSpeed * DeltaSeconds;
+      Cam.InputPitch += AxisValue(SystemInput[MyInputSlots.Camera.AbsPitch]);
+      Cam.Transform.Rotation = Quaternion(UpVector3,    Radians(Cam.InputYaw)) *
+                               Quaternion(RightVector3, Radians(Cam.InputPitch));
+      SafeNormalize(&Cam.Transform.Rotation);
+
+      auto const ViewProjectioMatrix = CameraViewProjectionMatrix(Cam, Cam.Transform);
+
+      //
+      // Handle resize requests
+      //
       if(::GlobalIsResizeRequested)
       {
         LogBeginScope("Resizing swapchain");

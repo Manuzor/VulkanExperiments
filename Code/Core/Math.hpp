@@ -87,6 +87,13 @@ union quaternion
   float Data[4];
 };
 
+struct transform
+{
+  vec3 Translation;
+  quaternion Rotation;
+  vec3 Scale;
+};
+
 
 //
 // Construction Functions: Vec2, Vec3, Vec4
@@ -211,6 +218,9 @@ Mat4x4FromPositionRotationScale(vec3 Position, quaternion Rotation, vec3 Scale);
 mat4x4 CORE_API
 Mat4x4(quaternion Quat);
 
+mat4x4 CORE_API
+Mat4x4(transform Transform);
+
 
 //
 // Constants: mat4x4
@@ -258,6 +268,16 @@ Quaternion(mat4x4 Mat);
 constexpr quaternion IdentityQuaternion = Quaternion(0, 0, 0, 1);
 
 //
+// Construction Functions: transform
+//
+
+transform constexpr
+Transform(vec3 Translation, quaternion Rotation, vec3 Scale)
+{
+  return { Translation, Rotation, Scale };
+}
+
+//
 // Algorithms: Equality
 //
 bool constexpr operator ==(vec2 A, vec2 B) { return A.X == B.X && A.Y == B.Y; }
@@ -299,6 +319,10 @@ vec2 constexpr operator +(vec2 A, vec2 B) { return Vec2(A.X + B.X, A.Y + B.Y); }
 vec3 constexpr operator +(vec3 A, vec3 B) { return Vec3(A.X + B.X, A.Y + B.Y, A.Z + B.Z); }
 vec4 constexpr operator +(vec4 A, vec4 B) { return Vec4(A.X + B.X, A.Y + B.Y, A.Z + B.Z, A.W + B.W); }
 
+void inline operator +=(vec2& A, vec2 B) { A = A + B; }
+void inline operator +=(vec3& A, vec3 B) { A = A + B; }
+void inline operator +=(vec4& A, vec4 B) { A = A + B; }
+
 
 //
 // Operator: Subtract
@@ -306,6 +330,10 @@ vec4 constexpr operator +(vec4 A, vec4 B) { return Vec4(A.X + B.X, A.Y + B.Y, A.
 vec2 constexpr operator -(vec2 A, vec2 B) { return Vec2(A.X - B.X, A.Y - B.Y); }
 vec3 constexpr operator -(vec3 A, vec3 B) { return Vec3(A.X - B.X, A.Y - B.Y, A.Z - B.Z); }
 vec4 constexpr operator -(vec4 A, vec4 B) { return Vec4(A.X - B.X, A.Y - B.Y, A.Z - B.Z, A.W - B.W); }
+
+void inline operator -=(vec2& A, vec2 B) { A = A - B; }
+void inline operator -=(vec3& A, vec3 B) { A = A - B; }
+void inline operator -=(vec4& A, vec4 B) { A = A - B; }
 
 
 //
@@ -317,6 +345,32 @@ vec4 constexpr operator *(float S, vec4 V) { return Vec4(S * V.X, S * V.Y, S * V
 vec2 constexpr operator *(vec2 V, float S) { return S * V; }
 vec3 constexpr operator *(vec3 V, float S) { return S * V; }
 vec4 constexpr operator *(vec4 V, float S) { return S * V; }
+void inline operator *=(vec2& V, float S) { V = V * S; }
+void inline operator *=(vec3& V, float S) { V = V * S; }
+void inline operator *=(vec4& V, float S) { V = V * S; }
+
+vec2 constexpr ComponentwiseMultiply(vec2 A, vec2 B) { return Vec2(A.X * B.X, A.Y * B.Y); }
+vec3 constexpr ComponentwiseMultiply(vec3 A, vec3 B) { return Vec3(A.X * B.X, A.Y * B.Y, A.Z * B.Z); }
+vec4 constexpr ComponentwiseMultiply(vec4 A, vec4 B) { return Vec4(A.X * B.X, A.Y * B.Y, A.Z * B.Z, A.W * B.W); }
+
+vec2 constexpr operator *(vec2 A, vec2 B) { return ComponentwiseMultiply(A, B); }
+vec3 constexpr operator *(vec3 A, vec3 B) { return ComponentwiseMultiply(A, B); }
+vec4 constexpr operator *(vec4 A, vec4 B) { return ComponentwiseMultiply(A, B); }
+
+void inline operator *=(vec2& A, vec2 B) { A = A * B; }
+void inline operator *=(vec3& A, vec3 B) { A = A * B; }
+void inline operator *=(vec4& A, vec4 B) { A = A * B; }
+
+mat4x4 CORE_API MatrixMultiply(mat4x4 A, mat4x4 B);
+
+mat4x4 CORE_API operator *(mat4x4 A, mat4x4 B);
+void inline operator *=(mat4x4& A, mat4x4 B) { A = A * B; }
+
+quaternion CORE_API operator *(quaternion A, quaternion B);
+void inline operator *=(quaternion& A, quaternion B) { A = A * B; }
+
+transform CORE_API operator *(transform A, transform B);
+void inline operator *=(transform& A, transform B) { A = A * B; }
 
 
 //
@@ -325,6 +379,10 @@ vec4 constexpr operator *(vec4 V, float S) { return S * V; }
 vec2 constexpr operator /(vec2 V, float S) { return (1 / S) * V; }
 vec3 constexpr operator /(vec3 V, float S) { return (1 / S) * V; }
 vec4 constexpr operator /(vec4 V, float S) { return (1 / S) * V; }
+
+void inline operator /=(vec2& V, float S) { V = (1 / S) * V; }
+void inline operator /=(vec3& V, float S) { V = (1 / S) * V; }
+void inline operator /=(vec4& V, float S) { V = (1 / S) * V; }
 
 
 //
@@ -337,10 +395,6 @@ float constexpr Dot(vec4 A, vec4 B) { return A.X * B.X + A.Y * B.Y + A.Z * B.Z +
 float constexpr operator |(vec2 A, vec2 B) { return Dot(A, B); }
 float constexpr operator |(vec3 A, vec3 B) { return Dot(A, B); }
 float constexpr operator |(vec4 A, vec4 B) { return Dot(A, B); }
-
-mat4x4 CORE_API MatrixMultiply(mat4x4 A, mat4x4 B);
-
-mat4x4 CORE_API operator *(mat4x4 A, mat4x4 B);
 
 
 //
@@ -389,6 +443,35 @@ vec3 constexpr Cross(vec3 A, vec3 B) { return Vec3((A.Y * B.Z) - (A.Z * B.Y),
 
 vec3 constexpr operator ^(vec3 A, vec3 B) { return Cross(A, B); }
 
+void inline operator ^=(vec3& A, vec3 B) { A = A ^ B; }
+
+//
+// Algorithms: Reciprocal
+//
+vec2 constexpr
+Reciprocal(vec2 Vec, float ZeroCase = 3.4e38f)
+{
+  return Vec2(Vec.X ? 1 / Vec.X : ZeroCase,
+              Vec.Y ? 1 / Vec.Y : ZeroCase);
+}
+
+vec3 constexpr
+Reciprocal(vec3 Vec, float ZeroCase = 3.4e38f)
+{
+  return Vec3(Vec.X ? 1 / Vec.X : ZeroCase,
+              Vec.Y ? 1 / Vec.Y : ZeroCase,
+              Vec.Z ? 1 / Vec.Z : ZeroCase);
+}
+
+vec4 constexpr
+Reciprocal(vec4 Vec, float ZeroCase = 3.4e38f)
+{
+  return Vec4(Vec.X ? 1 / Vec.X : ZeroCase,
+              Vec.Y ? 1 / Vec.Y : ZeroCase,
+              Vec.Z ? 1 / Vec.Z : ZeroCase,
+              Vec.W ? 1 / Vec.W : ZeroCase);
+}
+
 //
 // Algorithms: Transforming Vectors
 //
@@ -418,6 +501,30 @@ InverseTransformDirection(mat4x4 Mat, vec3 Vec);
 
 vec3 CORE_API
 InverseTransformPosition(mat4x4 Mat, vec3 Vec);
+
+vec3 CORE_API
+TransformDirection(quaternion Quat, vec3 Direction);
+
+vec4 CORE_API
+TransformDirection(quaternion Quat, vec4 Direction);
+
+vec3 CORE_API
+InverseTransformDirection(quaternion Quat, vec3 Direction);
+
+vec4 CORE_API
+InverseTransformDirection(quaternion Quat, vec4 Direction);
+
+vec3 CORE_API
+TransformDirection(transform Transform, vec3 Vec);
+
+vec3 CORE_API
+TransformPosition(transform Transform, vec3 Vec);
+
+vec3 CORE_API
+InverseTransformDirection(transform Transform, vec3 Vec);
+
+vec3 CORE_API
+InverseTransformPosition(transform Transform, vec3 Vec);
 
 //
 // Algorithms: Matrix Transposition and Inversion
@@ -467,6 +574,14 @@ vec3 CORE_API ScaledZAxis(mat4x4 Mat);
 vec3 CORE_API UnitXAxis(mat4x4 Mat);
 vec3 CORE_API UnitYAxis(mat4x4 Mat);
 vec3 CORE_API UnitZAxis(mat4x4 Mat);
+
+//
+// Algorithms: Transform Accessors
+//
+
+vec3 CORE_API ForwardVector(transform Transform);
+vec3 CORE_API RightVector(transform Transform);
+vec3 CORE_API UpVector(transform Transform);
 
 
 //

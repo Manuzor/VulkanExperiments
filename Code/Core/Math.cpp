@@ -1,7 +1,7 @@
 #include "Math.hpp"
 
 auto
-MatrixMultiply(mat4x4 A, mat4x4 B)
+::MatrixMultiply(mat4x4 A, mat4x4 B)
   -> mat4x4
 {
   mat4x4 Result;
@@ -30,10 +30,33 @@ MatrixMultiply(mat4x4 A, mat4x4 B)
 }
 
 auto
-operator *(mat4x4 A, mat4x4 B)
+::operator *(mat4x4 A, mat4x4 B)
   -> mat4x4
 {
   return MatrixMultiply(A, B);
+}
+
+auto
+::operator *(quaternion A, quaternion B)
+  -> quaternion
+{
+  return Quaternion(
+    (A.W * B.X) + (A.X * B.W) + (A.Y * B.Z) - (A.Z * B.Y),
+    (A.W * B.Y) + (A.Y * B.W) + (A.Z * B.X) - (A.X * B.Z),
+    (A.W * B.Z) + (A.Z * B.W) + (A.X * B.Y) - (A.Y * B.X),
+    (A.W * B.W) - (A.X * B.X) - (A.Y * B.Y) - (A.Z * B.Z)
+  );
+}
+
+auto
+::operator *(transform A, transform B)
+  -> transform
+{
+  transform Result;
+  Result.Rotation = B.Rotation * A.Rotation;
+  Result.Scale = ComponentwiseMultiply(A.Scale, B.Scale);
+  Result.Translation = B.Rotation * (ComponentwiseMultiply(B.Scale, A.Translation)) + B.Translation;
+  return Result;
 }
 
 auto
@@ -342,6 +365,72 @@ auto
 }
 
 auto
+::TransformDirection(quaternion Quat, vec3 Direction)
+  -> vec3
+{
+  auto const Q = Vec3(Quat.X, Quat.Y, Quat.Z);
+  auto const T = 2.0f * (Q ^ Direction);
+  return Direction + (Quat.W * T) + (Q ^ T);
+}
+
+auto
+::TransformDirection(quaternion Quat, vec4 Direction)
+  -> vec4
+{
+  auto const XYZ = Vec3FromXYZ(Direction);
+  auto const Q = Vec3(Quat.X, Quat.Y, Quat.Z);
+  auto const T = 2.0f * (Q ^ XYZ);
+  return Vec4(XYZ + (Quat.W * T) + (Q ^ T), Direction.W);
+}
+
+auto
+::InverseTransformDirection(quaternion Quat, vec3 Direction)
+  -> vec3
+{
+  auto const Q = Vec3(-Quat.X, -Quat.Y, -Quat.Z);
+  auto const T = 2.0f * (Q ^ Direction);
+  return Direction + (Quat.W * T) + (Q ^ T);
+}
+
+auto
+::InverseTransformDirection(quaternion Quat, vec4 Direction)
+  -> vec4
+{
+  auto const XYZ = Vec3FromXYZ(Direction);
+  auto const Q = Vec3(-Quat.X, -Quat.Y, -Quat.Z);
+  auto const T = 2.0f * (Q ^ XYZ);
+  return Vec4(XYZ + (Quat.W * T) + (Q ^ T), Direction.W);
+}
+
+auto
+::TransformDirection(transform Transform, vec3 Vec)
+  -> vec3
+{
+  return Transform.Rotation * ComponentwiseMultiply(Transform.Scale, Vec);
+}
+
+auto
+::TransformPosition(transform Transform, vec3 Vec)
+  -> vec3
+{
+  return Transform.Rotation * ComponentwiseMultiply(Transform.Scale, Vec) + Transform.Translation;
+}
+
+auto
+::InverseTransformDirection(transform Transform, vec3 Vec)
+  -> vec3
+{
+  return InverseTransformDirection(Transform.Rotation, Vec) * Reciprocal(Transform.Scale, 0);
+}
+
+auto
+::InverseTransformPosition(transform Transform, vec3 Vec)
+  -> vec3
+{
+  return InverseTransformDirection(Transform.Rotation, Vec - Transform.Translation) * Reciprocal(Transform.Scale, 0);
+}
+
+auto
 ::Mat4x4(float const(&Col0)[4],
          float const(&Col1)[4],
          float const(&Col2)[4],
@@ -492,6 +581,13 @@ auto
     {XZ + WY,          YZ - WX,          1.0f - (XX + YY), 0.0f},
     {0.0f,             0.0f,             0.0f,             1.0f},
   });
+}
+
+auto
+::Mat4x4(transform Transform)
+  -> mat4x4
+{
+  return Mat4x4FromPositionRotationScale(Transform.Translation, Transform.Rotation, Transform.Scale);
 }
 
 auto
@@ -705,3 +801,23 @@ auto
   return Normalized(ScaledZAxis(Mat));
 }
 
+auto
+::ForwardVector(transform Transform)
+  -> vec3
+{
+  return TransformDirection(Transform, ForwardVector3);
+}
+
+auto
+::RightVector(transform Transform)
+  -> vec3
+{
+  return TransformDirection(Transform, RightVector3);
+}
+
+auto
+::UpVector(transform Transform)
+  -> vec3
+{
+  return TransformDirection(Transform, UpVector3);
+}
