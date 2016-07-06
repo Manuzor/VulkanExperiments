@@ -821,3 +821,51 @@ auto
 {
   return TransformDirection(Transform, UpVector3);
 }
+
+auto
+DirectionAndLength(vec2 const& Vec, vec2* OutDirection, float* OutLength, float Epsilon)
+  -> void
+{
+  *OutLength = Length(Vec);
+
+  if(*OutLength > Epsilon)
+  {
+    *OutDirection = Vec / *OutLength;
+  }
+  else
+  {
+    *OutDirection = ZeroVector2;
+  }
+}
+
+auto
+DirectionAndLength(vec3 const& Vec, vec3* OutDirection, float* OutLength, float Epsilon)
+  -> void
+{
+  *OutLength = Length(Vec);
+
+  if(*OutLength > Epsilon)
+  {
+    *OutDirection = Vec / *OutLength;
+  }
+  else
+  {
+    *OutDirection = ZeroVector3;
+  }
+}
+
+auto
+DirectionAndLength(vec4 const& Vec, vec4* OutDirection, float* OutLength, float Epsilon)
+  -> void
+{
+  *OutLength = Length(Vec);
+
+  if(*OutLength > Epsilon)
+  {
+    *OutDirection = Vec / *OutLength;
+  }
+  else
+  {
+    *OutDirection = ZeroVector4;
+  }
+}

@@ -32,6 +32,56 @@ TEST_CASE("Math: Vector Basics", "[Math]")
   }
 }
 
+TEST_CASE("Math: Vector Length", "[Math]")
+{
+  vec2  const V2    = Vec2(1, 2);
+  vec2  const V2Dir = Vec2(0.447213595f, 0.894427191f);
+  float const V2Len = 2.236067977f;
+
+  vec3  const V3    = Vec3(1, 2, 3);
+  vec3  const V3Dir = Vec3(0.267261242f, 0.534522484f, 0.801783726f);
+  float const V3Len = 3.741657387f;
+
+  vec4  const V4    = Vec4(1, 2, 3, 4);
+  vec4  const V4Dir = Vec4(0.182574186f, 0.365148372f, 0.547722558f, 0.730296743f);
+  float const V4Len = 5.477225575f;
+
+  SECTION("LengthSquared")
+  {
+    REQUIRE( AreNearlyEqual(LengthSquared(V2), V2Len * V2Len, 1e-5f) );
+    REQUIRE( AreNearlyEqual(LengthSquared(V3), V3Len * V3Len, 1e-5f) );
+    REQUIRE( AreNearlyEqual(LengthSquared(V4), V4Len * V4Len, 1e-5f) );
+  }
+
+  SECTION("Length")
+  {
+    REQUIRE( AreNearlyEqual(Length(V2), V2Len) );
+    REQUIRE( AreNearlyEqual(Length(V3), V3Len) );
+    REQUIRE( AreNearlyEqual(Length(V4), V4Len) );
+  }
+
+  SECTION("DirectionAndLength")
+  {
+    vec2 Dir2;
+    float Len2;
+    DirectionAndLength(V2, &Dir2, &Len2);
+    REQUIRE( AreNearlyEqual(Dir2, V2Dir) );
+    REQUIRE( AreNearlyEqual(Len2, V2Len) );
+
+    vec3 Dir3;
+    float Len3;
+    DirectionAndLength(V3, &Dir3, &Len3);
+    REQUIRE( AreNearlyEqual(Dir3, V3Dir) );
+    REQUIRE( AreNearlyEqual(Len3, V3Len) );
+
+    vec4 Dir4;
+    float Len4;
+    DirectionAndLength(V4, &Dir4, &Len4);
+    REQUIRE( AreNearlyEqual(Dir4, V4Dir) );
+    REQUIRE( AreNearlyEqual(Len4, V4Len) );
+  }
+}
+
 TEST_CASE("Math: Matrix Basics", "[Math]")
 {
   auto Mat = Mat4x4( 1,  2,  3,  4,

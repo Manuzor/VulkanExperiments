@@ -585,6 +585,35 @@ vec3 CORE_API UpVector(transform const& Transform);
 
 
 //
+// Misc
+//
+
+/// Utility function to convert the given Vec into a unit direction vector
+/// (OutDirection) and its original length (OutLength).
+///
+/// If the length of Vec is smaller than the given Epsilon, OutDirection will
+/// be set to ZeroVector2.
+void CORE_API
+DirectionAndLength(vec2 const& Vec, vec2* OutDirection, float* OutLength, float Epsilon = 1e-4f);
+
+/// Utility function to convert the given Vec into a unit direction vector
+/// (OutDirection) and its original length (OutLength).
+///
+/// If the length of Vec is smaller than the given Epsilon, OutDirection will
+/// be set to ZeroVector3.
+void CORE_API
+DirectionAndLength(vec3 const& Vec, vec3* OutDirection, float* OutLength, float Epsilon = 1e-4f);
+
+/// Utility function to convert the given Vec into a unit direction vector
+/// (OutDirection) and its original length (OutLength).
+///
+/// If the length of Vec is smaller than the given Epsilon, OutDirection will
+/// be set to ZeroVector4.
+void CORE_API
+DirectionAndLength(vec4 const& Vec, vec4* OutDirection, float* OutLength, float Epsilon = 1e-4f);
+
+
+//
 // Slicing
 //
 slice<float> constexpr Slice(vec2& V) { return Slice(V.Data); }
