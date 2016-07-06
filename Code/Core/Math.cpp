@@ -1,7 +1,7 @@
 #include "Math.hpp"
 
 auto
-::MatrixMultiply(mat4x4 A, mat4x4 B)
+::MatrixMultiply(mat4x4 const& A, mat4x4 const& B)
   -> mat4x4
 {
   mat4x4 Result;
@@ -30,14 +30,14 @@ auto
 }
 
 auto
-::operator *(mat4x4 A, mat4x4 B)
+::operator *(mat4x4 const& A, mat4x4 const& B)
   -> mat4x4
 {
   return MatrixMultiply(A, B);
 }
 
 auto
-::operator *(quaternion A, quaternion B)
+::operator *(quaternion const& A, quaternion const& B)
   -> quaternion
 {
   return Quaternion(
@@ -49,7 +49,7 @@ auto
 }
 
 auto
-::operator *(transform A, transform B)
+::operator *(transform const& A, transform const& B)
   -> transform
 {
   transform Result;
@@ -60,31 +60,31 @@ auto
 }
 
 auto
-::Length(vec2 A)
+::Length(vec2 const& Vec)
   -> float
 {
-  auto Result = Sqrt(LengthSquared(A));
+  auto Result = Sqrt(LengthSquared(Vec));
   return Result;
 }
 
 auto
-::Length(vec3 A)
+::Length(vec3 const& Vec)
   -> float
 {
-  auto Result = Sqrt(LengthSquared(A));
+  auto Result = Sqrt(LengthSquared(Vec));
   return Result;
 }
 
 auto
-::Length(vec4 A)
+::Length(vec4 const& Vec)
   -> float
 {
-  auto Result = Sqrt(LengthSquared(A));
+  auto Result = Sqrt(LengthSquared(Vec));
   return Result;
 }
 
 auto
-Length(quaternion Quat)
+Length(quaternion const& Quat)
   -> float
 {
   auto Result = Sqrt(LengthSquared(Quat));
@@ -93,7 +93,7 @@ Length(quaternion Quat)
 
 
 auto
-::Normalized(vec2 Vec)
+::Normalized(vec2 const& Vec)
   -> vec2
 {
   auto Result = Vec / Length(Vec);
@@ -101,7 +101,7 @@ auto
 }
 
 auto
-::Normalized(vec3 Vec)
+::Normalized(vec3 const& Vec)
   -> vec3
 {
   auto Result = Vec / Length(Vec);
@@ -109,7 +109,7 @@ auto
 }
 
 auto
-::Normalized(vec4 Vec)
+::Normalized(vec4 const& Vec)
   -> vec4
 {
   auto Result = Vec / Length(Vec);
@@ -138,21 +138,21 @@ auto
 }
 
 auto
-::SafeNormalized(vec2 Vec, float Epsilon)
+::SafeNormalized(vec2 const& Vec, float Epsilon)
   -> vec2
 {
   return IsNearlyZero(Vec, Epsilon) ? ZeroVector2 : Normalized(Vec);
 }
 
 auto
-::SafeNormalized(vec3 Vec, float Epsilon)
+::SafeNormalized(vec3 const& Vec, float Epsilon)
   -> vec3
 {
   return IsNearlyZero(Vec, Epsilon) ? ZeroVector3 : Normalized(Vec);
 }
 
 auto
-::SafeNormalized(vec4 Vec, float Epsilon)
+::SafeNormalized(vec4 const& Vec, float Epsilon)
   -> vec4
 {
   return IsNearlyZero(Vec, Epsilon) ? ZeroVector4 : Normalized(Vec);
@@ -180,7 +180,7 @@ auto
 }
 
 auto
-::Normalized(quaternion Quat)
+::Normalized(quaternion const& Quat)
   -> quaternion
 {
   auto Len = Length(Quat);
@@ -188,7 +188,7 @@ auto
 }
 
 auto
-::SafeNormalized(quaternion Quat, float Epsilon)
+::SafeNormalized(quaternion const& Quat, float Epsilon)
   -> quaternion
 {
   auto Len = Length(Quat);
@@ -207,23 +207,23 @@ auto
 
 
 auto
-::Quaternion(vec3 Axis, angle Angle)
+::Quaternion(vec3 const& Axis, angle Angle)
   -> quaternion
 {
-  SafeNormalize(&Axis);
+  auto NormalizedAxis = SafeNormalized(Axis);
 
   quaternion Quat;
   Quat.W = Cos(Angle * 0.5f);
   float const Sine = Sin(Angle * 0.5f);
-  Quat.X = Sine * Axis.X;
-  Quat.Y = Sine * Axis.Y;
-  Quat.Z = Sine * Axis.Z;
+  Quat.X = Sine * NormalizedAxis.X;
+  Quat.Y = Sine * NormalizedAxis.Y;
+  Quat.Z = Sine * NormalizedAxis.Z;
 
   return Quat;
 }
 
 auto
-::Quaternion(mat4x4 Mat)
+::Quaternion(mat4x4 const& Mat)
   -> quaternion
 {
   if(IsNearlyZero(ScaledXAxis(Mat)) || IsNearlyZero(ScaledYAxis(Mat)) || IsNearlyZero(ScaledZAxis(Mat)))
@@ -281,7 +281,7 @@ auto
 }
 
 auto
-::TransformDirection(quaternion Quat, vec3 Direction)
+::TransformDirection(quaternion const& Quat, vec3 const& Direction)
   -> vec3
 {
   auto const Q = Vec3(Quat.X, Quat.Y, Quat.Z);
@@ -290,7 +290,7 @@ auto
 }
 
 auto
-::TransformDirection(quaternion Quat, vec4 Direction)
+::TransformDirection(quaternion const& Quat, vec4 const& Direction)
   -> vec4
 {
   auto const Q = Vec3(Quat.X, Quat.Y, Quat.Z);
@@ -300,14 +300,14 @@ auto
 }
 
 auto
-::operator *(quaternion Quat, vec3 Direction)
+::operator *(quaternion const& Quat, vec3 const& Direction)
   -> vec3
 {
   return TransformDirection(Quat, Direction);
 }
 
 auto
-::TransformDirection(mat4x4 Mat, vec4 Vec)
+::TransformDirection(mat4x4 const& Mat, vec4 const& Vec)
   -> vec4
 {
   vec4 Result;
@@ -321,21 +321,21 @@ auto
 }
 
 auto
-::TransformDirection(mat4x4 Mat, vec3 Vec)
+::TransformDirection(mat4x4 const& Mat, vec3 const& Vec)
   -> vec3
 {
   return Vec3FromXYZ(TransformDirection(Mat, Vec4(Vec, 0)));
 }
 
 auto
-::TransformPosition(mat4x4 Mat, vec3 Vec)
+::TransformPosition(mat4x4 const& Mat, vec3 const& Vec)
   -> vec3
 {
   return Vec3FromXYZ(TransformDirection(Mat, Vec4(Vec, 1)));
 }
 
 auto
-::InverseTransformDirection(mat4x4 Mat, vec4 Vec)
+::InverseTransformDirection(mat4x4 const& Mat, vec4 const& Vec)
   -> vec4
 {
   vec4 Result;
@@ -351,21 +351,21 @@ auto
 }
 
 auto
-::InverseTransformDirection(mat4x4 Mat, vec3 Vec)
+::InverseTransformDirection(mat4x4 const& Mat, vec3 const& Vec)
   -> vec3
 {
   return Vec3FromXYZ(InverseTransformDirection(Mat, Vec4(Vec, 0)));
 }
 
 auto
-::InverseTransformPosition(mat4x4 Mat, vec3 Vec)
+::InverseTransformPosition(mat4x4 const& Mat, vec3 const& Vec)
   -> vec3
 {
   return Vec3FromXYZ(InverseTransformDirection(Mat, Vec4(Vec, 1)));
 }
 
 auto
-::TransformDirection(quaternion Quat, vec3 Direction)
+::TransformDirection(quaternion const& Quat, vec3 const& Direction)
   -> vec3
 {
   auto const Q = Vec3(Quat.X, Quat.Y, Quat.Z);
@@ -374,7 +374,7 @@ auto
 }
 
 auto
-::TransformDirection(quaternion Quat, vec4 Direction)
+::TransformDirection(quaternion const& Quat, vec4 const& Direction)
   -> vec4
 {
   auto const XYZ = Vec3FromXYZ(Direction);
@@ -384,7 +384,7 @@ auto
 }
 
 auto
-::InverseTransformDirection(quaternion Quat, vec3 Direction)
+::InverseTransformDirection(quaternion const& Quat, vec3 const& Direction)
   -> vec3
 {
   auto const Q = Vec3(-Quat.X, -Quat.Y, -Quat.Z);
@@ -393,7 +393,7 @@ auto
 }
 
 auto
-::InverseTransformDirection(quaternion Quat, vec4 Direction)
+::InverseTransformDirection(quaternion const& Quat, vec4 const& Direction)
   -> vec4
 {
   auto const XYZ = Vec3FromXYZ(Direction);
@@ -403,28 +403,28 @@ auto
 }
 
 auto
-::TransformDirection(transform Transform, vec3 Vec)
+::TransformDirection(transform const& Transform, vec3 const& Vec)
   -> vec3
 {
   return Transform.Rotation * ComponentwiseMultiply(Transform.Scale, Vec);
 }
 
 auto
-::TransformPosition(transform Transform, vec3 Vec)
+::TransformPosition(transform const& Transform, vec3 const& Vec)
   -> vec3
 {
   return Transform.Rotation * ComponentwiseMultiply(Transform.Scale, Vec) + Transform.Translation;
 }
 
 auto
-::InverseTransformDirection(transform Transform, vec3 Vec)
+::InverseTransformDirection(transform const& Transform, vec3 const& Vec)
   -> vec3
 {
   return InverseTransformDirection(Transform.Rotation, Vec) * Reciprocal(Transform.Scale, 0);
 }
 
 auto
-::InverseTransformPosition(transform Transform, vec3 Vec)
+::InverseTransformPosition(transform const& Transform, vec3 const& Vec)
   -> vec3
 {
   return InverseTransformDirection(Transform.Rotation, Vec - Transform.Translation) * Reciprocal(Transform.Scale, 0);
@@ -489,7 +489,7 @@ auto
 }
 
 auto
-::Mat4x4LookAt(vec3 Target, vec3 Position, vec3 Up)
+::Mat4x4LookAt(vec3 const& Target, vec3 const& Position, vec3 const& Up)
   -> mat4x4
 {
   auto Direction = Target - Position;
@@ -497,24 +497,24 @@ auto
 }
 
 auto
-::Mat4x4LookDir(vec3 Direction, vec3 Position, vec3 Up)
+::Mat4x4LookDir(vec3 const& Direction, vec3 const& Position, vec3 const& Up)
   -> mat4x4
 {
-  SafeNormalize(&Direction);
-  auto Right = Direction ^ SafeNormalized(Up);
-  Up = Right ^ Direction;
-  return Mat4x4(Direction, Right, Up, Position);
+  auto Dir = SafeNormalized(Direction);
+  auto Right = Dir ^ SafeNormalized(Up);
+  auto NewUp = Right ^ Dir;
+  return Mat4x4(Dir, Right, NewUp, Position);
 }
 
 auto
-::Mat4x4FromPositionRotation(vec3 Position, quaternion Rotation)
+::Mat4x4FromPositionRotation(vec3 const& Position, quaternion const& Rotation)
   -> mat4x4
 {
   return Mat4x4FromPositionRotationScale(Position, Rotation, UnitScaleVector3);
 }
 
 auto
-::Mat4x4FromPositionRotationScale(vec3 Position, quaternion Rotation, vec3 Scale)
+::Mat4x4FromPositionRotationScale(vec3 const& Position, quaternion const& Rotation, vec3 const& Scale)
   -> mat4x4
 {
   mat4x4 Result;
@@ -556,7 +556,7 @@ auto
 }
 
 auto
-::Mat4x4(quaternion Quat)
+::Mat4x4(quaternion const& Quat)
   -> mat4x4
 {
   float const X2 = Quat.X + Quat.X;
@@ -584,7 +584,7 @@ auto
 }
 
 auto
-::Mat4x4(transform Transform)
+::Mat4x4(transform const& Transform)
   -> mat4x4
 {
   return Mat4x4FromPositionRotationScale(Transform.Translation, Transform.Rotation, Transform.Scale);
@@ -598,14 +598,14 @@ auto
 }
 
 auto
-::IsInvertible(mat4x4 Mat)
+::IsInvertible(mat4x4 const& Mat)
   -> bool
 {
   return !IsNearlyZero(Determinant(Mat));
 }
 
 auto
-::Inverted(mat4x4 Mat)
+::Inverted(mat4x4 const& Mat)
   -> mat4x4
 {
   Assert(IsInvertible(Mat));
@@ -676,7 +676,7 @@ auto
 }
 
 auto
-::SafeInverted(mat4x4 Mat)
+::SafeInverted(mat4x4 const& Mat)
   -> mat4x4
 {
   if(!IsInvertible(Mat) ||
@@ -700,7 +700,7 @@ auto
 
 
 auto
-::Determinant(mat4x4 Mat)
+::Determinant(mat4x4 const& Mat)
   -> float
 {
   /*
@@ -760,63 +760,63 @@ auto
 }
 
 auto
-::ScaledXAxis(mat4x4 Mat)
+::ScaledXAxis(mat4x4 const& Mat)
   -> vec3
 {
   return Vec3FromXYZ(Mat.Col0);
 }
 
 auto
-::ScaledYAxis(mat4x4 Mat)
+::ScaledYAxis(mat4x4 const& Mat)
   -> vec3
 {
   return Vec3FromXYZ(Mat.Col1);
 }
 
 auto
-::ScaledZAxis(mat4x4 Mat)
+::ScaledZAxis(mat4x4 const& Mat)
   -> vec3
 {
   return Vec3FromXYZ(Mat.Col2);
 }
 
 auto
-::UnitXAxis(mat4x4 Mat)
+::UnitXAxis(mat4x4 const& Mat)
   -> vec3
 {
   return Normalized(ScaledXAxis(Mat));
 }
 
 auto
-::UnitYAxis(mat4x4 Mat)
+::UnitYAxis(mat4x4 const& Mat)
   -> vec3
 {
   return Normalized(ScaledYAxis(Mat));
 }
 
 auto
-::UnitZAxis(mat4x4 Mat)
+::UnitZAxis(mat4x4 const& Mat)
   -> vec3
 {
   return Normalized(ScaledZAxis(Mat));
 }
 
 auto
-::ForwardVector(transform Transform)
+::ForwardVector(transform const& Transform)
   -> vec3
 {
   return TransformDirection(Transform, ForwardVector3);
 }
 
 auto
-::RightVector(transform Transform)
+::RightVector(transform const& Transform)
   -> vec3
 {
   return TransformDirection(Transform, RightVector3);
 }
 
 auto
-::UpVector(transform Transform)
+::UpVector(transform const& Transform)
   -> vec3
 {
   return TransformDirection(Transform, UpVector3);

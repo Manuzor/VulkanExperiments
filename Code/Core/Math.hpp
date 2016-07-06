@@ -105,20 +105,20 @@ vec2 constexpr Vec2(float X, float Y) {return { X, Y }; }
 
 vec3 constexpr Vec3(float XYZ) {return { XYZ, XYZ, XYZ }; }
 vec3 constexpr Vec3(float X, float Y, float Z) {return { X, Y, Z }; }
-vec3 constexpr Vec3(float X, vec2 YZ) { return Vec3(X, YZ.X, YZ.Y); }
-vec3 constexpr Vec3(vec2 XY, float Z) { return Vec3(XY.X, XY.Y, Z); }
+vec3 constexpr Vec3(float X, vec2 const& YZ) { return Vec3(X, YZ.X, YZ.Y); }
+vec3 constexpr Vec3(vec2 const& XY, float Z) { return Vec3(XY.X, XY.Y, Z); }
 
-vec3 constexpr Vec3FromXYZ(vec4 Vec) { return Vec3(Vec.X, Vec.Y, Vec.Z); }
+vec3 constexpr Vec3FromXYZ(vec4 const& Vec) { return Vec3(Vec.X, Vec.Y, Vec.Z); }
 
 
 vec4 constexpr Vec4(float XYZW) {return { XYZW, XYZW, XYZW, XYZW }; }
 vec4 constexpr Vec4(float X, float Y, float Z, float W) {return { X, Y, Z, W }; }
-vec4 constexpr Vec4(float X, float Y, vec2 ZW) { return Vec4(   X,    Y, ZW.X, ZW.Y); }
-vec4 constexpr Vec4(float X, vec2 YZ, float W) { return Vec4(   X, YZ.X, YZ.Y,    W); }
-vec4 constexpr Vec4(vec2 XY, float Z, float W) { return Vec4(XY.X, XY.Y,    Z,    W); }
-vec4 constexpr Vec4(vec2 XY, vec2 ZW)          { return Vec4(XY.X, XY.Y, ZW.X, ZW.Y); }
-vec4 constexpr Vec4(float X, vec3 YZW) { return Vec4(X, YZW.X, YZW.Y, YZW.Z); }
-vec4 constexpr Vec4(vec3 XYZ, float W) { return Vec4(XYZ.X, XYZ.Y, XYZ.Z, W); }
+vec4 constexpr Vec4(float X, float Y, vec2 const& ZW) { return Vec4(   X,    Y, ZW.X, ZW.Y); }
+vec4 constexpr Vec4(float X, vec2 const& YZ, float W) { return Vec4(   X, YZ.X, YZ.Y,    W); }
+vec4 constexpr Vec4(vec2 const& XY, float Z, float W) { return Vec4(XY.X, XY.Y,    Z,    W); }
+vec4 constexpr Vec4(vec2 XY, vec2 const& ZW)          { return Vec4(XY.X, XY.Y, ZW.X, ZW.Y); }
+vec4 constexpr Vec4(float X, vec3 const& YZW) { return Vec4(X, YZW.X, YZW.Y, YZW.Z); }
+vec4 constexpr Vec4(vec3 const& XYZ, float W) { return Vec4(XYZ.X, XYZ.Y, XYZ.Z, W); }
 
 
 //
@@ -171,7 +171,7 @@ Mat4x4(float M00, float M01, float M02, float M03,
 }
 
 mat4x4 constexpr
-Mat4x4(vec4 Col0, vec4 Col1, vec4 Col2, vec4 Col3)
+Mat4x4(vec4 const& Col0, vec4 const& Col1, vec4 const& Col2, vec4 const& Col3)
 {
   return { Col0.X, Col0.Y, Col0.Z, Col0.W,
            Col1.X, Col1.Y, Col1.Z, Col1.W,
@@ -189,7 +189,7 @@ mat4x4 CORE_API
 Mat4x4(mat4x4::float4x4 const& Data);
 
 mat4x4 constexpr
-Mat4x4(vec3 XAxis, vec3 YAxis, vec3 ZAxis, vec3 Position = ZeroVector3)
+Mat4x4(vec3 const& XAxis, vec3 const& YAxis, vec3 const& ZAxis, vec3 const& Position = ZeroVector3)
 {
   return { XAxis.X,    XAxis.Y,    XAxis.Z,    0,
            YAxis.X,    YAxis.Y,    YAxis.Z,    0,
@@ -204,22 +204,22 @@ mat4x4 CORE_API
 Mat4x4Orthogonal(float Width, float Height, float ZScale, float ZOffset);
 
 mat4x4 CORE_API
-Mat4x4LookAt(vec3 Target, vec3 Position, vec3 Up = UpVector3);
+Mat4x4LookAt(vec3 const& Target, vec3 const& Position, vec3 const& Up = UpVector3);
 
 mat4x4 CORE_API
-Mat4x4LookDir(vec3 Direction, vec3 Position, vec3 Up = UpVector3);
+Mat4x4LookDir(vec3 const& Direction, vec3 const& Position, vec3 const& Up = UpVector3);
 
 mat4x4 CORE_API
-Mat4x4FromPositionRotation(vec3 Position, quaternion Rotation);
+Mat4x4FromPositionRotation(vec3 const& Position, quaternion const& Rotation);
 
 mat4x4 CORE_API
-Mat4x4FromPositionRotationScale(vec3 Position, quaternion Rotation, vec3 Scale);
+Mat4x4FromPositionRotationScale(vec3 const& Position, quaternion const& Rotation, vec3 const& Scale);
 
 mat4x4 CORE_API
-Mat4x4(quaternion Quat);
+Mat4x4(quaternion const& Quat);
 
 mat4x4 CORE_API
-Mat4x4(transform Transform);
+Mat4x4(transform const& Transform);
 
 
 //
@@ -243,7 +243,7 @@ constexpr mat4x4 IdentityMatrix4x4 = Mat4x4(1, 0, 0, 0,
 
 
 quaternion constexpr
-Quaternion(float Data[4])
+Quaternion(float const(&Data)[4])
 {
   return { Data[0], Data[1], Data[2], Data[3] };
 }
@@ -255,10 +255,10 @@ Quaternion(float X, float Y, float Z, float W)
 }
 
 quaternion CORE_API
-Quaternion(vec3 Axis, angle Angle);
+Quaternion(vec3 const& Axis, angle Angle);
 
 quaternion CORE_API
-Quaternion(mat4x4 Mat);
+Quaternion(mat4x4 const& Mat);
 
 
 //
@@ -272,7 +272,7 @@ constexpr quaternion IdentityQuaternion = Quaternion(0, 0, 0, 1);
 //
 
 transform constexpr
-Transform(vec3 Translation, quaternion Rotation, vec3 Scale)
+Transform(vec3 const& Translation, quaternion const& Rotation, vec3 const& Scale)
 {
   return { Translation, Rotation, Scale };
 }
@@ -280,105 +280,105 @@ Transform(vec3 Translation, quaternion Rotation, vec3 Scale)
 //
 // Algorithms: Equality
 //
-bool constexpr operator ==(vec2 A, vec2 B) { return A.X == B.X && A.Y == B.Y; }
-bool constexpr operator ==(vec3 A, vec3 B) { return A.X == B.X && A.Y == B.Y && A.Z == B.Z; }
-bool constexpr operator ==(vec4 A, vec4 B) { return A.X == B.X && A.Y == B.Y && A.Z == B.Z && A.W == B.W; }
-bool constexpr operator ==(quaternion A, quaternion B) { return A.Direction == B.Direction && A.Angle == B.Angle; }
-bool constexpr operator ==(mat4x4 A, mat4x4 B) { return A.Col0 == B.Col0 && A.Col1 == B.Col1 && A.Col2 == B.Col2 && A.Col3 == B.Col3; }
+bool constexpr operator ==(vec2 const& A, vec2 const& B) { return A.X == B.X && A.Y == B.Y; }
+bool constexpr operator ==(vec3 const& A, vec3 const& B) { return A.X == B.X && A.Y == B.Y && A.Z == B.Z; }
+bool constexpr operator ==(vec4 const& A, vec4 const& B) { return A.X == B.X && A.Y == B.Y && A.Z == B.Z && A.W == B.W; }
+bool constexpr operator ==(quaternion const& A, quaternion const& B) { return A.Direction == B.Direction && A.Angle == B.Angle; }
+bool constexpr operator ==(mat4x4 const& A, mat4x4 const& B) { return A.Col0 == B.Col0 && A.Col1 == B.Col1 && A.Col2 == B.Col2 && A.Col3 == B.Col3; }
 
-bool constexpr operator !=(vec2 A, vec2 B) { return !(A == B); }
-bool constexpr operator !=(vec3 A, vec3 B) { return !(A == B); }
-bool constexpr operator !=(vec4 A, vec4 B) { return !(A == B); }
-bool constexpr operator !=(quaternion A, quaternion B) { return !(A == B); }
-bool constexpr operator !=(mat4x4 A, mat4x4 B) { return !(A == B); }
+bool constexpr operator !=(vec2 const& A, vec2 const& B) { return !(A == B); }
+bool constexpr operator !=(vec3 const& A, vec3 const& B) { return !(A == B); }
+bool constexpr operator !=(vec4 const& A, vec4 const& B) { return !(A == B); }
+bool constexpr operator !=(quaternion const& A, quaternion const& B) { return !(A == B); }
+bool constexpr operator !=(mat4x4 const& A, mat4x4 const& B) { return !(A == B); }
 
-bool constexpr AreNearlyEqual(vec2 A, vec2 B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.X, B.X, Epsilon) && AreNearlyEqual(A.Y, B.Y, Epsilon); }
-bool constexpr AreNearlyEqual(vec3 A, vec3 B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.X, B.X, Epsilon) && AreNearlyEqual(A.Y, B.Y, Epsilon) && AreNearlyEqual(A.Z, B.Z, Epsilon); }
-bool constexpr AreNearlyEqual(vec4 A, vec4 B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.X, B.X, Epsilon) && AreNearlyEqual(A.Y, B.Y, Epsilon) && AreNearlyEqual(A.Z, B.Z, Epsilon) && AreNearlyEqual(A.W, B.W, Epsilon); }
-bool constexpr AreNearlyEqual(quaternion A, quaternion B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.Direction, B.Direction, Epsilon) && AreNearlyEqual(A.Angle, B.Angle, Radians(Epsilon)); }
-bool constexpr AreNearlyEqual(mat4x4 A, mat4x4 B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.Col0, B.Col0, Epsilon) && AreNearlyEqual(A.Col1, B.Col1, Epsilon) && AreNearlyEqual(A.Col2, B.Col2, Epsilon) && AreNearlyEqual(A.Col3, B.Col3, Epsilon); }
+bool constexpr AreNearlyEqual(vec2 const& A, vec2 const& B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.X, B.X, Epsilon) && AreNearlyEqual(A.Y, B.Y, Epsilon); }
+bool constexpr AreNearlyEqual(vec3 const& A, vec3 const& B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.X, B.X, Epsilon) && AreNearlyEqual(A.Y, B.Y, Epsilon) && AreNearlyEqual(A.Z, B.Z, Epsilon); }
+bool constexpr AreNearlyEqual(vec4 const& A, vec4 const& B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.X, B.X, Epsilon) && AreNearlyEqual(A.Y, B.Y, Epsilon) && AreNearlyEqual(A.Z, B.Z, Epsilon) && AreNearlyEqual(A.W, B.W, Epsilon); }
+bool constexpr AreNearlyEqual(quaternion const& A, quaternion const& B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.Direction, B.Direction, Epsilon) && AreNearlyEqual(A.Angle, B.Angle, Radians(Epsilon)); }
+bool constexpr AreNearlyEqual(mat4x4 const& A, mat4x4 const& B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.Col0, B.Col0, Epsilon) && AreNearlyEqual(A.Col1, B.Col1, Epsilon) && AreNearlyEqual(A.Col2, B.Col2, Epsilon) && AreNearlyEqual(A.Col3, B.Col3, Epsilon); }
 
-bool constexpr IsNearlyZero(vec2 Vec, float Epsilon = 1e-4f) { return AreNearlyEqual(Vec, ZeroVector2, Epsilon); }
-bool constexpr IsNearlyZero(vec3 Vec, float Epsilon = 1e-4f) { return AreNearlyEqual(Vec, ZeroVector3, Epsilon); }
-bool constexpr IsNearlyZero(vec4 Vec, float Epsilon = 1e-4f) { return AreNearlyEqual(Vec, ZeroVector4, Epsilon); }
-bool constexpr IsNearlyZero(mat4x4 Mat, float Epsilon = 1e-4f) { return AreNearlyEqual(Mat, ZeroMatrix4x4, Epsilon); }
+bool constexpr IsNearlyZero(vec2 const& Vec, float Epsilon = 1e-4f) { return AreNearlyEqual(Vec, ZeroVector2, Epsilon); }
+bool constexpr IsNearlyZero(vec3 const& Vec, float Epsilon = 1e-4f) { return AreNearlyEqual(Vec, ZeroVector3, Epsilon); }
+bool constexpr IsNearlyZero(vec4 const& Vec, float Epsilon = 1e-4f) { return AreNearlyEqual(Vec, ZeroVector4, Epsilon); }
+bool constexpr IsNearlyZero(mat4x4 const& Mat, float Epsilon = 1e-4f) { return AreNearlyEqual(Mat, ZeroMatrix4x4, Epsilon); }
 
 
 //
 // Operator: Negate
 //
-vec2 constexpr operator -(vec2 V) { return Vec2(-V.X, -V.Y); }
-vec3 constexpr operator -(vec3 V) { return Vec3(-V.X, -V.Y, -V.Z); }
-vec4 constexpr operator -(vec4 V) { return Vec4(-V.X, -V.Y, -V.Z, -V.W); }
+vec2 constexpr operator -(vec2 const& V) { return Vec2(-V.X, -V.Y); }
+vec3 constexpr operator -(vec3 const& V) { return Vec3(-V.X, -V.Y, -V.Z); }
+vec4 constexpr operator -(vec4 const& V) { return Vec4(-V.X, -V.Y, -V.Z, -V.W); }
 
 
 //
 // Operator: Add
 //
-vec2 constexpr operator +(vec2 A, vec2 B) { return Vec2(A.X + B.X, A.Y + B.Y); }
-vec3 constexpr operator +(vec3 A, vec3 B) { return Vec3(A.X + B.X, A.Y + B.Y, A.Z + B.Z); }
-vec4 constexpr operator +(vec4 A, vec4 B) { return Vec4(A.X + B.X, A.Y + B.Y, A.Z + B.Z, A.W + B.W); }
+vec2 constexpr operator +(vec2 const& A, vec2 const& B) { return Vec2(A.X + B.X, A.Y + B.Y); }
+vec3 constexpr operator +(vec3 const& A, vec3 const& B) { return Vec3(A.X + B.X, A.Y + B.Y, A.Z + B.Z); }
+vec4 constexpr operator +(vec4 const& A, vec4 const& B) { return Vec4(A.X + B.X, A.Y + B.Y, A.Z + B.Z, A.W + B.W); }
 
-void inline operator +=(vec2& A, vec2 B) { A = A + B; }
-void inline operator +=(vec3& A, vec3 B) { A = A + B; }
-void inline operator +=(vec4& A, vec4 B) { A = A + B; }
+void inline operator +=(vec2& A, vec2 const& B) { A = A + B; }
+void inline operator +=(vec3& A, vec3 const& B) { A = A + B; }
+void inline operator +=(vec4& A, vec4 const& B) { A = A + B; }
 
 
 //
 // Operator: Subtract
 //
-vec2 constexpr operator -(vec2 A, vec2 B) { return Vec2(A.X - B.X, A.Y - B.Y); }
-vec3 constexpr operator -(vec3 A, vec3 B) { return Vec3(A.X - B.X, A.Y - B.Y, A.Z - B.Z); }
-vec4 constexpr operator -(vec4 A, vec4 B) { return Vec4(A.X - B.X, A.Y - B.Y, A.Z - B.Z, A.W - B.W); }
+vec2 constexpr operator -(vec2 const& A, vec2 const& B) { return Vec2(A.X - B.X, A.Y - B.Y); }
+vec3 constexpr operator -(vec3 const& A, vec3 const& B) { return Vec3(A.X - B.X, A.Y - B.Y, A.Z - B.Z); }
+vec4 constexpr operator -(vec4 const& A, vec4 const& B) { return Vec4(A.X - B.X, A.Y - B.Y, A.Z - B.Z, A.W - B.W); }
 
-void inline operator -=(vec2& A, vec2 B) { A = A - B; }
-void inline operator -=(vec3& A, vec3 B) { A = A - B; }
-void inline operator -=(vec4& A, vec4 B) { A = A - B; }
+void inline operator -=(vec2& A, vec2 const& B) { A = A - B; }
+void inline operator -=(vec3& A, vec3 const& B) { A = A - B; }
+void inline operator -=(vec4& A, vec4 const& B) { A = A - B; }
 
 
 //
 // Operator: Multiply
 //
-vec2 constexpr operator *(float S, vec2 V) { return Vec2(S * V.X, S * V.Y); }
-vec3 constexpr operator *(float S, vec3 V) { return Vec3(S * V.X, S * V.Y, S * V.Z); }
-vec4 constexpr operator *(float S, vec4 V) { return Vec4(S * V.X, S * V.Y, S * V.Z, S * V.W); }
-vec2 constexpr operator *(vec2 V, float S) { return S * V; }
-vec3 constexpr operator *(vec3 V, float S) { return S * V; }
-vec4 constexpr operator *(vec4 V, float S) { return S * V; }
+vec2 constexpr operator *(float S, vec2 const& V) { return Vec2(S * V.X, S * V.Y); }
+vec3 constexpr operator *(float S, vec3 const& V) { return Vec3(S * V.X, S * V.Y, S * V.Z); }
+vec4 constexpr operator *(float S, vec4 const& V) { return Vec4(S * V.X, S * V.Y, S * V.Z, S * V.W); }
+vec2 constexpr operator *(vec2 const& V, float S) { return S * V; }
+vec3 constexpr operator *(vec3 const& V, float S) { return S * V; }
+vec4 constexpr operator *(vec4 const& V, float S) { return S * V; }
 void inline operator *=(vec2& V, float S) { V = V * S; }
 void inline operator *=(vec3& V, float S) { V = V * S; }
 void inline operator *=(vec4& V, float S) { V = V * S; }
 
-vec2 constexpr ComponentwiseMultiply(vec2 A, vec2 B) { return Vec2(A.X * B.X, A.Y * B.Y); }
-vec3 constexpr ComponentwiseMultiply(vec3 A, vec3 B) { return Vec3(A.X * B.X, A.Y * B.Y, A.Z * B.Z); }
-vec4 constexpr ComponentwiseMultiply(vec4 A, vec4 B) { return Vec4(A.X * B.X, A.Y * B.Y, A.Z * B.Z, A.W * B.W); }
+vec2 constexpr ComponentwiseMultiply(vec2 const& A, vec2 const& B) { return Vec2(A.X * B.X, A.Y * B.Y); }
+vec3 constexpr ComponentwiseMultiply(vec3 const& A, vec3 const& B) { return Vec3(A.X * B.X, A.Y * B.Y, A.Z * B.Z); }
+vec4 constexpr ComponentwiseMultiply(vec4 const& A, vec4 const& B) { return Vec4(A.X * B.X, A.Y * B.Y, A.Z * B.Z, A.W * B.W); }
 
-vec2 constexpr operator *(vec2 A, vec2 B) { return ComponentwiseMultiply(A, B); }
-vec3 constexpr operator *(vec3 A, vec3 B) { return ComponentwiseMultiply(A, B); }
-vec4 constexpr operator *(vec4 A, vec4 B) { return ComponentwiseMultiply(A, B); }
+vec2 constexpr operator *(vec2 const& A, vec2 const& B) { return ComponentwiseMultiply(A, B); }
+vec3 constexpr operator *(vec3 const& A, vec3 const& B) { return ComponentwiseMultiply(A, B); }
+vec4 constexpr operator *(vec4 const& A, vec4 const& B) { return ComponentwiseMultiply(A, B); }
 
-void inline operator *=(vec2& A, vec2 B) { A = A * B; }
-void inline operator *=(vec3& A, vec3 B) { A = A * B; }
-void inline operator *=(vec4& A, vec4 B) { A = A * B; }
+void inline operator *=(vec2& A, vec2 const& B) { A = A * B; }
+void inline operator *=(vec3& A, vec3 const& B) { A = A * B; }
+void inline operator *=(vec4& A, vec4 const& B) { A = A * B; }
 
-mat4x4 CORE_API MatrixMultiply(mat4x4 A, mat4x4 B);
+mat4x4 CORE_API MatrixMultiply(mat4x4 const& A, mat4x4 const& B);
 
-mat4x4 CORE_API operator *(mat4x4 A, mat4x4 B);
-void inline operator *=(mat4x4& A, mat4x4 B) { A = A * B; }
+mat4x4 CORE_API operator *(mat4x4 const& A, mat4x4 const& B);
+void inline operator *=(mat4x4& A, mat4x4 const& B) { A = A * B; }
 
-quaternion CORE_API operator *(quaternion A, quaternion B);
-void inline operator *=(quaternion& A, quaternion B) { A = A * B; }
+quaternion CORE_API operator *(quaternion const& A, quaternion const& B);
+void inline operator *=(quaternion& A, quaternion const& B) { A = A * B; }
 
-transform CORE_API operator *(transform A, transform B);
-void inline operator *=(transform& A, transform B) { A = A * B; }
+transform CORE_API operator *(transform const& A, transform const& B);
+void inline operator *=(transform& A, transform const& B) { A = A * B; }
 
 
 //
 // Operator: Divide
 //
-vec2 constexpr operator /(vec2 V, float S) { return (1 / S) * V; }
-vec3 constexpr operator /(vec3 V, float S) { return (1 / S) * V; }
-vec4 constexpr operator /(vec4 V, float S) { return (1 / S) * V; }
+vec2 constexpr operator /(vec2 const& V, float S) { return (1 / S) * V; }
+vec3 constexpr operator /(vec3 const& V, float S) { return (1 / S) * V; }
+vec4 constexpr operator /(vec4 const& V, float S) { return (1 / S) * V; }
 
 void inline operator /=(vec2& V, float S) { V = (1 / S) * V; }
 void inline operator /=(vec3& V, float S) { V = (1 / S) * V; }
@@ -388,75 +388,75 @@ void inline operator /=(vec4& V, float S) { V = (1 / S) * V; }
 //
 // Algorithms: Dot Product
 //
-float constexpr Dot(vec2 A, vec2 B) { return A.X * B.X + A.Y * B.Y; }
-float constexpr Dot(vec3 A, vec3 B) { return A.X * B.X + A.Y * B.Y + A.Z * B.Z; }
-float constexpr Dot(vec4 A, vec4 B) { return A.X * B.X + A.Y * B.Y + A.Z * B.Z + A.W * B.W; }
+float constexpr Dot(vec2 const& A, vec2 const& B) { return A.X * B.X + A.Y * B.Y; }
+float constexpr Dot(vec3 const& A, vec3 const& B) { return A.X * B.X + A.Y * B.Y + A.Z * B.Z; }
+float constexpr Dot(vec4 const& A, vec4 const& B) { return A.X * B.X + A.Y * B.Y + A.Z * B.Z + A.W * B.W; }
 
-float constexpr operator |(vec2 A, vec2 B) { return Dot(A, B); }
-float constexpr operator |(vec3 A, vec3 B) { return Dot(A, B); }
-float constexpr operator |(vec4 A, vec4 B) { return Dot(A, B); }
+float constexpr operator |(vec2 const& A, vec2 const& B) { return Dot(A, B); }
+float constexpr operator |(vec3 const& A, vec3 const& B) { return Dot(A, B); }
+float constexpr operator |(vec4 const& A, vec4 const& B) { return Dot(A, B); }
 
 
 //
 // Algorithms: Length and Squared Length
 //
-float constexpr LengthSquared(vec2 A) { return A | A; }
-float constexpr LengthSquared(vec3 A) { return A | A; }
-float constexpr LengthSquared(vec4 A) { return A | A; }
-float constexpr LengthSquared(quaternion Quat) { return { Quat.X * Quat.X + Quat.Y * Quat.Y + Quat.Z * Quat.Z + Quat.W * Quat.W }; }
+float constexpr LengthSquared(vec2 const& A) { return A | A; }
+float constexpr LengthSquared(vec3 const& A) { return A | A; }
+float constexpr LengthSquared(vec4 const& A) { return A | A; }
+float constexpr LengthSquared(quaternion const& Quat) { return { Quat.X * Quat.X + Quat.Y * Quat.Y + Quat.Z * Quat.Z + Quat.W * Quat.W }; }
 
-float CORE_API Length(vec2 A);
-float CORE_API Length(vec3 A);
-float CORE_API Length(vec4 A);
-float CORE_API Length(quaternion Quat);
+float CORE_API Length(vec2 const& A);
+float CORE_API Length(vec3 const& A);
+float CORE_API Length(vec4 const& A);
+float CORE_API Length(quaternion const& Quat);
 
 
 //
 // Algorithms: Normalization
 //
-vec2 CORE_API Normalized(vec2 V);
-vec3 CORE_API Normalized(vec3 V);
-vec4 CORE_API Normalized(vec4 V);
+vec2 CORE_API Normalized(vec2 const& V);
+vec3 CORE_API Normalized(vec3 const& V);
+vec4 CORE_API Normalized(vec4 const& V);
 
 void CORE_API Normalize(vec2* V);
 void CORE_API Normalize(vec3* V);
 void CORE_API Normalize(vec4* V);
 
-vec2 CORE_API SafeNormalized(vec2 V, float Epsilon = 1e-4f);
-vec3 CORE_API SafeNormalized(vec3 V, float Epsilon = 1e-4f);
-vec4 CORE_API SafeNormalized(vec4 V, float Epsilon = 1e-4f);
+vec2 CORE_API SafeNormalized(vec2 const& V, float Epsilon = 1e-4f);
+vec3 CORE_API SafeNormalized(vec3 const& V, float Epsilon = 1e-4f);
+vec4 CORE_API SafeNormalized(vec4 const& V, float Epsilon = 1e-4f);
 
 void CORE_API SafeNormalize(vec2* V, float Epsilon = 1e-4f);
 void CORE_API SafeNormalize(vec3* V, float Epsilon = 1e-4f);
 void CORE_API SafeNormalize(vec4* V, float Epsilon = 1e-4f);
 
-quaternion CORE_API Normalized(quaternion Quat);
-quaternion CORE_API SafeNormalized(quaternion Quat, float Epsilon = 1e-4f);
+quaternion CORE_API Normalized(quaternion const& Quat);
+quaternion CORE_API SafeNormalized(quaternion const& Quat, float Epsilon = 1e-4f);
 void CORE_API SafeNormalize(quaternion* Quat, float Epsilon = 1e-4f);
 
 //
 // Algorithms: Cross Product
 //
-vec3 constexpr Cross(vec3 A, vec3 B) { return Vec3((A.Y * B.Z) - (A.Z * B.Y),
-                                                   (A.Z * B.X) - (A.X * B.Z),
-                                                   (A.X * B.Y) - (A.Y * B.X)); }
+vec3 constexpr Cross(vec3 const& A, vec3 const& B) { return Vec3((A.Y * B.Z) - (A.Z * B.Y),
+                                                                 (A.Z * B.X) - (A.X * B.Z),
+                                                                 (A.X * B.Y) - (A.Y * B.X)); }
 
-vec3 constexpr operator ^(vec3 A, vec3 B) { return Cross(A, B); }
+vec3 constexpr operator ^(vec3 const& A, vec3 const& B) { return Cross(A, B); }
 
-void inline operator ^=(vec3& A, vec3 B) { A = A ^ B; }
+void inline operator ^=(vec3& A, vec3 const& B) { A = A ^ B; }
 
 //
 // Algorithms: Reciprocal
 //
 vec2 constexpr
-Reciprocal(vec2 Vec, float ZeroCase = 3.4e38f)
+Reciprocal(vec2 const& Vec, float ZeroCase = 3.4e38f)
 {
   return Vec2(Vec.X ? 1 / Vec.X : ZeroCase,
               Vec.Y ? 1 / Vec.Y : ZeroCase);
 }
 
 vec3 constexpr
-Reciprocal(vec3 Vec, float ZeroCase = 3.4e38f)
+Reciprocal(vec3 const& Vec, float ZeroCase = 3.4e38f)
 {
   return Vec3(Vec.X ? 1 / Vec.X : ZeroCase,
               Vec.Y ? 1 / Vec.Y : ZeroCase,
@@ -464,7 +464,7 @@ Reciprocal(vec3 Vec, float ZeroCase = 3.4e38f)
 }
 
 vec4 constexpr
-Reciprocal(vec4 Vec, float ZeroCase = 3.4e38f)
+Reciprocal(vec4 const& Vec, float ZeroCase = 3.4e38f)
 {
   return Vec4(Vec.X ? 1 / Vec.X : ZeroCase,
               Vec.Y ? 1 / Vec.Y : ZeroCase,
@@ -476,61 +476,61 @@ Reciprocal(vec4 Vec, float ZeroCase = 3.4e38f)
 // Algorithms: Transforming Vectors
 //
 vec3 CORE_API
-TransformDirection(quaternion Quat, vec3 Direction);
+TransformDirection(quaternion const& Quat, vec3 const& Direction);
 
 vec4 CORE_API
-TransformDirection(quaternion Quat, vec4 Direction);
+TransformDirection(quaternion const& Quat, vec4 const& Direction);
 
 vec3 CORE_API
-operator *(quaternion Quat, vec3 Direction);
+operator *(quaternion const& Quat, vec3 const& Direction);
 
 vec4 CORE_API
-TransformDirection(mat4x4 Mat, vec4 Vec);
+TransformDirection(mat4x4 const& Mat, vec4 const& Vec);
 
 vec3 CORE_API
-TransformDirection(mat4x4 Mat, vec3 Vec);
+TransformDirection(mat4x4 const& Mat, vec3 const& Vec);
 
 vec3 CORE_API
-TransformPosition(mat4x4 Mat, vec3 Vec);
+TransformPosition(mat4x4 const& Mat, vec3 const& Vec);
 
 vec4 CORE_API
-InverseTransformDirection(mat4x4 Mat, vec4 Vec);
+InverseTransformDirection(mat4x4 const& Mat, vec4 const& Vec);
 
 vec3 CORE_API
-InverseTransformDirection(mat4x4 Mat, vec3 Vec);
+InverseTransformDirection(mat4x4 const& Mat, vec3 const& Vec);
 
 vec3 CORE_API
-InverseTransformPosition(mat4x4 Mat, vec3 Vec);
+InverseTransformPosition(mat4x4 const& Mat, vec3 const& Vec);
 
 vec3 CORE_API
-TransformDirection(quaternion Quat, vec3 Direction);
+TransformDirection(quaternion const& Quat, vec3 const& Direction);
 
 vec4 CORE_API
-TransformDirection(quaternion Quat, vec4 Direction);
+TransformDirection(quaternion const& Quat, vec4 const& Direction);
 
 vec3 CORE_API
-InverseTransformDirection(quaternion Quat, vec3 Direction);
+InverseTransformDirection(quaternion const& Quat, vec3 const& Direction);
 
 vec4 CORE_API
-InverseTransformDirection(quaternion Quat, vec4 Direction);
+InverseTransformDirection(quaternion const& Quat, vec4 const& Direction);
 
 vec3 CORE_API
-TransformDirection(transform Transform, vec3 Vec);
+TransformDirection(transform const& Transform, vec3 const& Vec);
 
 vec3 CORE_API
-TransformPosition(transform Transform, vec3 Vec);
+TransformPosition(transform const& Transform, vec3 const& Vec);
 
 vec3 CORE_API
-InverseTransformDirection(transform Transform, vec3 Vec);
+InverseTransformDirection(transform const& Transform, vec3 const& Vec);
 
 vec3 CORE_API
-InverseTransformPosition(transform Transform, vec3 Vec);
+InverseTransformPosition(transform const& Transform, vec3 const& Vec);
 
 //
 // Algorithms: Matrix Transposition and Inversion
 //
 mat4x4 constexpr
-Transposed(mat4x4 const Mat)
+Transposed(mat4x4 const& Mat)
 {
   return { Mat[0][0], Mat[1][0], Mat[2][0], Mat[3][0],
            Mat[0][1], Mat[1][1], Mat[2][1], Mat[3][1],
@@ -542,16 +542,16 @@ void CORE_API
 Transpose(mat4x4* Mat);
 
 bool CORE_API
-IsInvertible(mat4x4 Mat);
+IsInvertible(mat4x4 const& Mat);
 
 mat4x4 CORE_API
-Inverted(mat4x4 Mat);
+Inverted(mat4x4 const& Mat);
 
 void CORE_API
 Invert(mat4x4* Mat);
 
 mat4x4 CORE_API
-SafeInverted(mat4x4 Mat);
+SafeInverted(mat4x4 const& Mat);
 
 void CORE_API
 SafeInvert(mat4x4* Mat);
@@ -561,27 +561,27 @@ SafeInvert(mat4x4* Mat);
 // Algorithms: Matrix Determinant
 //
 float CORE_API
-Determinant(mat4x4 Mat);
+Determinant(mat4x4 const& Mat);
 
 
 //
 // Algorithms: Matrix Accessors
 //
-vec3 CORE_API ScaledXAxis(mat4x4 Mat);
-vec3 CORE_API ScaledYAxis(mat4x4 Mat);
-vec3 CORE_API ScaledZAxis(mat4x4 Mat);
+vec3 CORE_API ScaledXAxis(mat4x4 const& Mat);
+vec3 CORE_API ScaledYAxis(mat4x4 const& Mat);
+vec3 CORE_API ScaledZAxis(mat4x4 const& Mat);
 
-vec3 CORE_API UnitXAxis(mat4x4 Mat);
-vec3 CORE_API UnitYAxis(mat4x4 Mat);
-vec3 CORE_API UnitZAxis(mat4x4 Mat);
+vec3 CORE_API UnitXAxis(mat4x4 const& Mat);
+vec3 CORE_API UnitYAxis(mat4x4 const& Mat);
+vec3 CORE_API UnitZAxis(mat4x4 const& Mat);
 
 //
 // Algorithms: Transform Accessors
 //
 
-vec3 CORE_API ForwardVector(transform Transform);
-vec3 CORE_API RightVector(transform Transform);
-vec3 CORE_API UpVector(transform Transform);
+vec3 CORE_API ForwardVector(transform const& Transform);
+vec3 CORE_API RightVector(transform const& Transform);
+vec3 CORE_API UpVector(transform const& Transform);
 
 
 //
