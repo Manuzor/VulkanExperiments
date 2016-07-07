@@ -24,7 +24,65 @@ struct vulkan_gpu
   dynamic_array<VkQueueFamilyProperties> QueueProperties;
 };
 
-struct vulkan
+struct vulkan_device : public vulkan_device_functions
+{
+  vulkan* Vulkan;
+  vulkan_gpu* Gpu;
+  VkDevice DeviceHandle;
+};
+
+struct swapchain_buffer
+{
+  VkImage Image;
+  VkCommandBuffer Command;
+  VkImageView View;
+};
+
+struct depth
+{
+  VkFormat Format;
+
+  VkImage Image;
+  VkDeviceMemory Memory;
+  VkImageView View;
+};
+
+struct gpu_image
+{
+  VkImage ImageHandle;
+  VkImageLayout ImageLayout;
+  VkFormat ImageFormat;
+
+  VkDeviceMemory MemoryHandle;
+};
+
+struct texture
+{
+  VkSampler SamplerHandle;
+  gpu_image GpuImage;
+  VkImageView ImageViewHandle;
+};
+
+struct vertex_buffer
+{
+  VkBuffer Buffer;
+  VkDeviceMemory Memory;
+
+  uint32 BindID;
+  uint32 NumVertices;
+  VkVertexInputBindingDescription VertexInputBindingDescs[1];
+  VkVertexInputAttributeDescription VertexInputAttributeDescs[2];
+};
+
+struct index_buffer
+{
+  VkBuffer Buffer;
+  VkDeviceMemory Memory;
+
+  uint32 NumIndices;
+};
+
+struct vulkan : public vulkan_instance_functions
 {
   bool IsPrepared;
 
@@ -37,17 +95,57 @@ struct vulkan
   VkDebugReportCallbackEXT DebugCallbackHandle;
 
   vulkan_gpu Gpu;
+  uint32 QueueNodeIndex = IntMaxValue<uint32>();
 
-  vulkan_instance_functions F;
-};
+  vulkan_device Device;
 
-struct vulkan_device
-{
-  vulkan* Vulkan;
-  vulkan_gpu* Gpu;
-  VkDevice DeviceHandle;
+  VkSurfaceKHR Surface;
 
-  vulkan_device_functions F;
+  VkQueue Queue;
+
+  VkFormat Format;
+  VkColorSpaceKHR ColorSpace;
+
+  //
+  // Swapchain Data
+  //
+  uint32 Width;
+  uint32 Height;
+
+  VkCommandPool CommandPool;
+  VkCommandBuffer SetupCommand;
+  VkCommandBuffer DrawCommand;
+
+  VkSwapchainKHR Swapchain;
+  uint32 SwapchainImageCount;
+  dynamic_array<swapchain_buffer> SwapchainBuffers;
+  uint32 CurrentBufferIndex;
+
+  depth Depth;
+
+  //
+  // Misc
+  //
+  texture Texture;
+
+  vertex_buffer Vertices;
+  index_buffer Indices;
+
+  VkPipelineLayout PipelineLayout;
+  VkDescriptorSetLayout DescriptorSetLayout;
+
+  VkRenderPass RenderPass;
+  VkPipeline Pipeline;
+
+  VkDescriptorPool DescriptorPool;
+  VkDescriptorSet DescriptorSet;
+
+  dynamic_array<VkFramebuffer> Framebuffers;
+
+  VkBuffer GlobalUBO_BufferHandle;
+  VkDeviceMemory GlobalUBO_MemoryHandle;
+
+  float DepthStencilValue = 1.0f;
 };
 
 void
@@ -65,3 +163,9 @@ VulkanLoadInstanceFunctions(vulkan* Vulkan);
 
 void
 VulkanLoadDeviceFunctions(vulkan_device* Device);
+
+char const*
+VulkanEnumToString(VkFormat Format);
+
+char const*
+VulkanEnumToString(VkColorSpaceKHR ColorSpace);

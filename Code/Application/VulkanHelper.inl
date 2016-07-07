@@ -119,7 +119,6 @@ struct vulkan_instance_functions
   PFN_vkFlushMappedMemoryRanges vkFlushMappedMemoryRanges;
   PFN_vkFreeCommandBuffers vkFreeCommandBuffers;
   PFN_vkFreeDescriptorSets vkFreeDescriptorSets;
-  PFN_vkFreeFunction vkFreeFunction;
   PFN_vkFreeMemory vkFreeMemory;
   PFN_vkGetBufferMemoryRequirements vkGetBufferMemoryRequirements;
   PFN_vkGetDeviceMemoryCommitment vkGetDeviceMemoryCommitment;

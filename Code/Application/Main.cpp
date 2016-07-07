@@ -139,7 +139,7 @@ Win32CreateWindow(allocator_interface* Allocator, window_setup const* Args,
   }
 
   auto Window = Allocate<window>(Allocator);
-  MemDefaultConstruct(1, Window);
+  *Window = {};
   Window->WindowHandle = WindowHandle;
   Window->ClientWidth = Args->ClientWidth;
   Window->ClientHeight = Args->ClientHeight;
@@ -166,9 +166,9 @@ static bool
 VulkanCreateInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
 {
   Assert(Vulkan->DLL);
-  Assert(Vulkan->F.vkCreateInstance);
-  Assert(Vulkan->F.vkEnumerateInstanceLayerProperties);
-  Assert(Vulkan->F.vkEnumerateInstanceExtensionProperties);
+  Assert(Vulkan->vkCreateInstance);
+  Assert(Vulkan->vkEnumerateInstanceLayerProperties);
+  Assert(Vulkan->vkEnumerateInstanceExtensionProperties);
 
   //
   // Instance Layers
@@ -176,11 +176,11 @@ VulkanCreateInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
   scoped_array<char const*> LayerNames{ TempAllocator };
   {
     uint32 LayerCount;
-    Verify(Vulkan->F.vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
+    Verify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
 
     scoped_array<VkLayerProperties> LayerProperties = { TempAllocator };
     ExpandBy(&LayerProperties, LayerCount);
-    Verify(Vulkan->F.vkEnumerateInstanceLayerProperties(&LayerCount, LayerProperties.Ptr));
+    Verify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, LayerProperties.Ptr));
 
     LogBeginScope("Explicitly enabled instance layers:");
     Defer(, LogEndScope("=========="));
@@ -211,11 +211,11 @@ VulkanCreateInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
     bool PlatformSurfaceExtensionFound = false;
 
     uint32_t ExtensionCount;
-    Verify(Vulkan->F.vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
+    Verify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
     scoped_array<VkExtensionProperties> ExtensionProperties = { TempAllocator };
     ExpandBy(&ExtensionProperties, ExtensionCount);
-    Verify(Vulkan->F.vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, ExtensionProperties.Ptr));
+    Verify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, ExtensionProperties.Ptr));
 
     LogBeginScope("Explicitly enabled instance extensions:");
     Defer(, LogEndScope("=========="));
@@ -272,24 +272,31 @@ VulkanCreateInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
     Defer(, LogEndScope(""));
 
     VkApplicationInfo ApplicationInfo = {};
-    ApplicationInfo.pApplicationName = "Vulkan Experiments";
-    ApplicationInfo.applicationVersion = VK_MAKE_VERSION(0, 0, 1);
+    {
+      ApplicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+      ApplicationInfo.pApplicationName = "Vulkan Experiments";
+      ApplicationInfo.applicationVersion = VK_MAKE_VERSION(0, 0, 1);
 
-    ApplicationInfo.pEngineName = "Backbone";
-    ApplicationInfo.engineVersion = VK_MAKE_VERSION(0, 0, 1);
+      ApplicationInfo.pEngineName = "Backbone";
+      ApplicationInfo.engineVersion = VK_MAKE_VERSION(0, 0, 1);
 
-    ApplicationInfo.apiVersion = VK_MAKE_VERSION(1, 0, 13);
+      ApplicationInfo.apiVersion = VK_MAKE_VERSION(1, 0, 13);
+    }
 
     VkInstanceCreateInfo CreateInfo = {};
-    CreateInfo.pApplicationInfo = &ApplicationInfo;
+    {
+      CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 
-    CreateInfo.enabledExtensionCount = Cast<uint32_t>(ExtensionNames.Num);
-    CreateInfo.ppEnabledExtensionNames = ExtensionNames.Ptr;
+      CreateInfo.pApplicationInfo = &ApplicationInfo;
 
-    CreateInfo.enabledLayerCount = Cast<uint32_t>(LayerNames.Num);
-    CreateInfo.ppEnabledLayerNames = LayerNames.Ptr;
+      CreateInfo.enabledExtensionCount = Cast<uint32_t>(ExtensionNames.Num);
+      CreateInfo.ppEnabledExtensionNames = ExtensionNames.Ptr;
 
-    Verify(Vulkan->F.vkCreateInstance(&CreateInfo, nullptr, &Vulkan->InstanceHandle));
+      CreateInfo.enabledLayerCount = Cast<uint32_t>(LayerNames.Num);
+      CreateInfo.ppEnabledLayerNames = LayerNames.Ptr;
+    }
+
+    Verify(Vulkan->vkCreateInstance(&CreateInfo, nullptr, &Vulkan->InstanceHandle));
   }
 
   return true;
@@ -299,7 +306,7 @@ static void
 VulkanDestroyInstance(vulkan* Vulkan)
 {
   VkAllocationCallbacks const* AllocationCallbacks = nullptr;
-  Vulkan->F.vkDestroyInstance(Vulkan->InstanceHandle, AllocationCallbacks);
+  Vulkan->vkDestroyInstance(Vulkan->InstanceHandle, AllocationCallbacks);
 }
 
 static void
@@ -345,13 +352,14 @@ VulkanSetupDebugging(vulkan* Vulkan)
   LogBeginScope("Setting up Vulkan debugging.");
   Defer(, LogEndScope("Finished debug setup."));
 
-  if(Vulkan->F.vkCreateDebugReportCallbackEXT != nullptr)
+  if(Vulkan->vkCreateDebugReportCallbackEXT != nullptr)
   {
     VkDebugReportCallbackCreateInfoEXT DebugSetupInfo = {};
+    DebugSetupInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
     DebugSetupInfo.pfnCallback = &VulkanDebugCallback;
     DebugSetupInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
 
-    Verify(Vulkan->F.vkCreateDebugReportCallbackEXT(Vulkan->InstanceHandle,
+    Verify(Vulkan->vkCreateDebugReportCallbackEXT(Vulkan->InstanceHandle,
                                                   &DebugSetupInfo,
                                                   nullptr,
                                                   &Vulkan->DebugCallbackHandle));
@@ -367,18 +375,18 @@ VulkanSetupDebugging(vulkan* Vulkan)
 static void
 VulkanCleanupDebugging(vulkan* Vulkan)
 {
-  if(Vulkan->F.vkDestroyDebugReportCallbackEXT && Vulkan->DebugCallbackHandle)
+  if(Vulkan->vkDestroyDebugReportCallbackEXT && Vulkan->DebugCallbackHandle)
   {
-    Vulkan->F.vkDestroyDebugReportCallbackEXT(Vulkan->InstanceHandle, Vulkan->DebugCallbackHandle, nullptr);
+    Vulkan->vkDestroyDebugReportCallbackEXT(Vulkan->InstanceHandle, Vulkan->DebugCallbackHandle, nullptr);
   }
 }
 
 
-bool
+static bool
 VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAllocator)
 {
   uint32_t GpuCount;
-  Verify(Vulkan->F.vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
+  Verify(Vulkan->vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
                                             &GpuCount, nullptr));
   if(GpuCount == 0)
   {
@@ -391,7 +399,7 @@ VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAll
   scoped_array<VkPhysicalDevice> Gpus{ TempAllocator };
   ExpandBy(&Gpus, GpuCount);
 
-  Verify(Vulkan->F.vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
+  Verify(Vulkan->vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
                                             &GpuCount, Gpus.Ptr));
 
   // Use the first Physical Device for now.
@@ -405,17 +413,261 @@ VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAll
     LogBeginScope("Querying for physical device and queue properties.");
     Defer(, LogEndScope("Retrieved physical device and queue properties."));
 
-    Vulkan->F.vkGetPhysicalDeviceProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Properties);
-    Vulkan->F.vkGetPhysicalDeviceMemoryProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.MemoryProperties);
-    Vulkan->F.vkGetPhysicalDeviceFeatures(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Features);
+    Vulkan->vkGetPhysicalDeviceProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Properties);
+    Vulkan->vkGetPhysicalDeviceMemoryProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.MemoryProperties);
+    Vulkan->vkGetPhysicalDeviceFeatures(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Features);
 
     uint32_t QueueCount;
-    Vulkan->F.vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, nullptr);
+    Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, nullptr);
     Clear(&Vulkan->Gpu.QueueProperties);
     ExpandBy(&Vulkan->Gpu.QueueProperties, QueueCount);
-    Vulkan->F.vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, Vulkan->Gpu.QueueProperties.Ptr);
+    Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, Vulkan->Gpu.QueueProperties.Ptr);
   }
 
+  return true;
+}
+
+static bool
+VulkanInitializeForGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHandle, allocator_interface* TempAllocator)
+{
+  //
+  // Create Win32 Surface
+  //
+  {
+    LogBeginScope("Creating Win32 Surface.");
+    Defer(, LogEndScope("Created Win32 Surface."));
+
+    VkWin32SurfaceCreateInfoKHR CreateInfo = {};
+    {
+      CreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+      CreateInfo.hinstance = ProcessHandle;
+      CreateInfo.hwnd = WindowHandle;
+    }
+
+    Verify(Vulkan->vkCreateWin32SurfaceKHR(Vulkan->InstanceHandle, &CreateInfo, nullptr, &Vulkan->Surface));
+  }
+
+  //
+  // Find Queue for Graphics and Presenting
+  //
+  {
+    LogBeginScope("Finding queue indices for graphics and presenting.");
+    Defer(, LogEndScope("Done finding queue indices."));
+
+    uint32 GraphicsIndex = IntMaxValue<uint32>();
+    uint32 PresentIndex = IntMaxValue<uint32>();
+
+    uint32 const NumQueuesProperties = Cast<uint32>(Vulkan->Gpu.QueueProperties.Num);
+    for(uint32 Index = 0; Index < NumQueuesProperties; ++Index)
+    {
+      VkBool32 SupportsPresenting;
+      Vulkan->vkGetPhysicalDeviceSurfaceSupportKHR(Vulkan->Gpu.GpuHandle, Index, Vulkan->Surface, &SupportsPresenting);
+
+      auto& QueueProp = Vulkan->Gpu.QueueProperties[Index];
+      if(QueueProp.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+      {
+        if(GraphicsIndex == IntMaxValue<uint32>())
+        {
+          GraphicsIndex = Index;
+        }
+
+        if(SupportsPresenting)
+        {
+          GraphicsIndex = Index;
+          PresentIndex = Index;
+        }
+      }
+    }
+
+    // TODO: Support for separate graphics and present queue?
+    // See tri-demo 1.0.8 line 2200
+
+    if(GraphicsIndex == IntMaxValue<uint>())
+    {
+      LogError("Unable to find Graphics queue.");
+      return false;
+    }
+
+    if(PresentIndex == IntMaxValue<uint>())
+    {
+      LogError("Unable to find Present queue.");
+      return false;
+    }
+
+    if(GraphicsIndex != PresentIndex)
+    {
+      LogError("Support for separate graphics and present queue not implemented.");
+      return false;
+    }
+
+    Vulkan->QueueNodeIndex = GraphicsIndex;
+  }
+
+  //
+  // Create Logical Device
+  //
+  {
+    LogBeginScope("Creating Device.");
+    Defer(, LogEndScope("Device created."));
+
+
+    // Note: Device layers are deprecated.
+    #if 0
+    //
+    // Device Layers
+    //
+    auto LayerNames = scoped_array<char const>(TempAllocator);
+    {
+      // Required extensions:
+      bool SurfaceLayerFound;
+      bool PlatformSurfaceLayerFound;
+
+      uint LayerCount;
+      Verify(vkEnumerateDeviceLayerProperties(Vulkan->Gpu.GpuHandle, &LayerCount, nullptr));
+
+      auto LayerProperties = scoped_array<VkLayerProperties>(TempAllocator);
+      ExpandBy(&LayerProperties, LayerCount);
+      Verify(vkEnumerateDeviceLayerProperties(Vulkan->Gpu.GpuHandle, &LayerCount, LayerProperties.Ptr));
+
+      LogBeginScope("Explicitly enabled device layers:");
+      Defer(, LogEndScope("=========="));
+      for(auto& Property : Slice(&LayerProperties))
+      {
+        auto LayerName = Property.layerName;
+        if(LayerName == VK_LAYER_LUNARG_STANDARD_VALIDATION_NAME)
+        {
+          LayerNames ~= VK_LAYER_LUNARG_STANDARD_VALIDATION_NAME;
+        }
+        else
+        {
+          LogInfo("[ ] %s", LayerName);
+          continue;
+        }
+
+        LogInfo("[x] %s", LayerName);
+      }
+    }
+    #endif
+
+    //
+    // Device Extensions
+    //
+    auto ExtensionNames = scoped_array<char const*>(TempAllocator);
+    {
+      // Required extensions:
+      bool SwapchainExtensionFound = {};
+
+      uint ExtensionCount;
+      Verify(Vulkan->vkEnumerateDeviceExtensionProperties(Vulkan->Gpu.GpuHandle, nullptr, &ExtensionCount, nullptr));
+
+      scoped_array<VkExtensionProperties> ExtensionProperties(TempAllocator);
+      ExpandBy(&ExtensionProperties, ExtensionCount);
+      Verify(Vulkan->vkEnumerateDeviceExtensionProperties(Vulkan->Gpu.GpuHandle, nullptr, &ExtensionCount, ExtensionProperties.Ptr));
+
+      LogBeginScope("Explicitly enabled device extensions:");
+      Defer(, LogEndScope("=========="));
+      for(auto& Property : Slice(&ExtensionProperties))
+      {
+        auto ExtensionName = Property.extensionName;
+        if(SliceFromString(ExtensionName) == SliceFromString(VK_KHR_SWAPCHAIN_EXTENSION_NAME))
+        {
+          Expand(&ExtensionNames) = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+          SwapchainExtensionFound = true;
+        }
+        else
+        {
+          LogInfo("[ ] %s", ExtensionName);
+          continue;
+        }
+
+        LogInfo("[x] %s", ExtensionName);
+      }
+
+      bool Success = true;
+
+      if(!SwapchainExtensionFound)
+      {
+        LogError("Failed to load required extension: %s", VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+        Success = false;
+      }
+
+      if(!Success) return false;
+    }
+
+    fixed_block<1, float> QueuePriorities = {};
+    QueuePriorities[0] = 0.0f;
+
+    VkDeviceQueueCreateInfo QueueCreateInfo = {};
+    {
+      QueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+      QueueCreateInfo.queueFamilyIndex = Vulkan->QueueNodeIndex;
+      QueueCreateInfo.queueCount = Cast<uint32>(QueuePriorities.Num);
+      QueueCreateInfo.pQueuePriorities = &QueuePriorities[0];
+    }
+
+    VkPhysicalDeviceFeatures EnabledFeatures = {};
+    {
+      EnabledFeatures.shaderClipDistance = VK_TRUE;
+      EnabledFeatures.shaderCullDistance = VK_TRUE;
+      EnabledFeatures.textureCompressionBC = VK_TRUE;
+    }
+
+    VkDeviceCreateInfo DeviceCreateInfo = {};
+    {
+      DeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+      DeviceCreateInfo.queueCreateInfoCount = 1;
+      DeviceCreateInfo.pQueueCreateInfos = &QueueCreateInfo;
+
+      DeviceCreateInfo.enabledExtensionCount = Cast<uint32>(ExtensionNames.Num);
+      DeviceCreateInfo.ppEnabledExtensionNames = ExtensionNames.Ptr;
+
+      DeviceCreateInfo.pEnabledFeatures = &EnabledFeatures;
+    }
+
+    Verify(Vulkan->vkCreateDevice(Vulkan->Gpu.GpuHandle, &DeviceCreateInfo, nullptr, &Vulkan->Device.DeviceHandle));
+    Assert(Vulkan->Device.DeviceHandle);
+
+    Vulkan->Device.Vulkan = Vulkan;
+    Vulkan->Device.Gpu = &Vulkan->Gpu;
+
+    VulkanLoadDeviceFunctions(&Vulkan->Device);
+
+    Vulkan->Device.vkGetDeviceQueue(Vulkan->Device.DeviceHandle, Vulkan->QueueNodeIndex, 0, &Vulkan->Queue);
+    Assert(Vulkan->Queue);
+  }
+
+  //
+  // Get Physical Device Format and Color Space.
+  //
+  {
+    LogBeginScope("Gathering physical device format and color space.");
+    Defer(, LogEndScope("Got format and color space for the previously created Win32 surface."));
+
+    uint FormatCount;
+    Verify(Vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(Vulkan->Gpu.GpuHandle, Vulkan->Surface, &FormatCount, nullptr));
+    Assert(FormatCount > 0);
+
+    scoped_array<VkSurfaceFormatKHR> SurfaceFormats(TempAllocator);
+    ExpandBy(&SurfaceFormats, FormatCount);
+
+    Verify(Vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(Vulkan->Gpu.GpuHandle, Vulkan->Surface, &FormatCount, SurfaceFormats.Ptr));
+
+    if(FormatCount == 1 && SurfaceFormats[0].format == VK_FORMAT_UNDEFINED)
+    {
+      Vulkan->Format = VK_FORMAT_B8G8R8A8_UNORM;
+    }
+    else
+    {
+      Vulkan->Format = SurfaceFormats[0].format;
+    }
+    LogInfo("Format: %s", VulkanEnumToString(Vulkan->Format));
+
+    Vulkan->ColorSpace = SurfaceFormats[0].colorSpace;
+    LogInfo("Color Space: %s", VulkanEnumToString(Vulkan->ColorSpace));
+  }
+
+  // Done.
   return true;
 }
 
@@ -477,7 +729,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
   {
     auto Vulkan = Allocate<vulkan>(Allocator);
-    MemDefaultConstruct(1, Vulkan);
+    *Vulkan = {};
     Defer(=, Deallocate(Allocator, Vulkan));
 
     Init(Vulkan, Allocator);
@@ -567,8 +819,11 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
     Window->Input = &SystemInput;
 
-    // if(!VulkanInitializeForGraphics(&Vulkan, Instance, Window->WindowHandle))
-    //   return 5;
+    if(!VulkanInitializeForGraphics(Vulkan, Instance, Window->WindowHandle, Allocator))
+      return 5;
+
+    LogInfo("Vulkan initialization finished!");
+    Defer(, LogInfo("Shutting down..."));
 
     free_horizon_camera Cam = {};
     Cam.FieldOfView = Degrees(90);
