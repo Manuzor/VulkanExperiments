@@ -437,7 +437,7 @@ VulkanInitializeForGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND Window
     LogBeginScope("Creating Win32 Surface.");
     Defer(, LogEndScope("Created Win32 Surface."));
 
-    VkWin32SurfaceCreateInfoKHR CreateInfo = {};
+    auto CreateInfo = CreateVulkanStruct<VkWin32SurfaceCreateInfoKHR>();
     {
       CreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
       CreateInfo.hinstance = ProcessHandle;
@@ -597,25 +597,22 @@ VulkanInitializeForGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND Window
     fixed_block<1, float> QueuePriorities = {};
     QueuePriorities[0] = 0.0f;
 
-    VkDeviceQueueCreateInfo QueueCreateInfo = {};
+    auto QueueCreateInfo = CreateVulkanStruct<VkDeviceQueueCreateInfo>();
     {
-      QueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
       QueueCreateInfo.queueFamilyIndex = Vulkan->QueueNodeIndex;
       QueueCreateInfo.queueCount = Cast<uint32>(QueuePriorities.Num);
       QueueCreateInfo.pQueuePriorities = &QueuePriorities[0];
     }
 
-    VkPhysicalDeviceFeatures EnabledFeatures = {};
+    auto EnabledFeatures = CreateVulkanStruct<VkPhysicalDeviceFeatures>();
     {
       EnabledFeatures.shaderClipDistance = VK_TRUE;
       EnabledFeatures.shaderCullDistance = VK_TRUE;
       EnabledFeatures.textureCompressionBC = VK_TRUE;
     }
 
-    VkDeviceCreateInfo DeviceCreateInfo = {};
+    auto DeviceCreateInfo = CreateVulkanStruct<VkDeviceCreateInfo>();
     {
-      DeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-
       DeviceCreateInfo.queueCreateInfoCount = 1;
       DeviceCreateInfo.pQueueCreateInfos = &QueueCreateInfo;
 
@@ -766,11 +763,12 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     // Input Setup
     //
     x_input_dll XInput = {};
-    win32_input_context SystemInput = {};
-    {
-      Win32LoadXInput(&XInput, GlobalLog);
-      Init(&SystemInput, Allocator);
+    Win32LoadXInput(&XInput, GlobalLog);
 
+    win32_input_context SystemInput = {};
+    Init(&SystemInput, Allocator);
+    Defer(&SystemInput, Finalize(&SystemInput));
+    {
       // Let's pretend the system is user 0 for now.
       SystemInput.UserIndex = 0;
 
@@ -815,12 +813,20 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.AbsPitch);
       AddInputSlotMapping(&SystemInput, mouse::XDelta, MyInputSlots.Camera.AbsPitch);
     }
-    Defer(&SystemInput, Finalize(&SystemInput));
 
     Window->Input = &SystemInput;
 
-    if(!VulkanInitializeForGraphics(Vulkan, Instance, Window->WindowHandle, Allocator))
-      return 5;
+    {
+      LogBeginScope("Initializing Vulkan for graphics.");
+
+      if(!VulkanInitializeForGraphics(Vulkan, Instance, Window->WindowHandle, Allocator))
+      {
+        LogEndScope("Failed initialization.");
+        return 5;
+      }
+
+      LogEndScope("Initialized successfully.");
+    }
 
     LogInfo("Vulkan initialization finished!");
     Defer(, LogInfo("Shutting down..."));

@@ -169,3 +169,11 @@ VulkanEnumToString(VkFormat Format);
 
 char const*
 VulkanEnumToString(VkColorSpaceKHR ColorSpace);
+
+template<typename T>
+T
+CreateVulkanStruct()
+{
+  // Note: impl_vulkan_struct is found in VulkanHelper.inl
+  return impl_vulkan_struct<T>::Do();
+}
