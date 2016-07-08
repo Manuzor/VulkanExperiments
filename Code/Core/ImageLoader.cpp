@@ -15,12 +15,18 @@ auto
   -> bool
 {
   FILE* File = std::fopen(FileName, "rb");
-  Defer(=, std::fclose(File));
+  if(File == nullptr)
+    return false;
+
+  Defer [=](){ std::fclose(File); };
 
   const auto BufferMemorySize = MiB(1);
   auto BufferMemory = TempAllocator->Allocate(BufferMemorySize, 1);
+  if(BufferMemory == nullptr)
+    return false;
+
+  Defer [=](){ TempAllocator->Deallocate(BufferMemory); };
   auto Buffer = Slice(BufferMemorySize, Cast<char*>(BufferMemory));
-  Defer(=, TempAllocator->Deallocate(BufferMemory));
 
   scoped_array<char> Content(TempAllocator);
   while(!std::feof(File))

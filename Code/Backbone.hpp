@@ -83,6 +83,14 @@ constexpr uint64 MB(uint64 Amount) { return KB(Amount) * (uint64)1000; }
 constexpr uint64 GB(uint64 Amount) { return MB(Amount) * (uint64)1000; }
 constexpr uint64 TB(uint64 Amount) { return GB(Amount) * (uint64)1000; }
 
+constexpr uint32 SetBit(uint32 Bits, uint32 Position) { return Bits | (uint32(1) << Position); }
+constexpr uint32 UnsetBit(uint32 Bits, uint32 Position) { return Bits & ~(uint32(1) << Position); }
+constexpr bool IsBitSet(uint32 Bits, uint32 Position) { return !!(Bits & (uint32(1) << Position)); }
+
+constexpr uint64 SetBit(uint64 Bits, uint64 Position) { return Bits | (uint64(1) << Position); }
+constexpr uint64 UnsetBit(uint64 Bits, uint64 Position) { return Bits & ~(uint64(1) << Position); }
+constexpr bool IsBitSet(uint64 Bits, uint64 Position) { return !!(Bits & (uint64(1) << Position)); }
+
 //
 // ================
 //
@@ -103,36 +111,50 @@ template<typename t_type, size_t N>
 constexpr size_t
 ArrayCount(t_type(&)[N]) { return N; }
 
-// Used to get the size of a type with support for void where a size of 1 byte is assumed.
-template<typename T> struct non_void { enum { Size = sizeof(T) }; };
-template<>           struct non_void<void>       : non_void<uint8>       { };
-template<>           struct non_void<void const> : non_void<uint8 const> { };
+template<typename T> struct impl_size_of { enum { Value = sizeof(T) }; };
+template<>           struct impl_size_of<void>          : impl_size_of<uint8>          { };
+template<>           struct impl_size_of<void const>    : impl_size_of<uint8 const>    { };
+template<>           struct impl_size_of<void volatile> : impl_size_of<uint8 volatile> { };
+
+/// Get the size of type T in bytes.
+///
+/// Same as sizeof(T) except it works also with 'void' (possibly cv-qualified) where a size of 1 byte is assumed.
+template<typename T>
+constexpr size_t
+SizeOf() { return impl_size_of<T>::Value; }
 
 /// Reinterpretation of the given pointer in case t_pointer_type is `void`.
 template<typename t_pointer_type>
-inline constexpr t_pointer_type*
+constexpr t_pointer_type*
 NonVoidPtr(t_pointer_type* Ptr)
 {
   return Ptr;
 }
 
 /// Reinterpretation of the given pointer in case t_pointer_type is `void`.
-inline constexpr uint8*
+constexpr uint8*
 NonVoidPtr(void* Ptr)
 {
   return reinterpret_cast<uint8*>(Ptr);
 }
 
 /// Reinterpretation of the given pointer in case t_pointer_type is `void`.
-inline constexpr uint8 const*
+constexpr uint8 const*
 NonVoidPtr(void const* Ptr)
 {
   return reinterpret_cast<uint8 const*>(Ptr);
 }
 
+/// Reinterpretation of the given pointer in case t_pointer_type is `void`.
+constexpr uint8 volatile*
+NonVoidPtr(void volatile* Ptr)
+{
+  return reinterpret_cast<uint8 volatile*>(Ptr);
+}
+
 /// Advance the given pointer value by the given amount of bytes.
 template<typename t_pointer_type, typename OffsetType>
-inline constexpr t_pointer_type*
+constexpr t_pointer_type*
 MemAddByteOffset(t_pointer_type* Pointer, OffsetType Offset)
 {
   return reinterpret_cast<t_pointer_type*>((uint8*)Pointer + Offset);
@@ -140,16 +162,28 @@ MemAddByteOffset(t_pointer_type* Pointer, OffsetType Offset)
 
 /// Advance the given pointer value by the given amount times sizeof(t_pointer_type)
 template<typename t_pointer_type, typename OffsetType>
-inline constexpr t_pointer_type*
+constexpr t_pointer_type*
 MemAddOffset(t_pointer_type* Pointer, OffsetType Offset)
 {
-  return MemAddByteOffset(Pointer, Offset * non_void<t_pointer_type>::Size);
+  return MemAddByteOffset(Pointer, Offset * SizeOf<t_pointer_type>());
 }
 
+// TODO: This is MSVC specific right now.
+template<typename T> struct impl_is_pod { static constexpr bool Value = __is_pod(T); };
+template<>           struct impl_is_pod<void>          : public impl_is_pod<uint8>          {};
+template<>           struct impl_is_pod<void const>    : public impl_is_pod<uint8 const>    {};
+template<>           struct impl_is_pod<void volatile> : public impl_is_pod<uint8 volatile> {};
+
+/// Whether the given type T is a "plain old data" (POD) type.
+///
+/// The type 'void' is also considered POD.
 template<typename T>
 constexpr bool
-IsPOD() { return std::is_pod<T>::value; }
+IsPOD() { return impl_is_pod<T>::Value; }
 
+/// Get the number of bits of a given type.
+///
+/// Note: The type 'void' is not supported.
 template<typename T>
 constexpr size_t
 NumBits() { return sizeof(T) * 8; }
@@ -375,14 +409,18 @@ Swap(t_a& A, t_b& B)
   B = Temp;
 }
 
-template<typename t_func_type>
-struct _defer_impl
+struct impl_defer
 {
-  t_func_type Func;
+  template<typename LambdaType>
+  struct helper
+  {
+    LambdaType Lambda;
+    helper(LambdaType InLambda) : Lambda{ Move(InLambda) } {}
+    ~helper() { Lambda(); }
+  };
 
   template<typename t_in_func_type>
-  _defer_impl(t_in_func_type InFunc) : Func{ Move(InFunc) } {};
-  ~_defer_impl() { Func(); }
+  helper<t_in_func_type> operator =(t_in_func_type InLambda) { return { Move(InLambda) }; }
 };
 
 #define PRE_Concat2_Impl(A, B)  A ## B
@@ -390,18 +428,22 @@ struct _defer_impl
 #define PRE_Concat3(A, B, C)    PRE_Concat2(PRE_Concat2(A, B), C)
 #define PRE_Concat4(A, B, C, D) PRE_Concat2(PRE_Concat2(A, B), PRE_Concat2(C, D))
 
-// Usage:
-// int i = 0;
-// Defer(&, printf("Foo %d\n", i); i++ );
-// Defer(&, printf("Bar %d\n", i); i++ );
-//
-// Output:
-// Bar 0
-// Foo 1
-//
-// \param CaptureSpec The lambda capture specification.
-#define Defer(CaptureSpec, ...) auto PRE_Concat2(_DeferFunc, __LINE__) = [CaptureSpec](){ __VA_ARGS__; }; \
-_defer_impl<decltype(PRE_Concat2(_DeferFunc, __LINE__))> PRE_Concat2(_Defer, __LINE__){ PRE_Concat2(_DeferFunc, __LINE__) }
+/// Defers execution of code until the end of the current scope.
+///
+/// Usage:
+/// int i = 0;
+/// Defer [&](){ i++; printf("Foo %d\n", i); };
+/// Defer [&](){ i++; printf("Bar %d\n", i); };
+/// Defer [=](){      printf("Baz %d\n", i); };
+///
+/// Output:
+/// Baz 0
+/// Bar 1
+/// Foo 2
+///
+/// \param CaptureSpec The lambda capture specification.
+//#define Defer(Lambda) impl_defer<decltype(Lambda)> PRE_Concat2(_Defer, __LINE__){ Lambda }
+#define Defer auto PRE_Concat2(_Defer, __LINE__) = impl_defer() =
 
 // ===================================
 // === Source: Backbone/Memory.hpp ===
@@ -440,11 +482,11 @@ struct impl_mem_copy
 };
 
 template<typename T>
-struct impl_mem_copy<T, false>
+struct impl_mem_copy<T, true>
 {
-  static constexpr void Do(T* Destination, T const* Source, size_t Num)
+  static constexpr void Do(size_t Num, T* Destination, T const* Source)
   {
-    MemCopyBytes(Num * sizeof(T), Reinterpret<void*>(Destination), Reinterpret<void const*>(Source));
+    MemCopyBytes(Num * SizeOf<T>(), Reinterpret<void*>(Destination), Reinterpret<void const*>(Source));
   }
 };
 
@@ -814,7 +856,7 @@ Slice(ElementType* FirstPtr, ElementType* OnePastLastPtr)
     auto A = Reinterpret<size_t>(FirstPtr);
     auto B = Reinterpret<size_t>(OnePastLastPtr);
     auto Delta = Max(A, B) - Min(A, B);
-    Assert(Delta % sizeof(ElementType) == 0);
+    Assert(Delta % SizeOf<ElementType>() == 0);
   });
 
   slice<ElementType> Result;
@@ -1019,6 +1061,13 @@ bool
 operator !=(slice<ElementTypeA> A, slice<ElementTypeB> B)
 {
   return !(A == B);
+}
+
+template<typename ElementType>
+constexpr size_t
+SliceByteSize(slice<ElementType> S)
+{
+  return S.Num * SizeOf<ElementType>();
 }
 
 // ==================================

@@ -70,8 +70,8 @@ struct vertex_buffer
 
   uint32 BindID;
   uint32 NumVertices;
-  VkVertexInputBindingDescription VertexInputBindingDescs[1];
-  VkVertexInputAttributeDescription VertexInputAttributeDescs[2];
+  fixed_block<1, VkVertexInputBindingDescription> VertexInputBindingDescs;
+  fixed_block<2, VkVertexInputAttributeDescription> VertexInputAttributeDescs;
 };
 
 struct index_buffer
@@ -165,15 +165,61 @@ void
 VulkanLoadDeviceFunctions(vulkan_device* Device);
 
 char const*
-VulkanEnumToString(VkFormat Format);
+VulkanEnumName(VkFormat Format);
 
 char const*
-VulkanEnumToString(VkColorSpaceKHR ColorSpace);
+VulkanEnumName(VkColorSpaceKHR ColorSpace);
 
 template<typename T>
-T
-CreateVulkanStruct()
+constexpr auto
+VulkanStruct() -> decltype(impl_vulkan_struct<rm_ref<T>>::Do())
 {
   // Note: impl_vulkan_struct is found in VulkanHelper.inl
-  return impl_vulkan_struct<T>::Do();
+  return impl_vulkan_struct<rm_ref<T>>::Do();
 }
+
+void
+VulkanSetImageLayout(vulkan_device const& Device,
+                     VkCommandPool CommandPool,
+                     VkCommandBuffer& CommandBuffer,
+                     VkImage Image,
+                     VkImageAspectFlags AspectMask,
+                     VkImageLayout OldImageLayout,
+                     VkImageLayout NewImageLayout,
+                     VkAccessFlags SourceAccessMask);
+
+uint32
+VulkanDetermineMemoryTypeIndex(VkPhysicalDeviceMemoryProperties const& MemoryProperties,
+                               uint32 TypeBits,
+                               VkFlags RequirementsMask);
+
+void
+VulkanEnsureSetupCommandIsReady(vulkan_device const& Device,
+                                VkCommandPool CommandPool,
+                                VkCommandBuffer& CommandBuffer);
+
+void
+VulkanFlushSetupCommand(vulkan_device const& Device,
+                        VkQueue Queue,
+                        VkCommandPool CommandPool,
+                        VkCommandBuffer& CommandBuffer);
+
+void
+VulkanVerify(VkResult Result);
+
+bool
+VulkanIsImageCompatibleWithGpu(vulkan_gpu const& Gpu, struct image const& Image);
+
+VkFormat
+ImageFormatToVulkan(enum class image_format KrepelFormat);
+
+enum class image_format
+ImageFormatFromVulkan(VkFormat VulkanFormat);
+
+bool
+VulkanUploadImageToGpu(allocator_interface* TempAllocator,
+                       vulkan_device const& Device,
+                       VkCommandPool CommandPool,
+                       VkCommandBuffer CommandBuffer,
+                       image const& Image,
+                       gpu_image* GpuImage);

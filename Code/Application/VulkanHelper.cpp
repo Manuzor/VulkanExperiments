@@ -1,10 +1,12 @@
 #include "VulkanHelper.hpp"
 
 #include <Core/Log.hpp>
+#include <Core/Image.hpp>
 
 
-void
-Init(vulkan* Vulkan, allocator_interface* Allocator)
+auto
+::Init(vulkan* Vulkan, allocator_interface* Allocator)
+  -> void
 {
   Init(&Vulkan->Gpu.QueueProperties, Allocator);
   Init(&Vulkan->SwapchainBuffers, Allocator);
@@ -12,7 +14,9 @@ Init(vulkan* Vulkan, allocator_interface* Allocator)
   Vulkan->Gpu.Vulkan = Vulkan;
 }
 
-void Finalize(vulkan* Vulkan)
+auto
+::Finalize(vulkan* Vulkan)
+  -> void
 {
   Finalize(&Vulkan->Framebuffers);
   Finalize(&Vulkan->SwapchainBuffers);
@@ -50,7 +54,8 @@ auto
   -> bool
 {
   LogBeginScope("Loading Vulkan DLL.");
-  Defer(=, LogEndScope(""));
+  Defer [](){ LogEndScope(""); };
+
 
   char const* FileName = "vulkan-1.dll";
   Vulkan->DLL = LoadLibraryA(FileName);
@@ -104,7 +109,7 @@ auto
   Assert(Vulkan->DLL);
 
   LogBeginScope("Loading Vulkan instance procedures.");
-  Defer(=, LogEndScope(""));
+  Defer [](){ LogEndScope(""); };
 
   #define TRY_LOAD(Name) if(!LoadHelper(Vulkan, #Name, &Vulkan->##Name)) \
   { \
@@ -282,7 +287,7 @@ auto
   -> void
 {
   LogBeginScope("Loading Vulkan device procedures.");
-  Defer(=, LogEndScope(""));
+  Defer [](){ LogEndScope(""); };
 
   #define TRY_LOAD(Name) if(!LoadHelper(Device, #Name, &Device->##Name)) \
   { \
@@ -427,7 +432,7 @@ auto
 }
 
 auto
-::VulkanEnumToString(VkFormat Format)
+::VulkanEnumName(VkFormat Format)
   -> char const*
 {
   switch(Format)
@@ -623,7 +628,7 @@ auto
 }
 
 auto
-::VulkanEnumToString(VkColorSpaceKHR ColorSpace)
+::VulkanEnumName(VkColorSpaceKHR ColorSpace)
   -> char const*
 {
   switch(ColorSpace)
@@ -631,4 +636,487 @@ auto
     case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR: return "VK_COLOR_SPACE_SRGB_NONLINEAR_KHR";
     default: return "<UNKNOWN>";
   }
+}
+
+auto
+::VulkanSetImageLayout(vulkan_device const& Device, VkCommandPool CommandPool, VkCommandBuffer& CommandBuffer,
+                       VkImage Image,
+                       VkImageAspectFlags AspectMask,
+                       VkImageLayout OldImageLayout,
+                       VkImageLayout NewImageLayout,
+                       VkAccessFlags SourceAccessMask)
+  -> void
+{
+  VulkanEnsureSetupCommandIsReady(Device, CommandPool, CommandBuffer);
+
+  auto ImageMemoryBarrier = VulkanStruct<VkImageMemoryBarrier>();
+  {
+    ImageMemoryBarrier.srcAccessMask = SourceAccessMask;
+    ImageMemoryBarrier.oldLayout = OldImageLayout;
+    ImageMemoryBarrier.newLayout = NewImageLayout;
+    ImageMemoryBarrier.image = Image;
+    ImageMemoryBarrier.subresourceRange = { AspectMask, 0, 1, 0, 1 };
+
+    if(NewImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+    {
+      // Make sure anything that was copying from this image has completed.
+      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    }
+
+    if(NewImageLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+    {
+      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    }
+
+    if(NewImageLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+    {
+      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    }
+
+    if(NewImageLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+      // Make sure any Copy or CPU writes to image are flushed.
+      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+    }
+  }
+
+  VkPipelineStageFlags SourceStages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+  VkPipelineStageFlags DestinationStages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+  Device.vkCmdPipelineBarrier(CommandBuffer,                   // commandBuffer
+                              SourceStages, DestinationStages, // dstStageMask, srcStageMask
+                              0,                               // dependencyFlags
+                              0, nullptr,                      // memoryBarrierCount, pMemoryBarriers
+                              0, nullptr,                      // bufferMemoryBarrierCount, pBufferMemoryBarriers
+                              1, &ImageMemoryBarrier);         // imageMemoryBarrierCount, pImageMemoryBarriers
+}
+
+auto
+::VulkanDetermineMemoryTypeIndex(VkPhysicalDeviceMemoryProperties const& MemoryProperties,
+                           uint32 TypeBits,
+                           VkFlags RequirementsMask)
+  -> uint32
+{
+  // Search memtypes to find first index with those properties
+  for(uint32 Index = 0; Index < 32; ++Index)
+  {
+    if(IsBitSet(TypeBits, Index))
+    {
+      // Type is available, does it match user properties?
+      auto const PropertyFlags = MemoryProperties.memoryTypes[Index].propertyFlags;
+      auto const FilteredFlags = PropertyFlags & RequirementsMask;
+      if(FilteredFlags == RequirementsMask)
+      {
+        // Perfect match.
+        return Index;
+      }
+    }
+  }
+
+  // No memory types matched.
+  return IntMaxValue<uint32>();
+}
+
+/// Create and begin setup command buffer.
+auto
+::VulkanEnsureSetupCommandIsReady(vulkan_device const& Device, VkCommandPool CommandPool, VkCommandBuffer& CommandBuffer)
+  -> void
+{
+  if(CommandBuffer)
+    return;
+
+  auto SetupCommandBufferAllocateInfo = VulkanStruct<VkCommandBufferAllocateInfo>();
+  {
+    SetupCommandBufferAllocateInfo.commandPool = CommandPool;
+    SetupCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    SetupCommandBufferAllocateInfo.commandBufferCount = 1;
+  }
+
+  VulkanVerify(Device.vkAllocateCommandBuffers(Device.DeviceHandle, &SetupCommandBufferAllocateInfo, &CommandBuffer));
+
+  auto InheritanceInfo = VulkanStruct<VkCommandBufferInheritanceInfo>();
+  auto BeginInfo = VulkanStruct<VkCommandBufferBeginInfo>();
+  BeginInfo.pInheritanceInfo = &InheritanceInfo;
+
+  VulkanVerify(Device.vkBeginCommandBuffer(CommandBuffer, &BeginInfo));
+}
+
+auto
+::VulkanFlushSetupCommand(vulkan_device const& Device, VkQueue Queue, VkCommandPool CommandPool, VkCommandBuffer& CommandBuffer)
+  -> void
+{
+  if(CommandBuffer == VK_NULL_HANDLE)
+    return;
+
+  VulkanVerify(Device.vkEndCommandBuffer(CommandBuffer));
+
+  auto SubmitInfo = VulkanStruct<VkSubmitInfo>();
+  {
+    SubmitInfo.commandBufferCount = 1;
+    SubmitInfo.pCommandBuffers = &CommandBuffer;
+  }
+  VkFence NullFence = {};
+  VulkanVerify(Device.vkQueueSubmit(Queue, 1, &SubmitInfo, NullFence));
+
+  VulkanVerify(Device.vkQueueWaitIdle(Queue));
+
+  Device.vkFreeCommandBuffers(Device.DeviceHandle, CommandPool, 1, &CommandBuffer);
+  CommandBuffer = VK_NULL_HANDLE;
+}
+
+auto
+::VulkanVerify(VkResult Result)
+  -> void
+{
+  Assert(Result == VK_SUCCESS);
+}
+
+
+auto
+::VulkanIsImageCompatibleWithGpu(vulkan_gpu const& Gpu, image const& Image)
+  -> bool
+{
+  VkFormat VulkanTextureFormat = ImageFormatToVulkan(Image.Format);
+  if(VulkanTextureFormat == VK_FORMAT_UNDEFINED)
+  {
+    LogError("Unable to find corresponding Vulkan format for %s.", Image.Format);
+    return false;
+  }
+
+  VkFormatProperties FormatProperties;
+  Gpu.Vulkan->vkGetPhysicalDeviceFormatProperties(Gpu.GpuHandle, VulkanTextureFormat, &FormatProperties);
+
+  bool SupportsImageSampling = FormatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+  if(!SupportsImageSampling)
+  {
+    LogError("%s: Cannot sample this format with optimal tiling.", VulkanTextureFormat);
+    return false;
+  }
+
+  VkImageFormatProperties ImageProperties;
+  Gpu.Vulkan->vkGetPhysicalDeviceImageFormatProperties(Gpu.GpuHandle,
+                                                        VulkanTextureFormat,
+                                                        VK_IMAGE_TYPE_2D,
+                                                        VK_IMAGE_TILING_OPTIMAL,
+                                                        VK_IMAGE_USAGE_SAMPLED_BIT,
+                                                        0,
+                                                        &ImageProperties);
+
+  VkExtent3D ImageExtent = { Image.Width, Image.Height, 1 };
+  if(ImageProperties.maxExtent.width  < ImageExtent.width ||
+     ImageProperties.maxExtent.height < ImageExtent.height ||
+     ImageProperties.maxExtent.depth  < ImageExtent.depth)
+  {
+    LogError("Given image extent (%f, %f, %f) does not fit the devices' maximum extent (%f, %f, %f).",
+             ImageExtent.width, ImageExtent.height, ImageExtent.depth,
+             ImageProperties.maxExtent.width, ImageProperties.maxExtent.height, ImageProperties.maxExtent.depth);
+    return false;
+  }
+
+  if(Image.NumMipLevels > ImageProperties.maxMipLevels)
+  {
+    LogError("Physical device accepts a maximum of %d Mip levels, the given image has %d",
+             ImageProperties.maxMipLevels, Image.NumMipLevels);
+    return false;
+  }
+
+  if(Image.NumArrayIndices > ImageProperties.maxArrayLayers)
+  {
+    LogError("Physical device accepts a maximum of %d array layers, the given image has %d",
+             ImageProperties.maxArrayLayers, Image.NumArrayIndices);
+    return false;
+  }
+
+  // TODO(Manu): sampleCounts, maxResourceSize?
+
+  return true;
+}
+
+auto
+::ImageFormatToVulkan(image_format KrepelFormat)
+  -> VkFormat
+{
+  // TODO(Manu): final switch.
+  switch(KrepelFormat)
+  {
+    default: return VK_FORMAT_UNDEFINED;
+
+    //
+    // BGR formats
+    //
+    case image_format::B8G8R8_UNORM:        return VK_FORMAT_B8G8R8_UNORM;
+
+    //
+    // RGBA formats
+    //
+    case image_format::R8G8B8A8_UNORM:      return VK_FORMAT_R8G8B8A8_UNORM;
+    case image_format::R8G8B8A8_SNORM:      return VK_FORMAT_R8G8B8A8_SNORM;
+    case image_format::R8G8B8A8_UNORM_SRGB: return VK_FORMAT_R8G8B8A8_SRGB;
+    //case image_format::R8G8B8A8_TYPELESS:   return VK_FORMAT_R8G8B8A8_SSCALED;
+    case image_format::R8G8B8A8_UINT:       return VK_FORMAT_R8G8B8A8_UINT;
+    case image_format::R8G8B8A8_SINT:       return VK_FORMAT_R8G8B8A8_SINT;
+
+    //
+    // BGRA formats
+    //
+    case image_format::B8G8R8A8_UNORM:      return VK_FORMAT_B8G8R8A8_UNORM;
+    //case image_format::B8G8R8A8_TYPELESS:   return VK_FORMAT_B8G8R8A8_SSCALED;
+    case image_format::B8G8R8A8_UNORM_SRGB: return VK_FORMAT_B8G8R8A8_SRGB;
+
+    //
+    // Block compressed formats
+    //
+    case image_format::BC1_UNORM:           return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+    case image_format::BC1_UNORM_SRGB:      return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
+
+    case image_format::BC2_UNORM:           return VK_FORMAT_BC2_UNORM_BLOCK;
+    case image_format::BC2_UNORM_SRGB:      return VK_FORMAT_BC2_SRGB_BLOCK;
+
+    case image_format::BC3_UNORM:           return VK_FORMAT_BC3_UNORM_BLOCK;
+    case image_format::BC3_UNORM_SRGB:      return VK_FORMAT_BC3_SRGB_BLOCK;
+
+    case image_format::BC4_UNORM:           return VK_FORMAT_BC4_UNORM_BLOCK;
+    case image_format::BC4_SNORM:           return VK_FORMAT_BC4_SNORM_BLOCK;
+
+    case image_format::BC5_UNORM:           return VK_FORMAT_BC5_UNORM_BLOCK;
+    case image_format::BC5_SNORM:           return VK_FORMAT_BC5_SNORM_BLOCK;
+
+    case image_format::BC6H_UF16:           return VK_FORMAT_BC6H_UFLOAT_BLOCK;
+    case image_format::BC6H_SF16:           return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+
+    case image_format::BC7_UNORM:           return VK_FORMAT_BC7_UNORM_BLOCK;
+    case image_format::BC7_UNORM_SRGB:      return VK_FORMAT_BC7_SRGB_BLOCK;
+  }
+}
+
+auto
+::ImageFormatFromVulkan(VkFormat VulkanFormat)
+  -> image_format
+{
+  // TODO(Manu): Complete this. Check out whether the ones that are commented
+  // out are correct.
+  switch(VulkanFormat)
+  {
+    default: return image_format::UNKNOWN;
+
+    //
+    // BGR formats
+    //
+    case VK_FORMAT_B8G8R8_UNORM: return image_format::B8G8R8_UNORM;
+
+    //
+    // RGBA formats
+    //
+    case VK_FORMAT_R8G8B8A8_UNORM:   return image_format::R8G8B8A8_UNORM;
+    case VK_FORMAT_R8G8B8A8_SNORM:   return image_format::R8G8B8A8_SNORM;
+    case VK_FORMAT_R8G8B8A8_SRGB:    return image_format::R8G8B8A8_UNORM_SRGB;
+    //case VK_FORMAT_R8G8B8A8_SSCALED: return image_format::R8G8B8A8_TYPELESS;
+    case VK_FORMAT_R8G8B8A8_UINT:    return image_format::R8G8B8A8_UINT;
+    case VK_FORMAT_R8G8B8A8_SINT:    return image_format::R8G8B8A8_SINT;
+
+    //
+    // BGRA formats
+    //
+    case VK_FORMAT_B8G8R8A8_UNORM:      return image_format::B8G8R8A8_UNORM;
+    //case VK_FORMAT_B8G8R8A8_SSCALED:    return image_format::B8G8R8A8_TYPELESS;
+    case VK_FORMAT_B8G8R8A8_SRGB: return image_format::B8G8R8A8_UNORM_SRGB;
+
+    //
+    // Block compressed formats
+    //
+    case VK_FORMAT_BC1_RGBA_UNORM_BLOCK: return image_format::BC1_UNORM;
+    case VK_FORMAT_BC1_RGBA_SRGB_BLOCK:  return image_format::BC1_UNORM_SRGB;
+
+    case VK_FORMAT_BC2_UNORM_BLOCK:      return image_format::BC2_UNORM;
+    case VK_FORMAT_BC2_SRGB_BLOCK:       return image_format::BC2_UNORM_SRGB;
+
+    case VK_FORMAT_BC3_UNORM_BLOCK:      return image_format::BC3_UNORM;
+    case VK_FORMAT_BC3_SRGB_BLOCK:       return image_format::BC3_UNORM_SRGB;
+
+    case VK_FORMAT_BC4_UNORM_BLOCK:      return image_format::BC4_UNORM;
+    case VK_FORMAT_BC4_SNORM_BLOCK:      return image_format::BC4_SNORM;
+
+    case VK_FORMAT_BC5_UNORM_BLOCK:      return image_format::BC5_UNORM;
+    case VK_FORMAT_BC5_SNORM_BLOCK:      return image_format::BC5_SNORM;
+
+    case VK_FORMAT_BC6H_UFLOAT_BLOCK:    return image_format::BC6H_UF16;
+    case VK_FORMAT_BC6H_SFLOAT_BLOCK:    return image_format::BC6H_SF16;
+
+    case VK_FORMAT_BC7_UNORM_BLOCK:      return image_format::BC7_UNORM;
+    case VK_FORMAT_BC7_SRGB_BLOCK:       return image_format::BC7_UNORM_SRGB;
+  }
+}
+
+auto
+::VulkanUploadImageToGpu(allocator_interface* TempAllocator,
+                         vulkan_device const& Device,
+                         VkCommandPool CommandPool,
+                         VkCommandBuffer CommandBuffer,
+                         image const& Image,
+                         gpu_image* GpuImage)
+  -> bool
+{
+  //
+  // 1. Allocate a temporary buffer.
+  // 2. Blit the image data into that.
+  // 3. Allocate an image with optimal tiling
+  // 4. Blit the buffer data into the image.
+  // 5. Deallocate the temporary buffer.
+  //
+
+  GpuImage->ImageFormat = ImageFormatToVulkan(Image.Format);
+  LogInfo("Image format (Ours => Vulkan): %s => %s",
+          ImageFormatName(Image.Format),
+          VulkanEnumName(GpuImage->ImageFormat));
+
+  if(GpuImage->ImageFormat == VK_FORMAT_UNDEFINED)
+  {
+    LogError("Could not convert our image format to Vulkan image format. "
+             "Did you run IsImageCompatibleWithGpu before calling this function?");
+    return false;
+  }
+
+  //
+  // Create the temporary buffer and upload the data to it.
+  //
+    auto ImageData = Slice(ImageDataSize(&Image), ImageDataPointer<void>(&Image));
+
+    auto Temp_BufferCreateInfo = VulkanStruct<VkBufferCreateInfo>();
+    {
+      Temp_BufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+      Temp_BufferCreateInfo.size = Cast<uint32>(ImageData.Num);
+    }
+
+    VkBuffer Temp_Buffer;
+    VulkanVerify(Device.vkCreateBuffer(Device.DeviceHandle, &Temp_BufferCreateInfo, nullptr, &Temp_Buffer));
+    Defer [&, Temp_Buffer](){ Device.vkDestroyBuffer(Device.DeviceHandle, Temp_Buffer, nullptr); };
+
+    VkMemoryRequirements Temp_MemoryRequirements;
+    Device.vkGetBufferMemoryRequirements(Device.DeviceHandle, Temp_Buffer, &Temp_MemoryRequirements);
+
+    auto Temp_MemoryAllocationInfo = VulkanStruct<VkMemoryAllocateInfo>();
+    {
+      Temp_MemoryAllocationInfo.allocationSize = Temp_MemoryRequirements.size;
+      Temp_MemoryAllocationInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Device.Gpu->MemoryProperties,
+                                                                                 Temp_MemoryRequirements.memoryTypeBits,
+                                                                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+      if(Temp_MemoryAllocationInfo.memoryTypeIndex == IntMaxValue<uint32>())
+      {
+        LogError("Unable to determine memory type for temporary buffer memory.");
+        return false;
+      }
+    }
+
+    VkDeviceMemory Temp_Memory;
+    VulkanVerify(Device.vkAllocateMemory(Device.DeviceHandle, &Temp_MemoryAllocationInfo, nullptr, &Temp_Memory));
+    Defer [&Device, Temp_Memory](){ Device.vkFreeMemory(Device.DeviceHandle, Temp_Memory, nullptr); };
+
+    // Copy over the image data to the temporary buffer.
+    {
+      void* RawData;
+      VulkanVerify(Device.vkMapMemory(Device.DeviceHandle,
+                                      Temp_Memory,
+                                      0, // offset
+                                      VK_WHOLE_SIZE,
+                                      0, // flags
+                                      &RawData));
+
+      MemCopy(ImageData.Num, RawData, ImageData.Ptr);
+
+      Device.vkUnmapMemory(Device.DeviceHandle, Temp_Memory);
+    }
+
+    VulkanVerify(Device.vkBindBufferMemory(Device.DeviceHandle, Temp_Buffer, Temp_Memory, 0));
+
+  //
+  // Create the actual texture image.
+  //
+    // Now that we have the buffer in place, holding the texture data, we copy
+    // it over to an image.
+    auto Image_CreateInfo = VulkanStruct<VkImageCreateInfo>();
+    {
+      Image_CreateInfo.imageType = VK_IMAGE_TYPE_2D;
+      Image_CreateInfo.format = GpuImage->ImageFormat;
+      Image_CreateInfo.extent = VkExtent3D{ Image.Width, Image.Height, 1 };
+      Image_CreateInfo.mipLevels = Image.NumMipLevels;
+      Image_CreateInfo.arrayLayers = Image.NumArrayIndices;
+      Image_CreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // TODO(Manu): Should probably be passed in as a parameter to this function, because it must be consistent with the renderpass, etc.
+      Image_CreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+      Image_CreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+      Image_CreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+      Image_CreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    }
+    VulkanVerify(Device.vkCreateImage(Device.DeviceHandle, &Image_CreateInfo, nullptr, &GpuImage->ImageHandle));
+
+    VkMemoryRequirements Image_MemoryRequirements;
+    Device.vkGetImageMemoryRequirements(Device.DeviceHandle, GpuImage->ImageHandle, &Image_MemoryRequirements);
+
+    LogInfo("Requiring %d bytes on the GPU for the given image data.", Image_MemoryRequirements.size);
+
+    auto Image_MemoryAllocateInfo = VulkanStruct<VkMemoryAllocateInfo>();
+    {
+      Image_MemoryAllocateInfo.allocationSize = Image_MemoryRequirements.size;
+      Image_MemoryAllocateInfo.memoryTypeIndex =  VulkanDetermineMemoryTypeIndex(Device.Gpu->MemoryProperties,
+                                                                                 Image_MemoryRequirements.memoryTypeBits,
+                                                                                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      if(Image_MemoryAllocateInfo.memoryTypeIndex == IntMaxValue<uint32>())
+      {
+        LogError("Unable to determine memory type for image memory.");
+        return false;
+      }
+    }
+
+    // Allocate image memory
+    VulkanVerify(Device.vkAllocateMemory(Device.DeviceHandle, &Image_MemoryAllocateInfo, nullptr, &GpuImage->MemoryHandle));
+
+    // Bind image and image memory
+    VulkanVerify(Device.vkBindImageMemory(Device.DeviceHandle, GpuImage->ImageHandle, GpuImage->MemoryHandle, 0));
+
+    // Since the initial layout is VK_IMAGE_LAYOUT_UNDEFINED, and this image
+    // is a blit-target, we set its current layout to
+    // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL.
+    VulkanSetImageLayout(Device, CommandPool, CommandBuffer,
+                         GpuImage->ImageHandle,
+                         VK_IMAGE_ASPECT_COLOR_BIT,
+                         VK_IMAGE_LAYOUT_UNDEFINED,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         0);
+
+  //
+  // Copy the buffered data over to the image memory.
+  //
+  {
+    scoped_array<VkBufferImageCopy> Regions(TempAllocator);
+    // TODO(Manu): Upload all MIP levels.
+    for(uint32 MipLevel = 0; MipLevel < 1; ++MipLevel)
+    {
+      auto Region = &Expand(&Regions);
+      //Region.bufferOffset = ;
+      Region->imageExtent = Image_CreateInfo.extent;
+      Region->imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      Region->imageSubresource.mipLevel = MipLevel;
+      Region->imageSubresource.baseArrayLayer = 0;
+      Region->imageSubresource.layerCount = 1; // TODO(Manu): Should be more than 1.
+    }
+    Device.vkCmdCopyBufferToImage(CommandBuffer,
+                                  Temp_Buffer,
+                                  GpuImage->ImageHandle,
+                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                  Cast<uint32>(Regions.Num),
+                                  Regions.Ptr);
+  }
+  //
+  // Set the image layout.
+  //
+    VulkanSetImageLayout(Device, CommandPool, CommandBuffer,
+                         GpuImage->ImageHandle,
+                         VK_IMAGE_ASPECT_COLOR_BIT,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                         0);
+
+  // TODO(Manu): Synchronization?
+
+  return true;
 }

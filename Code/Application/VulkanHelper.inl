@@ -308,14 +308,16 @@ struct vulkan_device_functions
 template<typename T>
 struct impl_vulkan_struct
 {
+  using StructType = rm_ref<T>;
   // Return an instance of T, filled with zeroes.
-  static constexpr T Do() { return {}; }
+  static constexpr StructType Do() { return {}; }
 };
 
 #define IMPL_HELPER(Type, Enum) template<>\
 struct impl_vulkan_struct<Type>\
 {\
-  static constexpr Type Do() { return { Enum }; }\
+  using StructType = rm_ref<Type>;\
+  static constexpr StructType Do() { return { Enum }; }\
 }
 
 
@@ -360,7 +362,7 @@ IMPL_HELPER(VkFramebufferCreateInfo, VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO);
 IMPL_HELPER(VkRenderPassCreateInfo, VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO);
 IMPL_HELPER(VkCommandPoolCreateInfo, VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO);
 IMPL_HELPER(VkCommandBufferAllocateInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
-IMPL_HELPER(VkCommandBufferInheritanceInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
+IMPL_HELPER(VkCommandBufferInheritanceInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO);
 IMPL_HELPER(VkCommandBufferBeginInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
 IMPL_HELPER(VkRenderPassBeginInfo, VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO);
 IMPL_HELPER(VkBufferMemoryBarrier, VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER);

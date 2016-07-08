@@ -30,7 +30,7 @@ auto
   };
 
   LogBeginScope(Log, "Loading XInput");
-  Defer(=, LogEndScope(Log, ""));
+  Defer [Log](){ LogEndScope(Log, ""); };
 
   for(auto DLLName : Slice(DLLNames))
   {
@@ -452,7 +452,7 @@ auto
   }
 
   auto NewControllerStatePtr = &NewControllerState;
-  Defer(=, Input->XInputPreviousState[UserIndex] = *NewControllerStatePtr);
+  Defer [=](){ Input->XInputPreviousState[UserIndex] = *NewControllerStatePtr; };
 
   auto OldGamepad = &Input->XInputPreviousState[UserIndex].Gamepad;
   auto NewGamepad = &NewControllerState.Gamepad;
