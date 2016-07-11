@@ -27,6 +27,20 @@ auto
 }
 
 auto
+::Mod(double Value, double Divisor)
+  -> double
+{
+  return std::fmod(Value, Divisor);
+}
+
+auto
+::Mod(float Value, float Divisor)
+  -> float
+{
+  return std::fmod(Value, Divisor);
+}
+
+auto
 ::Sqrt(double Value)
   -> double
 {

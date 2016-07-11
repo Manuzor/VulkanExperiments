@@ -245,8 +245,6 @@ Forward(rm_ref<t_type>&& Argument)
   return static_cast<t_type&&>(Argument);
 }
 
-// TODO(Manu): Add int_trait (platform specific because of DWORD etc.)
-
 template<typename t_dest, typename t_source>
 constexpr t_dest
 Cast(t_source Value)
@@ -284,6 +282,23 @@ t_type const*
 AsPtrToConst(t_type* Value)
 {
   return const_cast<t_type const*>(Value);
+}
+
+template<typename ToType, typename FromType>
+struct impl_convert
+{
+  static constexpr ToType
+  Do(FromType const& Value)
+  {
+    return Cast<ToType>(Value);
+  }
+};
+
+template<typename ToType, typename FromType>
+ToType
+Convert(FromType const& Value)
+{
+  return impl_convert<ToType, FromType>::Do(Value);       
 }
 
 /// Asserts on overflows and underflows when converting signed or unsigned
@@ -362,6 +377,12 @@ Pow(float Base, float Exponent);
 template<typename ReturnType = double, typename BaseType, typename ExponentType>
 constexpr ReturnType
 Pow(BaseType Base, ExponentType Exponent) { return (ReturnType)Pow((double)Base, (double)Exponent); }
+
+double
+Mod(double Value, double Divisor);
+
+float
+Mod(float Value, float Divisor);
 
 double
 Sqrt(double Value);
