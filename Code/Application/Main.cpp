@@ -1611,7 +1611,6 @@ VulkanCleanup(vulkan* Vulkan)
 
   Vulkan->Device.vkDestroySwapchainKHR(Vulkan->Device.DeviceHandle, Vulkan->Swapchain, nullptr);
   Vulkan->Device.vkDestroyDevice(Vulkan->Device.DeviceHandle, nullptr);
-  VulkanCleanupDebugging(Vulkan);
 
   Vulkan->vkDestroySurfaceKHR(Vulkan->InstanceHandle, Vulkan->Surface, nullptr);
   Vulkan->vkDestroyInstance(Vulkan->InstanceHandle, nullptr);
