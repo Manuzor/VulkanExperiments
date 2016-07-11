@@ -44,4 +44,24 @@
     </Expand>
   </Type>
 
+  <Type Name="dictionary&lt;*,*&gt;">
+    <DisplayString Condition="Num == 0">{{ Empty }}</DisplayString>
+    <DisplayString>{{ Num={Num}, Capacity={Capacity} }}</DisplayString>
+    <Expand>
+      <Item Name="Num">Num</Item>
+      <Item Name="Capacity">Capacity</Item>
+      <CustomListItems>
+        <Variable Name="Index" InitialValue="0"/>
+        <Size>Num</Size>
+        <Loop>
+          <If Condition="Index == Num">
+            <Break/>
+          </If>
+          <Item Name="[{KeysPtr[Index]}]">ValuesPtr[Index]</Item>
+          <Exec>++Index</Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+
 </AutoVisualizer>
