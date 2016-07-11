@@ -56,18 +56,21 @@ Finalize(dictionary<K, V>* Dict)
 
 template<typename K, typename V>
 void
-Reserve(dictionary<K, V>* Dict, size_t MinBytesToReserve)
+Reserve(dictionary<K, V>* Dict, size_t MinElementsToReserve)
 {
+  if(Dict->Capacity >= MinElementsToReserve)
+    return;
+
   auto NewKeys = ContainerReserve(Dict->Allocator,
                                   Dict->KeysPtr, Dict->Num,
                                   Dict->Capacity,
-                                  MinBytesToReserve,
+                                  MinElementsToReserve,
                                   DictionaryMinimumCapacity);
 
   auto NewValues = ContainerReserve(Dict->Allocator,
                                     Dict->ValuesPtr, Dict->Num,
                                     Dict->Capacity,
-                                    MinBytesToReserve,
+                                    MinElementsToReserve,
                                     DictionaryMinimumCapacity);
 
   Assert(NewKeys.Num == NewValues.Num);
@@ -134,7 +137,7 @@ GetOrCreate(dictionary<K, V>* Dict, IndexType KeyIndex)
   if(ArrayIndex != INVALID_INDEX)
     return &Values(Dict)[ArrayIndex];
 
-  Reserve(Dict, Dict->Capacity + 1);
+  Reserve(Dict, Dict->Num + 1);
 
   ArrayIndex = Dict->Num++;
 

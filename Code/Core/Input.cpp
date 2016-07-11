@@ -184,10 +184,10 @@ auto
   if(TriggeringSlot == nullptr)
     return false;
 
-  NewValue = AttuneInputValue(Context, TriggeringSlotId, NewValue);
+  float const AttunedValue = AttuneInputValue(Context, TriggeringSlotId, NewValue);
 
   TriggeringSlot->Frame = Context->CurrentFrame;
-  TriggeringSlot->Value = NewValue;
+  TriggeringSlot->Value = AttunedValue;
 
   //
   // Apply input mapping
@@ -197,7 +197,7 @@ auto
   {
     if(Mapping.SourceSlotId == TriggeringSlotId)
     {
-      float NewMappedValue = NewValue * Mapping.Scale;
+      float NewMappedValue = AttunedValue * Mapping.Scale;
       UpdateInputSlotValue(Context, Mapping.TargetSlotId, NewMappedValue);
     }
   }
@@ -219,11 +219,11 @@ auto
 
   if(NewValue > 0 && Properties->PositiveDeadZone > 0.0f)
   {
-    NewValue = Max(0, NewValue - Properties->PositiveDeadZone) / (1.0f - Properties->PositiveDeadZone);
+    NewValue = Max(0.0f, NewValue - Properties->PositiveDeadZone) / (1.0f - Properties->PositiveDeadZone);
   }
   else if(NewValue < 0 && Properties->NegativeDeadZone > 0.0f)
   {
-    NewValue = -Max(0, -NewValue - Properties->NegativeDeadZone) / (1.0f - Properties->NegativeDeadZone);
+    NewValue = -Max(0.0f, -NewValue - Properties->NegativeDeadZone) / (1.0f - Properties->NegativeDeadZone);
   }
 
   // Apply the exponent setting, if any.
@@ -257,7 +257,9 @@ auto
   auto Slots = Values(&Context->Slots);
   for(size_t Index = 0; Index < Context->Slots.Num; ++Index)
   {
+    auto Id = Ids[Index];
     auto Slot = &Slots[Index];
+
     if(Slot->Frame < Context->CurrentFrame)
     {
       if(Slot->Type == input_type::Action)
@@ -268,7 +270,6 @@ auto
       continue;
     }
 
-    auto Id = Ids[Index];
     Context->ChangeEvent(Id, Slot);
   }
 }

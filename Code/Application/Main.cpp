@@ -1139,7 +1139,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
 
     VulkanVerify(Vulkan->Device.vkCreateDescriptorSetLayout(Vulkan->Device.DeviceHandle, &DescriptorSetLayoutCreateInfo, nullptr, &Vulkan->DescriptorSetLayout));
 
-    auto PipelineLayoutCreateInfo =VulkanStruct<VkPipelineLayoutCreateInfo>();
+    auto PipelineLayoutCreateInfo = VulkanStruct<VkPipelineLayoutCreateInfo>();
     {
       PipelineLayoutCreateInfo.setLayoutCount = 1;
       PipelineLayoutCreateInfo.pSetLayouts = &Vulkan->DescriptorSetLayout;
@@ -2153,9 +2153,8 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
                                                 0, // flags
                                                 &RawData));
 
-        auto const NumBytesToCopy = SizeOf<decltype(ViewProjectionMatrix)>();
-        auto const SourceData = Reinterpret<void const*>(&ViewProjectionMatrix);
-        MemCopy(NumBytesToCopy, RawData, SourceData);
+        auto const Target = Reinterpret<mat4x4*>(RawData);
+        MemCopy(1, Target, &ViewProjectionMatrix);
 
         Vulkan->Device.vkUnmapMemory(Vulkan->Device.DeviceHandle, Vulkan->GlobalUBO_MemoryHandle);
       }

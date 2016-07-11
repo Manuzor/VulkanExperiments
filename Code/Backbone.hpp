@@ -1057,10 +1057,12 @@ operator ==(slice<ElementTypeA> A, slice<ElementTypeB> B)
   auto NumElements = A.Num;
   while(NumElements)
   {
-    if(*A_ == *B_)
-      --NumElements;
-    else
+    if(*A_ != *B_)
       return false;
+
+    ++A_;
+    ++B_;
+    --NumElements;
   }
 
   return true;
