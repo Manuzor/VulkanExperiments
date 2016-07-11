@@ -11,7 +11,7 @@ TEST_CASE("Event", "[Event]")
 
   event<int> IntEvent = {};
   Init(&IntEvent, Allocator);
-  Defer(&, Finalize(&IntEvent));
+  Defer [&](){ Finalize(&IntEvent); };
 
   auto Listener = [&](int Val){ Value += Val; ++CallCount; };
   auto Id1 = AddListener(&IntEvent, Listener);

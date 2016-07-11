@@ -9,7 +9,7 @@ TEST_CASE("Dynamic Array Basics", "[dynamic_array]")
 
   dynamic_array<int> Arr = {};
   Init(&Arr, Allocator);
-  Defer(&, Finalize(&Arr));
+  Defer [&](){ Finalize(&Arr); };
 
   REQUIRE( Arr.Num == 0 );
 
@@ -36,7 +36,7 @@ TEST_CASE("Dynamic Array Reserve", "[dynamic_array]")
 
   dynamic_array<int> Arr = {};
   Init(&Arr, Allocator);
-  Defer(&, Finalize(&Arr));
+  Defer [&](){ Finalize(&Arr); };
 
   SECTION("Reserve")
   {
@@ -54,7 +54,7 @@ TEST_CASE("Dynamic Array Expand", "[dynamic_array]")
 
   dynamic_array<int> Arr = {};
   Init(&Arr, Allocator);
-  Defer(&, Finalize(&Arr));
+  Defer [&](){ Finalize(&Arr); };
 
   SECTION("Expand")
   {
@@ -102,7 +102,7 @@ TEST_CASE("Dynamic Array Remove", "[dynamic_array]")
 
   dynamic_array<int> Arr = {};
   Init(&Arr, Allocator);
-  Defer(&, Finalize(&Arr));
+  Defer [&](){ Finalize(&Arr); };
 
   int Ints[] = { 0, 1, 2, 3 };
   SliceCopy(ExpandBy(&Arr, 4), AsConst(Slice(Ints)));
