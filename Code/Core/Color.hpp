@@ -148,10 +148,10 @@ struct impl_convert<color_linear_ub, color_linear>
   static constexpr color_linear_ub
   Do(color_linear const& Color)
   {
-    return { Cast<uint8>(Min(255.0f, (Color.R * 255.0f) + 0.5f)),
-             Cast<uint8>(Min(255.0f, (Color.G * 255.0f) + 0.5f)),
-             Cast<uint8>(Min(255.0f, (Color.B * 255.0f) + 0.5f)),
-             Cast<uint8>(Min(255.0f, (Color.A * 255.0f) + 0.5f)) };
+    return { FloatToUNorm<uint8>(Color.R),
+             FloatToUNorm<uint8>(Color.G),
+             FloatToUNorm<uint8>(Color.B),
+             FloatToUNorm<uint8>(Color.A) };
   }
 };
 
@@ -159,17 +159,14 @@ struct impl_convert<color_linear_ub, color_linear>
 template<>
 struct impl_convert<color_gamma_ub, color_linear>
 {
+  // Note: Can't make this constexpr due to FromLinearToGamma() not being constexpr
   static color_gamma_ub
   Do(color_linear const& Color)
   {
-    float const GammaR = FromLinearToGamma(Color.R);
-    float const GammaG = FromLinearToGamma(Color.G);
-    float const GammaB = FromLinearToGamma(Color.B);
-
-    return { Cast<uint8>(Min(255.0f, (GammaR  * 255.0f) + 0.5f)),
-             Cast<uint8>(Min(255.0f, (GammaG  * 255.0f) + 0.5f)),
-             Cast<uint8>(Min(255.0f, (GammaB  * 255.0f) + 0.5f)),
-             Cast<uint8>(Min(255.0f, (Color.A * 255.0f) + 0.5f)) };
+    return { FloatToUNorm<uint8>(FromLinearToGamma(Color.R)),
+             FloatToUNorm<uint8>(FromLinearToGamma(Color.G)),
+             FloatToUNorm<uint8>(FromLinearToGamma(Color.B)),
+             FloatToUNorm<uint8>(                  Color.A ) };
   }
 };
 
@@ -180,10 +177,10 @@ struct impl_convert<color_linear, color_linear_ub>
   static constexpr color_linear
   Do(color_linear_ub const& Color)
   {
-    return { Color.R / 255.0f,
-             Color.G / 255.0f,
-             Color.B / 255.0f,
-             Color.A / 255.0f };
+    return { UNormToFloat<uint8>(Color.R),
+             UNormToFloat<uint8>(Color.G),
+             UNormToFloat<uint8>(Color.B),
+             UNormToFloat<uint8>(Color.A) };
   }
 };
 
@@ -194,10 +191,10 @@ struct impl_convert<color_linear, color_gamma_ub>
   static constexpr color_linear
   Do(color_gamma_ub const& Color)
   {
-    return { FromGammaToLinear(Color.R) / 255.0f,
-             FromGammaToLinear(Color.G) / 255.0f,
-             FromGammaToLinear(Color.B) / 255.0f,
-                               Color.A  / 255.0f };
+    return { FromGammaToLinear(UNormToFloat<uint8>(Color.R)),
+             FromGammaToLinear(UNormToFloat<uint8>(Color.G)),
+             FromGammaToLinear(UNormToFloat<uint8>(Color.B)),
+             UNormToFloat<uint8>(                  Color.A ) };
   }
 };
 

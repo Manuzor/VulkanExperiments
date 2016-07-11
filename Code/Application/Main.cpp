@@ -10,6 +10,7 @@
 #include <Core/ImageLoader.hpp>
 
 #include <Core/Math.hpp>
+#include <Core/Color.hpp>
 
 #include <Core/Camera.hpp>
 
@@ -1659,12 +1660,8 @@ VulkanCreateDrawCommand(vulkan* Vulkan)
 
       // First color
       {
-        // TODO: Replace this once we have colors again.
-
-        ClearValues[0].color.float32[0] = 0.2f;
-        ClearValues[0].color.float32[1] = 0.3f;
-        ClearValues[0].color.float32[2] = 0.5f;
-        ClearValues[0].color.float32[3] = 0.0f;
+        SliceCopy(Slice(ClearValues[0].color.float32),
+                  AsConst(Slice(color::CornflowerBlue.Data)));
       }
 
       // Second color
