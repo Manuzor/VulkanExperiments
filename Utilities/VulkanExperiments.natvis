@@ -16,8 +16,6 @@
 
   <Type Name="slice&lt;char&gt;">
     <AlternativeType Name="slice&lt;char const&gt;" />
-    <AlternativeType Name="slice&lt;wchar_t&gt;" />
-    <AlternativeType Name="slice&lt;wchar_t const&gt;" />
     <DisplayString Condition="Ptr == nullptr">{{ Null }}</DisplayString>
     <DisplayString Condition="Num == 0">{{ Empty }}</DisplayString>
     <DisplayString>{Ptr,[Num]s8}</DisplayString>
@@ -62,6 +60,80 @@
         </Loop>
       </CustomListItems>
     </Expand>
+  </Type>
+
+  <Type Name="time">
+    <DisplayString>{{ {InternalData} Seconds }}</DisplayString>
+    <Expand>
+      <Item Name="Seconds">InternalData,g</Item>
+      <Item Name="Milliseconds">InternalData * 1000,g</Item>
+      <Item Name="Microseconds">InternalData * 1000 * 1000,g</Item>
+      <Item Name="Nanoseconds">InternalData * 1000 * 1000 * 1000,g</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="vec2">
+    <DisplayString>{{ X={X,g}, Y={Y,g} }}</DisplayString>
+  </Type>
+
+  <Type Name="vec3">
+    <DisplayString>{{ X={X,g}, Y={Y,g}, Z={Z,g} }}</DisplayString>
+  </Type>
+
+  <Type Name="vec4">
+    <DisplayString>{{ X={X,g}, Y={Y,g}, Z={Z,g}, W={W,g} }}</DisplayString>
+  </Type>
+
+  <Type Name="mat4x4">
+    <DisplayString>{Data[0],16}</DisplayString>
+    <Expand>
+      <Item Name="Is Identity" Condition="M00 == 1 &amp;&amp; M01 == 0 &amp;&amp; M02 == 0 &amp;&amp; M03 == 0 &amp;&amp;
+                                          M10 == 0 &amp;&amp; M11 == 1 &amp;&amp; M12 == 0 &amp;&amp; M13 == 0 &amp;&amp;
+                                          M20 == 0 &amp;&amp; M21 == 0 &amp;&amp; M22 == 1 &amp;&amp; M23 == 0 &amp;&amp;
+                                          M30 == 0 &amp;&amp; M31 == 0 &amp;&amp; M32 == 0 &amp;&amp; M33 == 1">true</Item>
+      <Item Name="Is Zero" Condition="M00 == 0 &amp;&amp; M01 == 0 &amp;&amp; M02 == 0 &amp;&amp; M03 == 0 &amp;&amp;
+                                      M10 == 0 &amp;&amp; M11 == 0 &amp;&amp; M12 == 0 &amp;&amp; M13 == 0 &amp;&amp;
+                                      M20 == 0 &amp;&amp; M21 == 0 &amp;&amp; M22 == 0 &amp;&amp; M23 == 0 &amp;&amp;
+                                      M30 == 0 &amp;&amp; M31 == 0 &amp;&amp; M32 == 0 &amp;&amp; M33 == 0">false</Item>
+      <Synthetic Name="Column View" Expression="Data">
+        <DisplayString>{{{{{M00}, {M01}, {M02}, {M03}}},{{{M10}, {M11}, {M12}, {M13}}},{{{M20}, {M21}, {M22}, {M23}}},{{{M30}, {M31}, {M32}, {M33}}}}}</DisplayString>
+        <Expand>
+          <Synthetic Name="Col [0]" Expression="Data[0]">
+            <DisplayString>{M00}, {M01}, {M02}, {M03}</DisplayString>
+          </Synthetic>
+          <Synthetic Name="Col [1]" Expression="Data[1]">
+            <DisplayString>{M10}, {M11}, {M12}, {M13}</DisplayString>
+          </Synthetic>
+          <Synthetic Name="Col [2]" Expression="Data[2]">
+            <DisplayString>{M20}, {M21}, {M22}, {M23}</DisplayString>
+          </Synthetic>
+          <Synthetic Name="Col [3]" Expression="Data[3]">
+            <DisplayString>{M30}, {M31}, {M32}, {M33}</DisplayString>
+          </Synthetic>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="Row View">
+        <DisplayString>{{{{{M00}, {M10}, {M20}, {M30}}},{{{M01}, {M11}, {M21}, {M31}}},{{{M02}, {M12}, {M22}, {M32}}},{{{M03}, {M13}, {M23}, {M33}}}}}</DisplayString>
+        <Expand>
+          <Synthetic Name="Row [0]">
+            <DisplayString>{M00}, {M10}, {M20}, {M30}</DisplayString>
+          </Synthetic>
+          <Synthetic Name="Row [1]">
+            <DisplayString>{M01}, {M11}, {M21}, {M31}</DisplayString>
+          </Synthetic>
+          <Synthetic Name="Row [2]">
+            <DisplayString>{M02}, {M12}, {M22}, {M32}</DisplayString>
+          </Synthetic>
+          <Synthetic Name="Row [3]">
+            <DisplayString>{M03}, {M13}, {M23}, {M33}</DisplayString>
+          </Synthetic>
+        </Expand>
+      </Synthetic>
+    </Expand>
+  </Type>
+
+  <Type Name="color_linear">
+    <DisplayString>{{ R={R,g}, G={G,g}, B={B,g}, A={A,g} }}</DisplayString>
   </Type>
 
 </AutoVisualizer>
