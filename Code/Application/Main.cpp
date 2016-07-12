@@ -540,7 +540,7 @@ VulkanInitializeForGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND Window
     //
     // Device Extensions
     //
-    auto ExtensionNames = scoped_array<char const*>(TempAllocator);
+    scoped_array<char const*> ExtensionNames(TempAllocator);
     {
       // Required extensions:
       bool SwapchainExtensionFound = {};
@@ -731,7 +731,26 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     Vulkan->Height = SwapchainExtent.height;
     LogInfo("Swapchain extents: { width=%u, height=%u }", SwapchainExtent.width, SwapchainExtent.height);
 
+
+    // Try to find the best present mode, preferring Mailbox or Immediate and
+    // fallback to FIFO (which is always available).
     VkPresentModeKHR SwapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+    for(size_t Index = 0; Index < PresentModeCount; ++Index)
+    {
+      auto const PresentMode = PresentModes[Index];
+
+      if(PresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+      {
+        SwapchainPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+        break;
+      }
+
+      Assert(SwapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR);
+      if(PresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR)
+      {
+        SwapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+      }
+    }
 
     // Determine the number of VkImage's to use in the swapchain (we desire to
     // own only 1 image at a time, besides the images being displayed and
@@ -818,9 +837,8 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       Vulkan->SwapchainBuffers[Index].Image = SwapchainImages[Index];
 
       // Render loop will expect image to have been used before and in
-      // VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-      // layout and will change to COLOR_ATTACHMENT_OPTIMAL, so init the image
-      // to that state.
+      // VK_IMAGE_LAYOUT_PRESENT_SRC_KHR layout and will change to
+      // COLOR_ATTACHMENT_OPTIMAL, so init the image to that state.
       VulkanSetImageLayout(Vulkan->Device, Vulkan->CommandPool, Vulkan->SetupCommand, Vulkan->SwapchainBuffers[Index].Image,
                            Cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_COLOR_BIT),
                            Cast<VkImageLayout>(VK_IMAGE_LAYOUT_UNDEFINED),
