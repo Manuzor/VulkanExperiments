@@ -1,5 +1,7 @@
 #pragma once
 
+#include "CoreAPI.hpp"
+
 #include <Backbone.hpp>
 
 struct time
@@ -14,18 +16,19 @@ struct stopwatch
   uint64 Frequency;
 };
 
-double
+
+double CORE_API
 TimeAsSeconds(time Time);
 
-double
+double CORE_API
 TimeAsMilliseconds(time Time);
 
 
-void
+void CORE_API
 StopwatchStart(stopwatch* Stopwatch);
 
-void
+void CORE_API
 StopwatchStop(stopwatch* Stopwatch);
 
-time
+time CORE_API
 StopwatchTime(stopwatch* Stopwatch);
