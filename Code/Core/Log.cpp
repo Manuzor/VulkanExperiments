@@ -1,6 +1,9 @@
 #include "Log.hpp"
 
-#include <Windows.h>
+#if defined(BB_Platform_Windows)
+  #include <Windows.h>
+#endif
+
 #include <stdio.h>
 
 
@@ -208,31 +211,72 @@ auto
 ::StdoutLogSink(log_sink_args Args)
   -> void
 {
-  switch(Args.LogLevel)
-  {
-    case log_level::Info:       printf("Info"); break;
-    case log_level::Warning:    printf("Warn"); break;
-    case log_level::Error:      printf("Err "); break;
-    case log_level::ScopeBegin: printf(" >>>"); break;
-    case log_level::ScopeEnd:   printf(" <<<"); break;
-  }
+  #if defined(BB_Platform_Windows)
+    auto const ConsoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
 
-  if(Args.Message)
-  {
-    printf(": ");
+    CONSOLE_SCREEN_BUFFER_INFO CurrentConsoleInfo;
+    GetConsoleScreenBufferInfo(ConsoleHandle, &CurrentConsoleInfo);
 
-    while(Args.Indentation > 0)
+    // Restore the current console attributes at the end of the function.
+    Defer [=](){ SetConsoleTextAttribute(ConsoleHandle, CurrentConsoleInfo.wAttributes); };
+
+    auto Color = CurrentConsoleInfo.wAttributes;
+    switch(Args.LogLevel)
     {
-      printf("  ");
-      --Args.Indentation;
+      case log_level::Warning: Color = FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_GREEN; break;
+      case log_level::Error:   Color = FOREGROUND_INTENSITY | FOREGROUND_RED; break;
     }
 
-    printf("%*s\n", Cast<int>(Args.Message.Num), Args.Message.Ptr);
-  }
-  else
-  {
+    SetConsoleTextAttribute(ConsoleHandle, Color);
+
+    switch(Args.LogLevel)
+    {
+      case log_level::Info:       WriteConsole(ConsoleHandle, "Info", 4, nullptr, nullptr); break;
+      case log_level::Warning:    WriteConsole(ConsoleHandle, "Warn", 4, nullptr, nullptr); break;
+      case log_level::Error:      WriteConsole(ConsoleHandle, "Err ", 4, nullptr, nullptr); break;
+      case log_level::ScopeBegin: WriteConsole(ConsoleHandle, " >>>", 4, nullptr, nullptr); break;
+      case log_level::ScopeEnd:   WriteConsole(ConsoleHandle, " <<<", 4, nullptr, nullptr); break;
+    }
+
+    if(Args.Message)
+    {
+      WriteConsole(ConsoleHandle, ": ", 2, nullptr, nullptr);
+
+      while(Args.Indentation > 0)
+      {
+        WriteConsole(ConsoleHandle, "  ", 2, nullptr, nullptr);
+        --Args.Indentation;
+      }
+
+      WriteConsole(ConsoleHandle, Args.Message.Ptr, Cast<DWORD>(Args.Message.Num), nullptr, nullptr);
+    }
+
+    WriteConsole(ConsoleHandle, "\n", 1, nullptr, nullptr);
+  #else
+    switch(Args.LogLevel)
+    {
+      case log_level::Info:       printf("Info"); break;
+      case log_level::Warning:    printf("Warn"); break;
+      case log_level::Error:      printf("Err "); break;
+      case log_level::ScopeBegin: printf(" >>>"); break;
+      case log_level::ScopeEnd:   printf(" <<<"); break;
+    }
+
+    if(Args.Message)
+    {
+      printf(": ");
+
+      while(Args.Indentation > 0)
+      {
+        printf("  ");
+        --Args.Indentation;
+      }
+
+      printf("%*s", Cast<int>(Args.Message.Num), Args.Message.Ptr);
+    }
+
     printf("\n");
-  }
+  #endif
 }
 
 auto
