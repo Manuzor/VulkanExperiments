@@ -1238,7 +1238,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       VertexShaderStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
       VertexShaderStage.pName = "main";
 
-      char const* FileName = "Data/Shader/tri/vert.spv";
+      char const* FileName = "Build/Shader-Simple.vert.spv";
 
       LogBeginScope("Loading vertex shader from file: %s", FileName);
       Defer [](){ LogEndScope(""); };
@@ -1263,7 +1263,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       FragmentShaderStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
       FragmentShaderStage.pName = "main";
 
-      char const* FileName = "Data/Shader/tri/frag.spv";
+      char const* FileName = "Build/Shader-Simple.frag.spv";
 
       LogBeginScope("Loading fragment shader from file: %s", FileName);
       Defer [](){ LogEndScope(""); };

@@ -86,6 +86,8 @@
 // Targets
 //
 
+#include "Data/fbuild.bff"
+
 #include "Code/Core/fbuild.bff"
 #include "Code/Application/fbuild.bff"
 #include "Tests/fbuild.bff"

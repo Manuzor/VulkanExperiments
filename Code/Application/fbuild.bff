@@ -6,7 +6,6 @@
   .ProjectName = 'Application'
   .SourcePath = '$RepoRoot$/Code/Application'
 
-
   //
   // Rules
   //
@@ -23,6 +22,7 @@
     .IncludeSearchPath + '$VulkanSDKPath$/Include;'
   }
 
+
   ObjectList( '$ProjectName$-Lib' )
   {
     .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
@@ -30,12 +30,21 @@
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
   }
 
-  Executable( '$ProjectName$' )
+  Executable( '$ProjectName$-Exe' )
   {
     .Libraries + '$ProjectName$-Lib'
                + 'Core-Lib'
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
     .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
+  }
+
+  Alias( '$ProjectName$' )
+  {
+    .Targets =
+    {
+      '$ProjectName$-Exe'
+      'Shaders' // Just require all shaders for now.
+    }
   }
 
   Alias( '$ProjectName$-x64-Debug' )   { .Targets = '$ProjectName$' }

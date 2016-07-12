@@ -1,0 +1,27 @@
+{
+  .ShaderFileNames =
+  {
+    'Simple.vert',
+    'Simple.frag',
+  }
+
+  .DataShaderTargets = {}
+
+  ForEach( .ShaderFileName in .ShaderFileNames )
+  {
+    Exec( 'Shader-$ShaderFileName$' )
+    {
+      .ExecExecutable = '$VulkanSDKPath$/Bin/glslangValidator.exe'
+      .ExecArguments = '-V "%1" -o "%2"'
+      .ExecInput = '$RepoRoot$\Data\Shader\$ShaderFileName$'
+      .ExecOutput = '$RepoRoot$\Build\Shader-$ShaderFileName$.spv'
+    }
+
+    ^DataShaderTargets + 'Shader-$ShaderFileName$'
+  }
+
+  Alias( 'Shaders' )
+  {
+    .Targets = .DataShaderTargets
+  }
+}
