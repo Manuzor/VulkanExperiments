@@ -54,3 +54,20 @@ Deallocate(allocator_interface* Allocator, T* Object)
 {
   Allocator->Deallocate(Object);
 }
+
+/// An allocator wrapper that is intended to be used only for a short period
+/// of time in the scope it was created.
+///
+/// \note This struct is __implicitly__ convertible to an
+///       \c allocator_interface*, so it can be used as such
+///       without further ado.
+struct CORE_API temp_allocator
+{
+  temp_allocator();
+  temp_allocator(temp_allocator const&) = delete;
+  ~temp_allocator();
+
+  operator allocator_interface*();
+
+  void* Impl;
+};

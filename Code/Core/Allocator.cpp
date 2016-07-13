@@ -15,3 +15,22 @@ mallocator::Deallocate(void* Memory)
   ::free(Memory);
   return true;
 }
+
+
+static mallocator GlobalTempAllocator = {};
+
+temp_allocator::temp_allocator()
+{
+  this->Impl = &GlobalTempAllocator;
+}
+
+temp_allocator::~temp_allocator()
+{
+  this->Impl = nullptr;
+}
+
+temp_allocator::operator allocator_interface*()
+{
+  Assert(this->Impl);
+  return Reinterpret<allocator_interface*>(this->Impl);
+}
