@@ -12,8 +12,8 @@
 
   VCXProject( '$ProjectName$-Proj' )
   {
-    .Output = '$RepoRoot$/Build/$ProjectName$.exe'
-    .OutputDirectory = '$RepoRoot$/Build'
+    .Output = '$BuildPath$/$ProjectName$.exe'
+    .OutputDirectory = '$BuildPath$'
 
     .ProjectOutput = 'Workspace/VisualStudio/$ProjectName$.vcxproj'
     .ProjectInputPaths = { '$SourcePath$' }
@@ -38,11 +38,34 @@
     .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
   }
 
+  // Vulkan debug files
+  {
+    .Dest = '$BuildPath$/'
+    .MySourceBase = '$VulkanSDKPath$/Source/lib'
+
+    Copy( 'Copy-VulkanDebugDLL' )
+    {
+      .Source = { '$MySourceBase$/vulkan-1.dll', '$MySourceBase$/vulkan-1.pdb' }
+    }
+
+    CopyDir( 'Copy-VulkanDebugLayers' )
+    {
+      .SourcePaths = '$MySourceBase$/'
+      .SourcePathsPattern = { 'VkLayer_*' }
+    }
+
+    Alias( '$ProjectName$-CopyVulkanDebugFiles' )
+    {
+      .Targets = { 'Copy-VulkanDebugDLL', 'Copy-VulkanDebugLayers' }
+    }
+  }
+
   Alias( '$ProjectName$' )
   {
     .Targets =
     {
       '$ProjectName$-Exe'
+      '$ProjectName$-CopyVulkanDebugFiles'
       'Shaders' // Just require all shaders for now.
     }
   }
