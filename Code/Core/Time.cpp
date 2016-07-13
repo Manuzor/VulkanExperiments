@@ -3,20 +3,6 @@
 #include <Windows.h>
 
 auto
-::TimeAsSeconds(time Time)
-  -> double
-{
-  return Time.InternalData;
-}
-
-auto
-::TimeAsMilliseconds(time Time)
-  -> double
-{
-  return Time.InternalData * 1000.0;
-}
-
-auto
 ::StopwatchStart(stopwatch* Stopwatch)
   -> void
 {

@@ -2,6 +2,7 @@
 #include <Backbone.hpp>
 
 #include <Core/DynamicArray.hpp>
+#include <Core/Math.hpp>
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.h>
@@ -70,8 +71,6 @@ struct vertex_buffer
 
   uint32 BindID;
   uint32 NumVertices;
-  fixed_block<1, VkVertexInputBindingDescription> VertexInputBindingDescs;
-  fixed_block<2, VkVertexInputAttributeDescription> VertexInputAttributeDescs;
 };
 
 struct index_buffer
@@ -80,6 +79,21 @@ struct index_buffer
   VkDeviceMemory Memory;
 
   uint32 NumIndices;
+};
+
+struct vertex
+{
+  vec3 Position;
+  vec2 TexCoord;
+};
+
+struct scene_object
+{
+  bool IsCreated;
+
+  texture Texture;
+  vertex_buffer Vertices;
+  index_buffer Indices;
 };
 
 struct vulkan : public vulkan_instance_functions
@@ -126,11 +140,6 @@ struct vulkan : public vulkan_instance_functions
   //
   // Misc
   //
-  texture Texture;
-
-  vertex_buffer Vertices;
-  index_buffer Indices;
-
   VkPipelineLayout PipelineLayout;
   VkDescriptorSetLayout DescriptorSetLayout;
 
@@ -146,7 +155,10 @@ struct vulkan : public vulkan_instance_functions
   VkDeviceMemory GlobalUBO_MemoryHandle;
 
   float DepthStencilValue = 1.0f;
+
+  dynamic_array<scene_object> SceneObjects;
 };
+
 
 void
 Init(vulkan* Vulkan, allocator_interface* Allocator);
@@ -223,3 +235,15 @@ VulkanUploadImageToGpu(allocator_interface* TempAllocator,
                        VkCommandBuffer* CommandBuffer,
                        image const& Image,
                        gpu_image* GpuImage);
+
+scene_object*
+VulkanCreateSceneObject(vulkan* Vulkan);
+
+void
+VulkanDestroySceneObject(vulkan* Vulkan, scene_object* SceneObject);
+
+bool
+VulkanSetTextureFromFile(vulkan* Vulkan, char const* FileName, texture* Texture);
+
+void
+VulkanSetQuadGeometry(vulkan* Vulkan, vec2 const& Extents, vertex_buffer* Vertices, index_buffer* Indices);
