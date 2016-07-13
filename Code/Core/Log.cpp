@@ -223,6 +223,7 @@ auto
     auto Color = CurrentConsoleInfo.wAttributes;
     switch(Args.LogLevel)
     {
+      case log_level::Info:    Color = Color | FOREGROUND_INTENSITY; break;
       case log_level::Warning: Color = FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_GREEN; break;
       case log_level::Error:   Color = FOREGROUND_INTENSITY | FOREGROUND_RED; break;
     }
