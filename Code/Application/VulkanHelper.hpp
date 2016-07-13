@@ -181,7 +181,7 @@ VulkanStruct() -> decltype(impl_vulkan_struct<rm_ref<T>>::Do())
 void
 VulkanSetImageLayout(vulkan_device const& Device,
                      VkCommandPool CommandPool,
-                     VkCommandBuffer& CommandBuffer,
+                     VkCommandBuffer* CommandBuffer,
                      VkImage Image,
                      VkImageAspectFlags AspectMask,
                      VkImageLayout OldImageLayout,
@@ -196,13 +196,13 @@ VulkanDetermineMemoryTypeIndex(VkPhysicalDeviceMemoryProperties const& MemoryPro
 void
 VulkanEnsureSetupCommandIsReady(vulkan_device const& Device,
                                 VkCommandPool CommandPool,
-                                VkCommandBuffer& CommandBuffer);
+                                VkCommandBuffer* CommandBuffer);
 
 void
 VulkanFlushSetupCommand(vulkan_device const& Device,
                         VkQueue Queue,
                         VkCommandPool CommandPool,
-                        VkCommandBuffer& CommandBuffer);
+                        VkCommandBuffer* CommandBuffer);
 
 void
 VulkanVerify(VkResult Result);
@@ -220,6 +220,6 @@ bool
 VulkanUploadImageToGpu(allocator_interface* TempAllocator,
                        vulkan_device const& Device,
                        VkCommandPool CommandPool,
-                       VkCommandBuffer CommandBuffer,
+                       VkCommandBuffer* CommandBuffer,
                        image const& Image,
                        gpu_image* GpuImage);

@@ -839,11 +839,11 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       // Render loop will expect image to have been used before and in
       // VK_IMAGE_LAYOUT_PRESENT_SRC_KHR layout and will change to
       // COLOR_ATTACHMENT_OPTIMAL, so init the image to that state.
-      VulkanSetImageLayout(Vulkan->Device, Vulkan->CommandPool, Vulkan->SetupCommand, Vulkan->SwapchainBuffers[Index].Image,
-                           Cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_COLOR_BIT),
-                           Cast<VkImageLayout>(VK_IMAGE_LAYOUT_UNDEFINED),
-                           Cast<VkImageLayout>(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR),
-                           Cast<VkAccessFlags>(0));
+      VulkanSetImageLayout(Vulkan->Device, Vulkan->CommandPool, &Vulkan->SetupCommand, Vulkan->SwapchainBuffers[Index].Image,
+                           VkImageAspectFlags(VK_IMAGE_ASPECT_COLOR_BIT),
+                           VkImageLayout(VK_IMAGE_LAYOUT_UNDEFINED),
+                           VkImageLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR),
+                           VkAccessFlags(0));
 
       ColorAttachmentCreateInfo.image = Vulkan->SwapchainBuffers[Index].Image;
 
@@ -895,11 +895,11 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     // Bind memory.
     VulkanVerify(Vulkan->Device.vkBindImageMemory(Vulkan->Device.DeviceHandle, Vulkan->Depth.Image, Vulkan->Depth.Memory, 0));
 
-    VulkanSetImageLayout(Vulkan->Device, Vulkan->CommandPool, Vulkan->SetupCommand, Vulkan->Depth.Image,
-                         Cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_DEPTH_BIT),
-                         Cast<VkImageLayout>(VK_IMAGE_LAYOUT_UNDEFINED),
-                         Cast<VkImageLayout>(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL),
-                         Cast<VkAccessFlags>(0));
+    VulkanSetImageLayout(Vulkan->Device, Vulkan->CommandPool, &Vulkan->SetupCommand, Vulkan->Depth.Image,
+                         VkImageAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT),
+                         VkImageLayout(VK_IMAGE_LAYOUT_UNDEFINED),
+                         VkImageLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL),
+                         VkAccessFlags(0));
 
     // Create image view.
     auto ImageViewCreateInfo = VulkanStruct<VkImageViewCreateInfo>();
@@ -944,7 +944,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     Assert(VulkanIsImageCompatibleWithGpu(*Vulkan->Device.Gpu, TheImage));
 
     if(VulkanUploadImageToGpu(TempAllocator,
-                              Vulkan->Device, Vulkan->CommandPool, Vulkan->SetupCommand,
+                              Vulkan->Device, Vulkan->CommandPool, &Vulkan->SetupCommand,
                               TheImage, &Vulkan->Texture.GpuImage))
     {
       LogInfo("Image data has been uploaded to the GPU.");
@@ -1826,7 +1826,7 @@ VulkanDraw(vulkan* Vulkan, allocator_interface* TempAllocator)
   // Assume the command buffer has been run on current_buffer before so
   // we need to set the image layout back to COLOR_ATTACHMENT_OPTIMAL
   {
-    VulkanEnsureSetupCommandIsReady(Vulkan->Device, Vulkan->CommandPool, Vulkan->SetupCommand);
+    VulkanEnsureSetupCommandIsReady(Vulkan->Device, Vulkan->CommandPool, &Vulkan->SetupCommand);
 
     auto ImageMemoryBarrier = VulkanStruct<VkImageMemoryBarrier>();
     {
@@ -1849,7 +1849,7 @@ VulkanDraw(vulkan* Vulkan, allocator_interface* TempAllocator)
                                         1, &ImageMemoryBarrier);         // imageMemoryBarrierCount, pImageMemoryBarriers
   }
 
-  VulkanFlushSetupCommand(Vulkan->Device, Vulkan->Queue, Vulkan->CommandPool, Vulkan->SetupCommand);
+  VulkanFlushSetupCommand(Vulkan->Device, Vulkan->Queue, Vulkan->CommandPool, &Vulkan->SetupCommand);
 
   // Wait for the present complete semaphore to be signaled to ensure
   // that the image won't be rendered to until the presentation

@@ -639,7 +639,7 @@ auto
 }
 
 auto
-::VulkanSetImageLayout(vulkan_device const& Device, VkCommandPool CommandPool, VkCommandBuffer& CommandBuffer,
+::VulkanSetImageLayout(vulkan_device const& Device, VkCommandPool CommandPool, VkCommandBuffer* CommandBuffer,
                        VkImage Image,
                        VkImageAspectFlags AspectMask,
                        VkImageLayout OldImageLayout,
@@ -683,7 +683,7 @@ auto
   VkPipelineStageFlags SourceStages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
   VkPipelineStageFlags DestinationStages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
-  Device.vkCmdPipelineBarrier(CommandBuffer,                   // commandBuffer
+  Device.vkCmdPipelineBarrier(*CommandBuffer,                  // commandBuffer
                               SourceStages, DestinationStages, // dstStageMask, srcStageMask
                               0,                               // dependencyFlags
                               0, nullptr,                      // memoryBarrierCount, pMemoryBarriers
@@ -719,10 +719,10 @@ auto
 
 /// Create and begin setup command buffer.
 auto
-::VulkanEnsureSetupCommandIsReady(vulkan_device const& Device, VkCommandPool CommandPool, VkCommandBuffer& CommandBuffer)
+::VulkanEnsureSetupCommandIsReady(vulkan_device const& Device, VkCommandPool CommandPool, VkCommandBuffer* CommandBuffer)
   -> void
 {
-  if(CommandBuffer)
+  if(*CommandBuffer != VK_NULL_HANDLE)
     return;
 
   auto SetupCommandBufferAllocateInfo = VulkanStruct<VkCommandBufferAllocateInfo>();
@@ -732,36 +732,36 @@ auto
     SetupCommandBufferAllocateInfo.commandBufferCount = 1;
   }
 
-  VulkanVerify(Device.vkAllocateCommandBuffers(Device.DeviceHandle, &SetupCommandBufferAllocateInfo, &CommandBuffer));
+  VulkanVerify(Device.vkAllocateCommandBuffers(Device.DeviceHandle, &SetupCommandBufferAllocateInfo, CommandBuffer));
 
   auto InheritanceInfo = VulkanStruct<VkCommandBufferInheritanceInfo>();
   auto BeginInfo = VulkanStruct<VkCommandBufferBeginInfo>();
   BeginInfo.pInheritanceInfo = &InheritanceInfo;
 
-  VulkanVerify(Device.vkBeginCommandBuffer(CommandBuffer, &BeginInfo));
+  VulkanVerify(Device.vkBeginCommandBuffer(*CommandBuffer, &BeginInfo));
 }
 
 auto
-::VulkanFlushSetupCommand(vulkan_device const& Device, VkQueue Queue, VkCommandPool CommandPool, VkCommandBuffer& CommandBuffer)
+::VulkanFlushSetupCommand(vulkan_device const& Device, VkQueue Queue, VkCommandPool CommandPool, VkCommandBuffer* CommandBuffer)
   -> void
 {
-  if(CommandBuffer == VK_NULL_HANDLE)
+  if(*CommandBuffer == VK_NULL_HANDLE)
     return;
 
-  VulkanVerify(Device.vkEndCommandBuffer(CommandBuffer));
+  VulkanVerify(Device.vkEndCommandBuffer(*CommandBuffer));
 
   auto SubmitInfo = VulkanStruct<VkSubmitInfo>();
   {
     SubmitInfo.commandBufferCount = 1;
-    SubmitInfo.pCommandBuffers = &CommandBuffer;
+    SubmitInfo.pCommandBuffers = CommandBuffer;
   }
   VkFence NullFence = {};
   VulkanVerify(Device.vkQueueSubmit(Queue, 1, &SubmitInfo, NullFence));
 
   VulkanVerify(Device.vkQueueWaitIdle(Queue));
 
-  Device.vkFreeCommandBuffers(Device.DeviceHandle, CommandPool, 1, &CommandBuffer);
-  CommandBuffer = VK_NULL_HANDLE;
+  Device.vkFreeCommandBuffers(Device.DeviceHandle, CommandPool, 1, CommandBuffer);
+  *CommandBuffer = VK_NULL_HANDLE;
 }
 
 auto
@@ -951,7 +951,7 @@ auto
 ::VulkanUploadImageToGpu(allocator_interface* TempAllocator,
                          vulkan_device const& Device,
                          VkCommandPool CommandPool,
-                         VkCommandBuffer CommandBuffer,
+                         VkCommandBuffer* CommandBuffer,
                          image const& Image,
                          gpu_image* GpuImage)
   -> bool
@@ -1078,10 +1078,10 @@ auto
     // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL.
     VulkanSetImageLayout(Device, CommandPool, CommandBuffer,
                          GpuImage->ImageHandle,
-                         VK_IMAGE_ASPECT_COLOR_BIT,
-                         VK_IMAGE_LAYOUT_UNDEFINED,
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                         0);
+                         VkImageAspectFlags(VK_IMAGE_ASPECT_COLOR_BIT),
+                         VkImageLayout(VK_IMAGE_LAYOUT_UNDEFINED),
+                         VkImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+                         VkAccessFlags(0));
 
   //
   // Copy the buffered data over to the image memory.
@@ -1099,7 +1099,7 @@ auto
       Region->imageSubresource.baseArrayLayer = 0;
       Region->imageSubresource.layerCount = 1; // TODO(Manu): Should be more than 1.
     }
-    Device.vkCmdCopyBufferToImage(CommandBuffer,
+    Device.vkCmdCopyBufferToImage(*CommandBuffer,
                                   Temp_Buffer,
                                   GpuImage->ImageHandle,
                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -1111,10 +1111,10 @@ auto
   //
     VulkanSetImageLayout(Device, CommandPool, CommandBuffer,
                          GpuImage->ImageHandle,
-                         VK_IMAGE_ASPECT_COLOR_BIT,
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                         0);
+                         VkImageAspectFlags(VK_IMAGE_ASPECT_COLOR_BIT),
+                         VkImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+                         VkImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+                         VkAccessFlags(0));
 
   // TODO(Manu): Synchronization?
 
