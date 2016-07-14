@@ -446,6 +446,33 @@ UNormToFloat(UNormType Value)
   return Clamp(Cast<float>(Value) / IntMaxValue<UNormType>(), 0.0f, 1.0f);
 }
 
+/// \see InitStruct
+template<typename T>
+struct impl_init_struct
+{
+  // Return an initialized instance of T.
+  template<typename... ArgTypes>
+  static constexpr T
+  Create(ArgTypes&&... Args) { return { Forward<ArgTypes>(Args)... }; }
+};
+
+/// Utility function to initialize a struct of the given type with a chance
+/// for centralized specialization.
+///
+/// To control the default or non-default construction behavior of a certain
+/// struct the template \c impl_init_struct can be specialized and a Create()
+/// function must be provided.
+///
+/// \see impl_init_struct
+template<typename T, typename... ArgTypes>
+inline auto
+InitStruct(ArgTypes&&... Args)
+  -> decltype(impl_init_struct<rm_ref<T>>::Create(Forward<ArgTypes>(Args)...))
+{
+  // Note: specializations for impl_init_struct are found in VulkanHelper.inl
+  return impl_init_struct<rm_ref<T>>::Create(Forward<ArgTypes>(Args)...);
+}
+
 struct impl_defer
 {
   template<typename LambdaType>

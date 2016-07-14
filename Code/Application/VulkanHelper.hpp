@@ -182,14 +182,6 @@ VulkanEnumName(VkFormat Format);
 char const*
 VulkanEnumName(VkColorSpaceKHR ColorSpace);
 
-template<typename T>
-constexpr auto
-VulkanStruct() -> decltype(impl_vulkan_struct<rm_ref<T>>::Do())
-{
-  // Note: impl_vulkan_struct is found in VulkanHelper.inl
-  return impl_vulkan_struct<rm_ref<T>>::Do();
-}
-
 void
 VulkanSetImageLayout(vulkan_device const& Device,
                      VkCommandPool CommandPool,

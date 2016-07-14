@@ -464,7 +464,7 @@ VulkanInitializeForGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND Window
     LogBeginScope("Creating Win32 Surface.");
     Defer [](){ LogEndScope("Created Win32 Surface."); };
 
-    auto CreateInfo = VulkanStruct<VkWin32SurfaceCreateInfoKHR>();
+    auto CreateInfo = InitStruct<VkWin32SurfaceCreateInfoKHR>();
     {
       CreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
       CreateInfo.hinstance = ProcessHandle;
@@ -585,21 +585,21 @@ VulkanInitializeForGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND Window
     fixed_block<1, float> QueuePriorities = {};
     QueuePriorities[0] = 0.0f;
 
-    auto QueueCreateInfo = VulkanStruct<VkDeviceQueueCreateInfo>();
+    auto QueueCreateInfo = InitStruct<VkDeviceQueueCreateInfo>();
     {
       QueueCreateInfo.queueFamilyIndex = Vulkan->QueueNodeIndex;
       QueueCreateInfo.queueCount = Cast<uint32>(QueuePriorities.Num);
       QueueCreateInfo.pQueuePriorities = &QueuePriorities[0];
     }
 
-    auto EnabledFeatures = VulkanStruct<VkPhysicalDeviceFeatures>();
+    auto EnabledFeatures = InitStruct<VkPhysicalDeviceFeatures>();
     {
       EnabledFeatures.shaderClipDistance = VK_TRUE;
       EnabledFeatures.shaderCullDistance = VK_TRUE;
       EnabledFeatures.textureCompressionBC = VK_TRUE;
     }
 
-    auto DeviceCreateInfo = VulkanStruct<VkDeviceCreateInfo>();
+    auto DeviceCreateInfo = InitStruct<VkDeviceCreateInfo>();
     {
       DeviceCreateInfo.queueCreateInfoCount = 1;
       DeviceCreateInfo.pQueueCreateInfos = &QueueCreateInfo;
@@ -666,7 +666,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     LogBeginScope("Creating command pool.");
     Defer [](){ LogEndScope("Finished creating command pool."); };
 
-    auto CreateInfo = VulkanStruct<VkCommandPoolCreateInfo>();
+    auto CreateInfo = InitStruct<VkCommandPoolCreateInfo>();
     {
       CreateInfo.queueFamilyIndex = Vulkan->QueueNodeIndex;
       CreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -683,7 +683,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     LogBeginScope("Creating command buffer.");
     Defer [](){ LogEndScope("Finished creating command buffer."); };
 
-    auto AllocateInfo = VulkanStruct<VkCommandBufferAllocateInfo>();
+    auto AllocateInfo = InitStruct<VkCommandBufferAllocateInfo>();
     {
       AllocateInfo.commandPool = Vulkan->CommandPool;
       AllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -714,7 +714,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
 
     VulkanVerify(Vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(Vulkan->Gpu.GpuHandle, Vulkan->Surface, &PresentModeCount, PresentModes.Ptr));
 
-    auto SwapchainExtent = VulkanStruct<VkExtent2D>();
+    auto SwapchainExtent = InitStruct<VkExtent2D>();
 
     if(SurfaceCapabilities.currentExtent.width == IntMaxValue<uint32>())
     {
@@ -774,7 +774,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       PreTransform = SurfaceCapabilities.currentTransform;
     }
 
-    auto SwapchainCreateInfo = VulkanStruct<VkSwapchainCreateInfoKHR>();
+    auto SwapchainCreateInfo = InitStruct<VkSwapchainCreateInfoKHR>();
     {
       SwapchainCreateInfo.surface = Vulkan->Surface;
       SwapchainCreateInfo.minImageCount = DesiredNumberOfSwapchainImages;
@@ -815,7 +815,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
 
     for(uint32 Index = 0; Index < Vulkan->SwapchainImageCount; ++Index)
     {
-      auto ColorAttachmentCreateInfo = VulkanStruct<VkImageViewCreateInfo>();
+      auto ColorAttachmentCreateInfo = InitStruct<VkImageViewCreateInfo>();
       {
         ColorAttachmentCreateInfo.format = Vulkan->Format;
 
@@ -860,7 +860,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     Defer [](){ LogEndScope("Finished preparing depth."); };
 
     Vulkan->Depth.Format = VK_FORMAT_D16_UNORM;
-    auto ImageCreateInfo = VulkanStruct<VkImageCreateInfo>();
+    auto ImageCreateInfo = InitStruct<VkImageCreateInfo>();
     {
       ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
       ImageCreateInfo.format = Vulkan->Depth.Format;
@@ -880,7 +880,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     Vulkan->Device.vkGetImageMemoryRequirements(Vulkan->Device.DeviceHandle, Vulkan->Depth.Image, &MemoryRequirements);
 
     // Select memory size and type.
-    auto MemoryAllocateInfo = VulkanStruct<VkMemoryAllocateInfo>();
+    auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
       MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
       MemoryAllocateInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Gpu.MemoryProperties,
@@ -902,7 +902,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
                          VkAccessFlags(0));
 
     // Create image view.
-    auto ImageViewCreateInfo = VulkanStruct<VkImageViewCreateInfo>();
+    auto ImageViewCreateInfo = InitStruct<VkImageViewCreateInfo>();
     {
       ImageViewCreateInfo.image = Vulkan->Depth.Image;
       ImageViewCreateInfo.format = Vulkan->Depth.Format;
@@ -937,7 +937,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       Layout.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
     }
 
-    auto DescriptorSetLayoutCreateInfo = VulkanStruct<VkDescriptorSetLayoutCreateInfo>();
+    auto DescriptorSetLayoutCreateInfo = InitStruct<VkDescriptorSetLayoutCreateInfo>();
     {
       DescriptorSetLayoutCreateInfo.bindingCount = Cast<uint32>(LayoutBindings.Num);
       DescriptorSetLayoutCreateInfo.pBindings = LayoutBindings.Ptr;
@@ -945,7 +945,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
 
     VulkanVerify(Vulkan->Device.vkCreateDescriptorSetLayout(Vulkan->Device.DeviceHandle, &DescriptorSetLayoutCreateInfo, nullptr, &Vulkan->DescriptorSetLayout));
 
-    auto PipelineLayoutCreateInfo = VulkanStruct<VkPipelineLayoutCreateInfo>();
+    auto PipelineLayoutCreateInfo = InitStruct<VkPipelineLayoutCreateInfo>();
     {
       PipelineLayoutCreateInfo.setLayoutCount = 1;
       PipelineLayoutCreateInfo.pSetLayouts = &Vulkan->DescriptorSetLayout;
@@ -964,7 +964,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     auto Attachments = Slice(AttachmentsBlock);
     {
       auto& Attachment = Attachments[0];
-      Attachment = VulkanStruct<decltype(Attachment)>();
+      Attachment = InitStruct<decltype(Attachment)>();
 
       Attachment.format = Vulkan->Format;
       Attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -978,7 +978,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
 
     {
       auto& Attachment = Attachments[1];
-      Attachment = VulkanStruct<decltype(Attachment)>();
+      Attachment = InitStruct<decltype(Attachment)>();
 
       Attachment.format = Vulkan->Depth.Format;
       Attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -990,19 +990,19 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       Attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
 
-    auto ColorReference = VulkanStruct<VkAttachmentReference>();
+    auto ColorReference = InitStruct<VkAttachmentReference>();
     {
       ColorReference.attachment = 0;
       ColorReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
 
-    auto DepthReference = VulkanStruct<VkAttachmentReference>();
+    auto DepthReference = InitStruct<VkAttachmentReference>();
     {
       DepthReference.attachment = 1;
       DepthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
 
-    auto SubpassDesc = VulkanStruct<VkSubpassDescription>();
+    auto SubpassDesc = InitStruct<VkSubpassDescription>();
     {
       SubpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
       SubpassDesc.colorAttachmentCount = 1;
@@ -1010,7 +1010,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       SubpassDesc.pDepthStencilAttachment = &DepthReference;
     }
 
-    auto RenderPassCreateInfo = VulkanStruct<VkRenderPassCreateInfo>();
+    auto RenderPassCreateInfo = InitStruct<VkRenderPassCreateInfo>();
     {
       RenderPassCreateInfo.attachmentCount = Cast<uint32>(Attachments.Num);
       RenderPassCreateInfo.pAttachments = Attachments.Ptr;
@@ -1033,7 +1033,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     auto Stages = Slice(StagesBlock);
     for(auto& Stage : Stages)
     {
-      Stage = VulkanStruct<decltype(Stage)>();
+      Stage = InitStruct<decltype(Stage)>();
     }
 
     //
@@ -1052,7 +1052,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       scoped_array<uint8> ShaderCode{ TempAllocator };
       ReadFileContentIntoArray(&ShaderCode, FileName);
 
-      auto ShaderModuleCreateInfo = VulkanStruct<VkShaderModuleCreateInfo>();
+      auto ShaderModuleCreateInfo = InitStruct<VkShaderModuleCreateInfo>();
       ShaderModuleCreateInfo.codeSize = Cast<uint32>(ShaderCode.Num); // In bytes, regardless of the fact that typeof(*pCode) == uint.
       ShaderModuleCreateInfo.pCode = Reinterpret<uint32*>(ShaderCode.Ptr); // Is a const(uint)*, for some reason...
 
@@ -1077,7 +1077,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       scoped_array<uint8> ShaderCode{ TempAllocator };
       ReadFileContentIntoArray(&ShaderCode, FileName);
 
-      auto ShaderModuleCreateInfo = VulkanStruct<VkShaderModuleCreateInfo>();
+      auto ShaderModuleCreateInfo = InitStruct<VkShaderModuleCreateInfo>();
       ShaderModuleCreateInfo.codeSize = Cast<uint32>(ShaderCode.Num); // In bytes, regardless of the fact that typeof(*pCode) == uint.
       ShaderModuleCreateInfo.pCode = Reinterpret<uint32*>(ShaderCode.Ptr); // Is a const(uint)*, for some reason...
 
@@ -1111,7 +1111,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       Desc.offset = Cast<uint32>(SizeOf<decltype(vertex::Position)>());
     }
 
-    auto VertexInputState = VulkanStruct<VkPipelineVertexInputStateCreateInfo>();
+    auto VertexInputState = InitStruct<VkPipelineVertexInputStateCreateInfo>();
     {
       VertexInputState.vertexBindingDescriptionCount = Cast<uint32>(VertexInputBindingDescs.Num);
       VertexInputState.pVertexBindingDescriptions    = &VertexInputBindingDescs[0];
@@ -1119,18 +1119,18 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       VertexInputState.pVertexAttributeDescriptions    = &VertexInputAttributeDescs[0];
     }
 
-    auto InputAssemblyState = VulkanStruct<VkPipelineInputAssemblyStateCreateInfo>();
+    auto InputAssemblyState = InitStruct<VkPipelineInputAssemblyStateCreateInfo>();
     {
       InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     }
 
-    auto ViewportState = VulkanStruct<VkPipelineViewportStateCreateInfo>();
+    auto ViewportState = InitStruct<VkPipelineViewportStateCreateInfo>();
     {
       ViewportState.viewportCount = 1;
       ViewportState.scissorCount = 1;
     }
 
-    auto RasterizationState = VulkanStruct<VkPipelineRasterizationStateCreateInfo>();
+    auto RasterizationState = InitStruct<VkPipelineRasterizationStateCreateInfo>();
     {
       RasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
       RasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
@@ -1141,12 +1141,12 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       RasterizationState.lineWidth = 1.0f;
     }
 
-    auto MultisampleState = VulkanStruct<VkPipelineMultisampleStateCreateInfo>();
+    auto MultisampleState = InitStruct<VkPipelineMultisampleStateCreateInfo>();
     {
       MultisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     }
 
-    auto DepthStencilState = VulkanStruct<VkPipelineDepthStencilStateCreateInfo>();
+    auto DepthStencilState = InitStruct<VkPipelineDepthStencilStateCreateInfo>();
     {
       DepthStencilState.depthTestEnable = VK_TRUE;
       DepthStencilState.depthWriteEnable = VK_TRUE;
@@ -1163,27 +1163,27 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     auto ColorBlendStateAttachments = Slice(ColorBlendStateAttachmentsBlock);
     {
       auto& Attachment = ColorBlendStateAttachments[0];
-      Attachment = VulkanStruct<decltype(Attachment)>();
+      Attachment = InitStruct<decltype(Attachment)>();
 
       Attachment.colorWriteMask = 0xf;
       Attachment.blendEnable = VK_FALSE;
     }
 
-    auto ColorBlendState = VulkanStruct<VkPipelineColorBlendStateCreateInfo>();
+    auto ColorBlendState = InitStruct<VkPipelineColorBlendStateCreateInfo>();
     {
       ColorBlendState.attachmentCount = Cast<uint32>(ColorBlendStateAttachments.Num);
       ColorBlendState.pAttachments = ColorBlendStateAttachments.Ptr;
     }
 
     fixed_block<VK_DYNAMIC_STATE_RANGE_SIZE, VkDynamicState> DynamicStates;
-    auto DynamicState = VulkanStruct<VkPipelineDynamicStateCreateInfo>();
+    auto DynamicState = InitStruct<VkPipelineDynamicStateCreateInfo>();
     {
       DynamicStates[DynamicState.dynamicStateCount++] = VK_DYNAMIC_STATE_VIEWPORT;
       DynamicStates[DynamicState.dynamicStateCount++] = VK_DYNAMIC_STATE_SCISSOR;
       DynamicState.pDynamicStates = &DynamicStates[0];
     }
 
-    auto GraphicsPipelineCreateInfo = VulkanStruct<VkGraphicsPipelineCreateInfo>();
+    auto GraphicsPipelineCreateInfo = InitStruct<VkGraphicsPipelineCreateInfo>();
     {
       GraphicsPipelineCreateInfo.stageCount = Cast<uint32>(Stages.Num);
       GraphicsPipelineCreateInfo.pStages = Stages.Ptr;
@@ -1199,7 +1199,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       GraphicsPipelineCreateInfo.renderPass = Vulkan->RenderPass;
     }
 
-    auto PipelineCacheCreateInfo = VulkanStruct<VkPipelineCacheCreateInfo>();
+    auto PipelineCacheCreateInfo = InitStruct<VkPipelineCacheCreateInfo>();
     VkPipelineCache PipelineCache;
     VulkanVerify(Vulkan->Device.vkCreatePipelineCache(Vulkan->Device.DeviceHandle,
                                                       &PipelineCacheCreateInfo,
@@ -1235,7 +1235,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       Size.descriptorCount = 1;
     }
 
-    auto DescriptorPoolCreateInfo = VulkanStruct<VkDescriptorPoolCreateInfo>();
+    auto DescriptorPoolCreateInfo = InitStruct<VkDescriptorPoolCreateInfo>();
     {
       DescriptorPoolCreateInfo.maxSets = 1;
       DescriptorPoolCreateInfo.poolSizeCount = Cast<uint32>(PoolSizes.Num);
@@ -1255,7 +1255,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     LogBeginScope("Preparing descriptor set.");
     Defer [](){ LogEndScope("Finished preparing descriptor set."); };
 
-    auto DescriptorSetAllocateInfo = VulkanStruct<VkDescriptorSetAllocateInfo>();
+    auto DescriptorSetAllocateInfo = InitStruct<VkDescriptorSetAllocateInfo>();
     {
       DescriptorSetAllocateInfo.descriptorPool = Vulkan->DescriptorPool;
       DescriptorSetAllocateInfo.descriptorSetCount = 1;
@@ -1269,7 +1269,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     // GlobalUBO
     //
     {
-      auto BufferCreateInfo = VulkanStruct<VkBufferCreateInfo>();
+      auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
       {
         BufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
         BufferCreateInfo.size = SizeOf<mat4x4>();
@@ -1282,7 +1282,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
       Vulkan->Device.vkGetBufferMemoryRequirements(Vulkan->Device.DeviceHandle, Vulkan->GlobalUBO_BufferHandle,
                                                    &Temp_MemoryRequirements);
 
-      auto Temp_MemoryAllocationInfo = VulkanStruct<VkMemoryAllocateInfo>();
+      auto Temp_MemoryAllocationInfo = InitStruct<VkMemoryAllocateInfo>();
       {
         Temp_MemoryAllocationInfo.allocationSize = Temp_MemoryRequirements.size;
         Temp_MemoryAllocationInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Device.Gpu->MemoryProperties,
@@ -1299,14 +1299,14 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     //
     // Associate the buffer with the descriptor set.
     //
-    auto DescriptorBufferInfo = VulkanStruct<VkDescriptorBufferInfo>();
+    auto DescriptorBufferInfo = InitStruct<VkDescriptorBufferInfo>();
     {
       DescriptorBufferInfo.buffer = Vulkan->GlobalUBO_BufferHandle;
       DescriptorBufferInfo.offset = 0;
       DescriptorBufferInfo.range = VK_WHOLE_SIZE;
     }
 
-    auto GlobalUBOUpdateInfo = VulkanStruct<VkWriteDescriptorSet>();
+    auto GlobalUBOUpdateInfo = InitStruct<VkWriteDescriptorSet>();
     {
       GlobalUBOUpdateInfo.dstSet = Vulkan->DescriptorSet;
       GlobalUBOUpdateInfo.dstBinding = 0;
@@ -1330,7 +1330,7 @@ VulkanPrepareSwapchain(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, alloca
     fixed_block<2, VkImageView> Attachments = {};
     Attachments[1] = Vulkan->Depth.View;
 
-    auto FramebufferCreateInfo = VulkanStruct<VkFramebufferCreateInfo>();
+    auto FramebufferCreateInfo = InitStruct<VkFramebufferCreateInfo>();
     {
       FramebufferCreateInfo.renderPass = Vulkan->RenderPass;
       FramebufferCreateInfo.attachmentCount = Cast<uint32>(Attachments.Num);
@@ -1459,7 +1459,7 @@ VulkanRenderPass(vulkan* Vulkan)
       ClearValues[1].depthStencil.stencil = 0;
     }
 
-    auto RenderPassBeginInfo = VulkanStruct<VkRenderPassBeginInfo>();
+    auto RenderPassBeginInfo = InitStruct<VkRenderPassBeginInfo>();
     {
       RenderPassBeginInfo.renderPass = Vulkan->RenderPass;
       RenderPassBeginInfo.framebuffer = Vulkan->Framebuffers[Vulkan->CurrentBufferIndex];
@@ -1482,7 +1482,7 @@ VulkanRenderPass(vulkan* Vulkan)
 
   // Set Viewport
   {
-    auto Viewport = VulkanStruct<VkViewport>();
+    auto Viewport = InitStruct<VkViewport>();
     {
       Viewport.height = Cast<float>(Vulkan->Height);
       Viewport.width = Cast<float>(Vulkan->Width);
@@ -1494,7 +1494,7 @@ VulkanRenderPass(vulkan* Vulkan)
 
   // Set Scissor
   {
-    auto Scissor = VulkanStruct<VkRect2D>();
+    auto Scissor = InitStruct<VkRect2D>();
     {
       Scissor.extent.width = Vulkan->Width;
       Scissor.extent.height = Vulkan->Height;
@@ -1508,7 +1508,7 @@ VulkanRenderPass(vulkan* Vulkan)
     // Bind vertex buffer
     //
     {
-      auto VertexBufferOffset = VulkanStruct<VkDeviceSize>();
+      auto VertexBufferOffset = InitStruct<VkDeviceSize>();
       Vulkan->Device.vkCmdBindVertexBuffers(Vulkan->DrawCommand, SceneObject.Vertices.BindID,
                                             1, &SceneObject.Vertices.Buffer, &VertexBufferOffset);
     }
@@ -1517,7 +1517,7 @@ VulkanRenderPass(vulkan* Vulkan)
     // Bind index buffer
     //
     {
-      auto IndexBufferOffset = VulkanStruct<VkDeviceSize>();
+      auto IndexBufferOffset = InitStruct<VkDeviceSize>();
       Vulkan->Device.vkCmdBindIndexBuffer(Vulkan->DrawCommand,
                                           SceneObject.Indices.Buffer,
                                           IndexBufferOffset,
@@ -1547,9 +1547,9 @@ VulkanDraw(vulkan* Vulkan, allocator_interface* TempAllocator)
   VkFence NullFence = {};
   VkResult Error = {};
 
-  auto PresentCompleteSemaphore = VulkanStruct<VkSemaphore>();
+  auto PresentCompleteSemaphore = InitStruct<VkSemaphore>();
   {
-    auto PresentCompleteSemaphoreCreateInfo = VulkanStruct<VkSemaphoreCreateInfo>();
+    auto PresentCompleteSemaphoreCreateInfo = InitStruct<VkSemaphoreCreateInfo>();
     VulkanVerify(Vulkan->Device.vkCreateSemaphore(Vulkan->Device.DeviceHandle, &PresentCompleteSemaphoreCreateInfo, nullptr, &PresentCompleteSemaphore));
   }
   Defer [=](){ Vulkan->Device.vkDestroySemaphore(Vulkan->Device.DeviceHandle, PresentCompleteSemaphore, nullptr); };
@@ -1586,14 +1586,12 @@ VulkanDraw(vulkan* Vulkan, allocator_interface* TempAllocator)
   {
     VulkanEnsureSetupCommandIsReady(Vulkan->Device, Vulkan->CommandPool, &Vulkan->SetupCommand);
 
-    auto ImageMemoryBarrier = VulkanStruct<VkImageMemoryBarrier>();
+    auto ImageMemoryBarrier = InitStruct<VkImageMemoryBarrier>();
     {
       ImageMemoryBarrier.srcAccessMask = 0;
       ImageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
       ImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
       ImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      ImageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      ImageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
       {
         auto& Range = ImageMemoryBarrier.subresourceRange;
         Range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1620,8 +1618,8 @@ VulkanDraw(vulkan* Vulkan, allocator_interface* TempAllocator)
 
 
   {
-    auto CommandBufferInheritanceInfo = VulkanStruct<VkCommandBufferInheritanceInfo>();
-    auto CommandBufferBeginInfo = VulkanStruct<VkCommandBufferBeginInfo>();
+    auto CommandBufferInheritanceInfo = InitStruct<VkCommandBufferInheritanceInfo>();
+    auto CommandBufferBeginInfo = InitStruct<VkCommandBufferBeginInfo>();
     CommandBufferBeginInfo.pInheritanceInfo = &CommandBufferInheritanceInfo;
     VulkanVerify(Vulkan->Device.vkBeginCommandBuffer(Vulkan->DrawCommand, &CommandBufferBeginInfo));
   }
@@ -1629,14 +1627,12 @@ VulkanDraw(vulkan* Vulkan, allocator_interface* TempAllocator)
   VulkanRenderPass(Vulkan);
 
   {
-    auto PrePresentBarrier = VulkanStruct<VkImageMemoryBarrier>();
+    auto PrePresentBarrier = InitStruct<VkImageMemoryBarrier>();
     {
       PrePresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
       PrePresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
       PrePresentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
       PrePresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-      PrePresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      PrePresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
       {
         auto& Range = PrePresentBarrier.subresourceRange;
         Range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1659,9 +1655,9 @@ VulkanDraw(vulkan* Vulkan, allocator_interface* TempAllocator)
 
   VulkanVerify(Vulkan->Device.vkEndCommandBuffer(Vulkan->DrawCommand));
 
-  auto DrawFence = VulkanStruct<VkFence>();
+  auto DrawFence = InitStruct<VkFence>();
   {
-    auto FenceInfo = VulkanStruct<VkFenceCreateInfo>();
+    auto FenceInfo = InitStruct<VkFenceCreateInfo>();
     VulkanVerify(Vulkan->Device.vkCreateFence(Vulkan->Device.DeviceHandle, &FenceInfo, nullptr, &DrawFence));
   }
   Defer [=](){ Vulkan->Device.vkDestroyFence(Vulkan->Device.DeviceHandle, DrawFence, nullptr); };
@@ -1669,7 +1665,7 @@ VulkanDraw(vulkan* Vulkan, allocator_interface* TempAllocator)
   // Submit the draw command to the queue.
   {
     VkPipelineStageFlags PipelineStageFlags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    auto SubmitInfo = VulkanStruct<VkSubmitInfo>();
+    auto SubmitInfo = InitStruct<VkSubmitInfo>();
     {
       SubmitInfo.waitSemaphoreCount = 1;
       SubmitInfo.pWaitSemaphores = &PresentCompleteSemaphore;
@@ -1707,7 +1703,7 @@ VulkanDraw(vulkan* Vulkan, allocator_interface* TempAllocator)
 
   // Present the results.
   {
-    auto Present = VulkanStruct<VkPresentInfoKHR>();
+    auto Present = InitStruct<VkPresentInfoKHR>();
     {
       Present.swapchainCount = 1;
       Present.pSwapchains = &Vulkan->Swapchain;
@@ -1954,14 +1950,14 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         //
         // Update the texture and sampler in use by the shader.
         //
-        auto TextureDescriptor = VulkanStruct<VkDescriptorImageInfo>();
+        auto TextureDescriptor = InitStruct<VkDescriptorImageInfo>();
         {
           TextureDescriptor.sampler = KittenQuad->Texture.SamplerHandle;
           TextureDescriptor.imageView = KittenQuad->Texture.ImageViewHandle;
           TextureDescriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
         }
 
-        auto TextureAndSamplerUpdateInfo = VulkanStruct<VkWriteDescriptorSet>();
+        auto TextureAndSamplerUpdateInfo = InitStruct<VkWriteDescriptorSet>();
         {
           TextureAndSamplerUpdateInfo.dstSet = Vulkan->DescriptorSet;
           TextureAndSamplerUpdateInfo.dstBinding = 1;

@@ -652,7 +652,7 @@ auto
 {
   VulkanEnsureSetupCommandIsReady(Device, CommandPool, CommandBuffer);
 
-  auto ImageMemoryBarrier = VulkanStruct<VkImageMemoryBarrier>();
+  auto ImageMemoryBarrier = InitStruct<VkImageMemoryBarrier>();
   {
     ImageMemoryBarrier.srcAccessMask = SourceAccessMask;
     ImageMemoryBarrier.oldLayout = OldImageLayout;
@@ -730,7 +730,7 @@ auto
   if(*CommandBuffer != VK_NULL_HANDLE)
     return;
 
-  auto SetupCommandBufferAllocateInfo = VulkanStruct<VkCommandBufferAllocateInfo>();
+  auto SetupCommandBufferAllocateInfo = InitStruct<VkCommandBufferAllocateInfo>();
   {
     SetupCommandBufferAllocateInfo.commandPool = CommandPool;
     SetupCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -739,8 +739,8 @@ auto
 
   VulkanVerify(Device.vkAllocateCommandBuffers(Device.DeviceHandle, &SetupCommandBufferAllocateInfo, CommandBuffer));
 
-  auto InheritanceInfo = VulkanStruct<VkCommandBufferInheritanceInfo>();
-  auto BeginInfo = VulkanStruct<VkCommandBufferBeginInfo>();
+  auto InheritanceInfo = InitStruct<VkCommandBufferInheritanceInfo>();
+  auto BeginInfo = InitStruct<VkCommandBufferBeginInfo>();
   BeginInfo.pInheritanceInfo = &InheritanceInfo;
 
   VulkanVerify(Device.vkBeginCommandBuffer(*CommandBuffer, &BeginInfo));
@@ -755,7 +755,7 @@ auto
 
   VulkanVerify(Device.vkEndCommandBuffer(*CommandBuffer));
 
-  auto SubmitInfo = VulkanStruct<VkSubmitInfo>();
+  auto SubmitInfo = InitStruct<VkSubmitInfo>();
   {
     SubmitInfo.commandBufferCount = 1;
     SubmitInfo.pCommandBuffers = CommandBuffer;
@@ -986,7 +986,7 @@ auto
   //
     auto ImageData = Slice(ImageDataSize(&Image), ImageDataPointer<void>(&Image));
 
-    auto Temp_BufferCreateInfo = VulkanStruct<VkBufferCreateInfo>();
+    auto Temp_BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
       Temp_BufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
       Temp_BufferCreateInfo.size = Cast<uint32>(ImageData.Num);
@@ -999,7 +999,7 @@ auto
     VkMemoryRequirements Temp_MemoryRequirements;
     Device.vkGetBufferMemoryRequirements(Device.DeviceHandle, Temp_Buffer, &Temp_MemoryRequirements);
 
-    auto Temp_MemoryAllocationInfo = VulkanStruct<VkMemoryAllocateInfo>();
+    auto Temp_MemoryAllocationInfo = InitStruct<VkMemoryAllocateInfo>();
     {
       Temp_MemoryAllocationInfo.allocationSize = Temp_MemoryRequirements.size;
       Temp_MemoryAllocationInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Device.Gpu->MemoryProperties,
@@ -1038,7 +1038,7 @@ auto
   //
     // Now that we have the buffer in place, holding the texture data, we copy
     // it over to an image.
-    auto Image_CreateInfo = VulkanStruct<VkImageCreateInfo>();
+    auto Image_CreateInfo = InitStruct<VkImageCreateInfo>();
     {
       Image_CreateInfo.imageType = VK_IMAGE_TYPE_2D;
       Image_CreateInfo.format = GpuImage->ImageFormat;
@@ -1059,7 +1059,7 @@ auto
 
     LogInfo("Requiring %d bytes on the GPU for the given image data.", Image_MemoryRequirements.size);
 
-    auto Image_MemoryAllocateInfo = VulkanStruct<VkMemoryAllocateInfo>();
+    auto Image_MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
       Image_MemoryAllocateInfo.allocationSize = Image_MemoryRequirements.size;
       Image_MemoryAllocateInfo.memoryTypeIndex =  VulkanDetermineMemoryTypeIndex(Device.Gpu->MemoryProperties,
@@ -1221,7 +1221,7 @@ auto
 
   // Create sampler.
   {
-    auto SamplerCreateInfo = VulkanStruct<VkSamplerCreateInfo>();
+    auto SamplerCreateInfo = InitStruct<VkSamplerCreateInfo>();
     {
       SamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
       SamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
@@ -1240,7 +1240,7 @@ auto
 
   // Create image view.
   {
-    auto ImageViewCreateInfo = VulkanStruct<VkImageViewCreateInfo>();
+    auto ImageViewCreateInfo = InitStruct<VkImageViewCreateInfo>();
     {
       ImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
       ImageViewCreateInfo.format = Texture->GpuImage.ImageFormat;
@@ -1284,7 +1284,7 @@ auto
 
   // Vertex Buffer Setup
   {
-    auto BufferCreateInfo = VulkanStruct<VkBufferCreateInfo>();
+    auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
       BufferCreateInfo.size = SliceByteSize(GeometryData);
       BufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -1294,7 +1294,7 @@ auto
     VkMemoryRequirements MemoryRequirements;
     Vulkan->Device.vkGetBufferMemoryRequirements(Vulkan->Device.DeviceHandle, Vertices->Buffer, &MemoryRequirements);
 
-    auto MemoryAllocateInfo = VulkanStruct<VkMemoryAllocateInfo>();
+    auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
       MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
       MemoryAllocateInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Gpu.MemoryProperties,
@@ -1322,7 +1322,7 @@ auto
 
   // Index Buffer Setup
   {
-    auto BufferCreateInfo = VulkanStruct<VkBufferCreateInfo>();
+    auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
       BufferCreateInfo.size = SliceByteSize(IndexData);
       BufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
@@ -1332,7 +1332,7 @@ auto
     VkMemoryRequirements MemoryRequirements;
     Vulkan->Device.vkGetBufferMemoryRequirements(Vulkan->Device.DeviceHandle, Indices->Buffer, &MemoryRequirements);
 
-    auto MemoryAllocateInfo = VulkanStruct<VkMemoryAllocateInfo>();
+    auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
       MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
       MemoryAllocateInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Gpu.MemoryProperties,
