@@ -69,6 +69,47 @@ using bool32 = int32;
 /// Generic unsigned integer if you don't care much about the actual size.
 using uint = unsigned int;
 
+
+/// Defines some array variants of types for better readability when used as
+/// function parameters.
+///
+/// For example, a function `Foo` that accepts and array of 4 floats by
+/// reference-to-const looks like this:
+/// \code
+/// void Foo(float const (&ParamName)[4]);
+/// \endcode
+///
+/// Using these typedefs, this can be transformed into:
+/// \code
+/// void Foo(float_4 const& ParamName);
+/// \endcode
+#define DefineArrayTypes(TheType)\
+  using TheType##_2   = TheType[2];\
+  using TheType##_3   = TheType[3];\
+  using TheType##_4   = TheType[4];\
+  using TheType##_2x2 = TheType##_2[2];\
+  using TheType##_2x3 = TheType##_2[3];\
+  using TheType##_2x4 = TheType##_2[4];\
+  using TheType##_3x2 = TheType##_3[2];\
+  using TheType##_3x3 = TheType##_3[3];\
+  using TheType##_3x4 = TheType##_3[4];\
+  using TheType##_4x2 = TheType##_4[2];\
+  using TheType##_4x3 = TheType##_4[3];\
+  using TheType##_4x4 = TheType##_4[4];
+
+DefineArrayTypes(float);
+DefineArrayTypes(double);
+
+DefineArrayTypes(int8);
+DefineArrayTypes(int16);
+DefineArrayTypes(int32);
+DefineArrayTypes(int64);
+
+DefineArrayTypes(uint8);
+DefineArrayTypes(uint16);
+DefineArrayTypes(uint32);
+DefineArrayTypes(uint64);
+
 //
 // ================
 //

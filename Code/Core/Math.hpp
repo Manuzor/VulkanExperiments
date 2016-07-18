@@ -9,110 +9,188 @@
 // Types
 //
 
-union vec2
+template<typename Type>
+union vec2_
 {
-  struct{ float X; float Y; };
-  float Data[2];
+  struct{ Type X; Type Y; };
+  Type Data[2];
 };
 
-union vec3
+template<typename Type>
+union vec3_
 {
-  struct{ float X; float Y; float Z; };
-  float Data[3];
+  struct{ Type X; Type Y; Type Z; };
+  Type Data[3];
 };
 
-union vec4
+template<typename Type>
+union vec4_
 {
-  struct{ float X; float Y; float Z; float W; };
-  float Data[4];
+  struct{ Type X; Type Y; Type Z; Type W; };
+  Type Data[4];
 };
 
 /// Column-Major
-union mat4x4
+template<typename Type>
+union mat4x4_
 {
-  using float4 = float[4];
-  using float4x4 = float4[4];
+  using Type_4   = Type[4];
+  using Type_4x4 = Type_4[4];
 
   struct
   {
-    float M00, M01, M02, M03;
-    float M10, M11, M12, M13;
-    float M20, M21, M22, M23;
-    float M30, M31, M32, M33;
+    Type M00, M01, M02, M03;
+    Type M10, M11, M12, M13;
+    Type M20, M21, M22, M23;
+    Type M30, M31, M32, M33;
   };
 
   struct
   {
-    vec4 Col0;
-    vec4 Col1;
-    vec4 Col2;
-    vec4 Col3;
+    vec4_<Type> Col0;
+    vec4_<Type> Col1;
+    vec4_<Type> Col2;
+    vec4_<Type> Col3;
   };
 
-  float4x4 Data;
+  Type_4x4 Data;
 
   inline
-  float4&
+  Type_4&
   operator [](size_t Index)
   {
     return Data[Index];
   }
 
   constexpr
-  float4 const&
+  Type_4 const&
   operator [](size_t Index) const
   {
     return Data[Index];
   }
 };
 
-static_assert(sizeof(mat4x4) == 4 * 4 * sizeof(float), "Incorrect size.");
-
-union quaternion
+template<typename Type>
+union quaternion_
 {
   struct
   {
-    float X;
-    float Y;
-    float Z;
-    float W;
+    Type X;
+    Type Y;
+    Type Z;
+    Type W;
   };
 
   struct
   {
-    vec3 Direction;
+    vec3_<Type> Direction;
     angle Angle;
   };
 
-  float Data[4];
+  Type Data[4];
 };
 
-struct transform
+template<typename Type>
+struct transform_
 {
-  vec3 Translation;
-  quaternion Rotation;
-  vec3 Scale;
+  vec3_<Type> Translation;
+  quaternion_<Type> Rotation;
+  vec3_<Type> Scale;
 };
+
+template<typename Type>
+union extent2_
+{
+  struct
+  {
+    Type Width;
+    Type Height;
+  };
+
+  vec2_<Type> Vec;
+
+  Type Data[2];
+};
+
+template<typename Type>
+union extent3_
+{
+  struct
+  {
+    Type Width;
+    Type Height;
+    Type Depth;
+  };
+
+  vec3_<Type> Vec;
+
+  Type Data[3];
+};
+
+template<typename Type>
+union rect_
+{
+  struct
+  {
+    Type X;
+    Type Y;
+    Type Width;
+    Type Height;
+  };
+
+  struct
+  {
+    vec2_<Type> Offset;
+    extent2_<Type> Extent;
+  };
+
+  Type Data[4];
+};
+
+
+//
+// Typedefs
+//
+
+using vec2 = vec2_<float>;
+using vec3 = vec3_<float>;
+using vec4 = vec4_<float>;
+using mat4x4 = mat4x4_<float>;
+using quaternion = quaternion_<float>;
+using transform = transform_<float>;
+
+using extent2 = extent2_<float>;
+using extent3 = extent3_<float>;
+using rect = rect_<float>;
+
+static_assert(sizeof(vec2)       ==     2 * sizeof(float), "Incorrect size.");
+static_assert(sizeof(vec3)       ==     3 * sizeof(float), "Incorrect size.");
+static_assert(sizeof(vec4)       ==     4 * sizeof(float), "Incorrect size.");
+static_assert(sizeof(quaternion) ==     4 * sizeof(float), "Incorrect size.");
+static_assert(sizeof(mat4x4)     == 4 * 4 * sizeof(float), "Incorrect size.");
+static_assert(sizeof(extent2)    ==     2 * sizeof(float), "Incorrect size.");
+static_assert(sizeof(extent3)    ==     3 * sizeof(float), "Incorrect size.");
+static_assert(sizeof(rect)       ==     4 * sizeof(float), "Incorrect size.");
 
 
 //
 // Construction Functions: Vec2, Vec3, Vec4
 //
 
-vec2 constexpr Vec2(float XY) {return { XY, XY }; }
-vec2 constexpr Vec2(float X, float Y) {return { X, Y }; }
+vec2 constexpr Vec2(float XY) { return { XY, XY }; }
+vec2 constexpr Vec2(float X, float Y) { return { X, Y }; }
 
 
-vec3 constexpr Vec3(float XYZ) {return { XYZ, XYZ, XYZ }; }
-vec3 constexpr Vec3(float X, float Y, float Z) {return { X, Y, Z }; }
+vec3 constexpr Vec3(float XYZ) { return { XYZ, XYZ, XYZ }; }
+vec3 constexpr Vec3(float X, float Y, float Z) { return { X, Y, Z }; }
 vec3 constexpr Vec3(float X, vec2 const& YZ) { return Vec3(X, YZ.X, YZ.Y); }
 vec3 constexpr Vec3(vec2 const& XY, float Z) { return Vec3(XY.X, XY.Y, Z); }
 
 vec3 constexpr Vec3FromXYZ(vec4 const& Vec) { return Vec3(Vec.X, Vec.Y, Vec.Z); }
 
 
-vec4 constexpr Vec4(float XYZW) {return { XYZW, XYZW, XYZW, XYZW }; }
-vec4 constexpr Vec4(float X, float Y, float Z, float W) {return { X, Y, Z, W }; }
+vec4 constexpr Vec4(float XYZW) { return { XYZW, XYZW, XYZW, XYZW }; }
+vec4 constexpr Vec4(float X, float Y, float Z, float W) { return { X, Y, Z, W }; }
 vec4 constexpr Vec4(float X, float Y, vec2 const& ZW) { return Vec4(   X,    Y, ZW.X, ZW.Y); }
 vec4 constexpr Vec4(float X, vec2 const& YZ, float W) { return Vec4(   X, YZ.X, YZ.Y,    W); }
 vec4 constexpr Vec4(vec2 const& XY, float Z, float W) { return Vec4(XY.X, XY.Y,    Z,    W); }
@@ -186,7 +264,7 @@ Mat4x4(float const(&Col0)[4],
        float const(&Col3)[4]);
 
 mat4x4 CORE_API
-Mat4x4(mat4x4::float4x4 const& Data);
+Mat4x4(float_4x4 const& Data);
 
 mat4x4 constexpr
 Mat4x4(vec3 const& XAxis, vec3 const& YAxis, vec3 const& ZAxis, vec3 const& Position = ZeroVector3)

@@ -446,11 +446,11 @@ auto
 }
 
 auto
-::Mat4x4(mat4x4::float4x4 const& Data)
+::Mat4x4(float_4x4 const& Data)
   -> mat4x4
 {
   mat4x4 Result;
-  MemCopy(4 * 4, &Result.M00, &Data[0][0]);
+  MemCopy(4 * 4, &Result.Data[0][0], &Data[0][0]);
   return Result;
 }
 
