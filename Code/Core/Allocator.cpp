@@ -29,7 +29,8 @@ temp_allocator::~temp_allocator()
   this->Impl = nullptr;
 }
 
-temp_allocator::operator allocator_interface*()
+allocator_interface*
+temp_allocator::operator *()
 {
   Assert(this->Impl);
   return Reinterpret<allocator_interface*>(this->Impl);
