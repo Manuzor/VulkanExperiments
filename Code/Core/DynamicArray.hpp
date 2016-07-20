@@ -133,6 +133,20 @@ Expand(dynamic_array<T>* Array)
 
 template<typename T>
 void
+SetNum(dynamic_array<T>* Array, size_t NewNum)
+{
+  if(Array->Num > NewNum)
+  {
+    ShrinkBy(Array, Array->Num - NewNum);
+  }
+  else if(Array->Num < NewNum)
+  {
+    ExpandBy(Array, NewNum - Array->Num);
+  }
+}
+
+template<typename T>
+void
 ShrinkBy(dynamic_array<T>* Array, size_t Amount)
 {
   Assert(Array->Num >= Amount);

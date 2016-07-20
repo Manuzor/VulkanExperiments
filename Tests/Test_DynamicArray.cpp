@@ -93,6 +93,18 @@ TEST_CASE("Dynamic Array Expand", "[dynamic_array]")
     REQUIRE( Arr[7] == 4 );
     REQUIRE( Arr[8] == 5 );
   }
+
+  SECTION("SetNum")
+  {
+    SetNum(&Arr, 3);
+    REQUIRE( Arr.Num == 3);
+
+    ExpandBy(&Arr, 1);
+    REQUIRE( Arr.Num == 4);
+
+    SetNum(&Arr, 3);
+    REQUIRE( Arr.Num == 3);
+  }
 }
 
 TEST_CASE("Dynamic Array Remove", "[dynamic_array]")
