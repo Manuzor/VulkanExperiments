@@ -10,27 +10,491 @@ auto
   -> void
 {
   Init(&Vulkan->Gpu.QueueProperties, Allocator);
-  Init(&Vulkan->SwapchainBuffers, Allocator);
   Init(&Vulkan->Framebuffers, Allocator);
   Init(&Vulkan->SceneObjects, Allocator);
+  Init(&Vulkan->Swapchain, &Vulkan->Device, Allocator);
   Vulkan->Gpu.Vulkan = Vulkan;
+  Vulkan->Device.Gpu = &Vulkan->Gpu;
 }
 
 auto
 ::Finalize(vulkan* Vulkan)
   -> void
 {
+  Finalize(&Vulkan->Swapchain);
   Finalize(&Vulkan->SceneObjects);
   Finalize(&Vulkan->Framebuffers);
-  Finalize(&Vulkan->SwapchainBuffers);
   Finalize(&Vulkan->Gpu.QueueProperties);
+}
+
+auto
+::Init(vulkan_swapchain* Swapchain, vulkan_device* Device, allocator_interface* Allocator)
+  -> void
+{
+  Init(&Swapchain->Images, Allocator);
+  Init(&Swapchain->ImageViews, Allocator);
+  Swapchain->Device = Device;
+}
+
+auto
+::Finalize(vulkan_swapchain* Swapchain)
+  -> void
+{
+  Finalize(&Swapchain->ImageViews);
+  Finalize(&Swapchain->Images);
+}
+
+auto
+::VulkanPrepareSurface(vulkan const&   Vulkan,
+                       vulkan_surface* Surface,
+                       HINSTANCE       ProcessHandle,
+                       HWND            WindowHandle)
+  -> bool
+{
+  //
+  // Create Win32 Surface
+  //
+  {
+    LogBeginScope("Creating Win32 Surface.");
+    Defer [](){ LogEndScope("Created Win32 Surface."); };
+
+    auto CreateInfo = InitStruct<VkWin32SurfaceCreateInfoKHR>();
+    {
+      CreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+      CreateInfo.hinstance = ProcessHandle;
+      CreateInfo.hwnd = WindowHandle;
+    }
+
+    VulkanVerify(Vulkan.vkCreateWin32SurfaceKHR(Vulkan.InstanceHandle, &CreateInfo, nullptr, &Surface->SurfaceHandle));
+  }
+
+  //
+  // Find Queue for Graphics and Presenting
+  //
+  {
+    LogBeginScope("Finding queue indices for graphics and presenting.");
+    Defer [](){ LogEndScope("Done finding queue indices."); };
+
+    uint32 GraphicsIndex = IntMaxValue<uint32>();
+    uint32 PresentIndex = IntMaxValue<uint32>();
+
+    uint32 const NumQueuesProperties = Cast<uint32>(Vulkan.Gpu.QueueProperties.Num);
+    for(uint32 Index = 0; Index < NumQueuesProperties; ++Index)
+    {
+      VkBool32 SupportsPresenting;
+      Vulkan.vkGetPhysicalDeviceSurfaceSupportKHR(Vulkan.Gpu.GpuHandle, Index, Surface->SurfaceHandle, &SupportsPresenting);
+
+      auto& QueueProp = Vulkan.Gpu.QueueProperties[Index];
+      if(QueueProp.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+      {
+        if(GraphicsIndex == IntMaxValue<uint32>())
+        {
+          GraphicsIndex = Index;
+        }
+
+        if(SupportsPresenting)
+        {
+          GraphicsIndex = Index;
+          PresentIndex = Index;
+        }
+      }
+    }
+
+    // TODO: Support for separate graphics and present queue?
+    // See tri-demo 1.0.8 line 2200
+
+    if(GraphicsIndex == IntMaxValue<uint>())
+    {
+      LogError("Unable to find Graphics queue.");
+      return false;
+    }
+
+    if(PresentIndex == IntMaxValue<uint>())
+    {
+      LogError("Unable to find Present queue.");
+      return false;
+    }
+
+    if(GraphicsIndex != PresentIndex)
+    {
+      LogError("Support for separate graphics and present queue not implemented.");
+      return false;
+    }
+
+    Surface->PresentNode.Index = GraphicsIndex;
+  }
+
+  //
+  // Get Physical Device Format and Color Space.
+  //
+  {
+    LogBeginScope("Gathering surface format and color space.");
+    Defer [](){ LogEndScope("Got format and color space for the previously created Win32 surface."); };
+
+    uint32 FormatCount;
+    VulkanVerify(Vulkan.vkGetPhysicalDeviceSurfaceFormatsKHR(Vulkan.Gpu.GpuHandle, Surface->SurfaceHandle, &FormatCount, nullptr));
+    Assert(FormatCount > 0);
+
+    temp_allocator TempAllocator;
+    scoped_array<VkSurfaceFormatKHR> SurfaceFormats(*TempAllocator);
+    ExpandBy(&SurfaceFormats, FormatCount);
+
+    VulkanVerify(Vulkan.vkGetPhysicalDeviceSurfaceFormatsKHR(Vulkan.Gpu.GpuHandle, Surface->SurfaceHandle, &FormatCount, SurfaceFormats.Ptr));
+
+    if(FormatCount == 1 && SurfaceFormats[0].format == VK_FORMAT_UNDEFINED)
+    {
+      Surface->Format = VK_FORMAT_B8G8R8A8_UNORM;
+    }
+    else
+    {
+      Surface->Format = SurfaceFormats[0].format;
+    }
+    LogInfo("Format: %s", VulkanEnumName(Surface->Format));
+
+    Surface->ColorSpace = SurfaceFormats[0].colorSpace;
+    LogInfo("Color Space: %s", VulkanEnumName(Surface->ColorSpace));
+  }
+
+  return true;
+}
+
+auto
+::VulkanCleanupSurface(vulkan const&   Vulkan,
+                       vulkan_surface* Surface)
+  -> void
+{
+  Vulkan.vkDestroySurfaceKHR(Vulkan.InstanceHandle, Surface->SurfaceHandle, nullptr);
+}
+
+auto
+::VulkanSwapchainConnect(vulkan_swapchain* Swapchain,
+                       vulkan_device*    Device,
+                       vulkan_surface*   Surface)
+  -> void
+{
+  Swapchain->Device = Device;
+  Swapchain->Surface = Surface;
+}
+
+auto
+::VulkanPrepareSwapchain(vulkan const&     Vulkan,
+                         vulkan_swapchain* Swapchain,
+                         extent2_<uint32>  Extents,
+                         vsync             VSync)
+  -> bool
+{
+  auto const& Device = *Swapchain->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  auto const OldSwapchainHandle = Swapchain->SwapchainHandle;
+
+  auto const Surface = Swapchain->Surface;
+  auto const SurfaceHandle = Surface->SurfaceHandle;
+
+
+  //
+  // Fetch surface capabilites
+  //
+  VkSurfaceCapabilitiesKHR SurfaceCapabilities;
+  VulkanVerify(Vulkan.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Vulkan.Gpu.GpuHandle,
+                                                                SurfaceHandle,
+                                                                &SurfaceCapabilities));
+
+
+  //
+  // Determine the final swapchain image extents
+  //
+  auto SwapchainExtent = SurfaceCapabilities.currentExtent;
+  if(SwapchainExtent.width == -1 && SwapchainExtent.height == -1)
+  {
+    // The extent is currently not defined, so we can just set our desired
+    // extent.
+    SwapchainExtent.width = Extents.Width;
+    SwapchainExtent.height = Extents.Height;
+  }
+
+  Swapchain->Extent.Width = SwapchainExtent.width;
+  Swapchain->Extent.Height = SwapchainExtent.height;
+  LogInfo("Swapchain extents: { width=%u, height=%u }", Swapchain->Extent.Width, Swapchain->Extent.Height);
+
+
+  //
+  // Select a present mode
+  //
+
+  // VK_PRESENT_MODE_FIFO_KHR must always be present, as per the vulkan spec.
+  VkPresentModeKHR SwapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+
+  // If v-sync is not requested, try to find a mailbox mode if present. It's
+  // the lowest latency non-tearing present mode available.
+  if(VSync == vsync::Off)
+  {
+    // Fetch available present modes
+
+    uint32 PresentModeCount;
+    VulkanVerify(Vulkan.vkGetPhysicalDeviceSurfacePresentModesKHR(Vulkan.Gpu.GpuHandle, SurfaceHandle, &PresentModeCount, nullptr));
+
+    temp_allocator TempAllocator;
+    scoped_array<VkPresentModeKHR> PresentModes(*TempAllocator);
+    ExpandBy(&PresentModes, PresentModeCount);
+
+    VulkanVerify(Vulkan.vkGetPhysicalDeviceSurfacePresentModesKHR(Vulkan.Gpu.GpuHandle, SurfaceHandle, &PresentModeCount, PresentModes.Ptr));
+
+    // Find a mailbox or immediate mode (in that order of preference).
+    for(auto Candidate : Slice(&PresentModes))
+    {
+      if(Candidate == VK_PRESENT_MODE_MAILBOX_KHR)
+      {
+        SwapchainPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+        break;
+      }
+
+      Assert(SwapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR);
+      if(Candidate == VK_PRESENT_MODE_IMMEDIATE_KHR)
+      {
+        SwapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+      }
+    }
+  }
+
+
+  //
+  // Determine the number of swapchain images
+  //
+
+  uint32 NumDesiredSwapchainImages = SurfaceCapabilities.minImageCount + 1;
+  if(SurfaceCapabilities.maxImageCount > 0)
+  {
+    NumDesiredSwapchainImages = Min(NumDesiredSwapchainImages, SurfaceCapabilities.maxImageCount);
+  }
+
+
+  //
+  // Determine surface transform mode
+  //
+
+  auto SurfacePreTransform = SurfaceCapabilities.currentTransform;
+  if(SurfaceCapabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
+  {
+    SurfacePreTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+  }
+
+
+  //
+  // Create the new swapchain
+  //
+
+  auto SwapchainCreateInfo = InitStruct<VkSwapchainCreateInfoKHR>();
+  {
+    SwapchainCreateInfo.surface = Swapchain->Surface->SurfaceHandle;
+    SwapchainCreateInfo.minImageCount = NumDesiredSwapchainImages;
+    SwapchainCreateInfo.imageFormat = Swapchain->Surface->Format;
+    SwapchainCreateInfo.imageColorSpace = Swapchain->Surface->ColorSpace;
+    SwapchainCreateInfo.imageExtent = SwapchainExtent;
+    SwapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    SwapchainCreateInfo.preTransform = SurfacePreTransform;
+    SwapchainCreateInfo.imageArrayLayers = 1;
+    SwapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    SwapchainCreateInfo.presentMode = SwapchainPresentMode;
+    SwapchainCreateInfo.clipped = true;
+    SwapchainCreateInfo.oldSwapchain = OldSwapchainHandle;
+    SwapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  }
+
+  VulkanVerify(Device.vkCreateSwapchainKHR(DeviceHandle,
+                                           &SwapchainCreateInfo,
+                                           nullptr,
+                                           &Swapchain->SwapchainHandle));
+  LogInfo("Created new swapchain.");
+
+
+  //
+  // Cleanup old swapchain (e.g. when resizing)
+  //
+
+  if(OldSwapchainHandle != VK_NULL_HANDLE)
+  {
+    for(auto ViewHandle : Slice(&Swapchain->ImageViews))
+    {
+      Device.vkDestroyImageView(DeviceHandle, ViewHandle, nullptr);
+    }
+    Device.vkDestroySwapchainKHR(DeviceHandle, OldSwapchainHandle, nullptr);
+    LogInfo("Destroyed old swapchain and image views.");
+  }
+
+  //
+  // Get swapchain image handles
+  //
+
+  VulkanVerify(Device.vkGetSwapchainImagesKHR(DeviceHandle, Swapchain->SwapchainHandle, &Swapchain->ImageCount, nullptr));
+
+  Clear(&Swapchain->Images);
+  ExpandBy(&Swapchain->Images, Swapchain->ImageCount);
+  VulkanVerify(Device.vkGetSwapchainImagesKHR(DeviceHandle, Swapchain->SwapchainHandle, &Swapchain->ImageCount, Swapchain->Images.Ptr));
+
+  //
+  // Create views to the swapchain images
+  //
+
+  Clear(&Swapchain->ImageViews);
+  for(auto ImageHandle : Slice(&Swapchain->Images))
+  {
+    VkImageView ViewHandle = {};
+
+    auto ColorAttachmentViewInfo = InitStruct<VkImageViewCreateInfo>();
+    {
+      ColorAttachmentViewInfo.format = Swapchain->Surface->Format;
+      ColorAttachmentViewInfo.components = InitStruct<VkComponentMapping>();
+      ColorAttachmentViewInfo.image = ImageHandle;
+      ColorAttachmentViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+      ColorAttachmentViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      ColorAttachmentViewInfo.subresourceRange.baseMipLevel = 0;
+      ColorAttachmentViewInfo.subresourceRange.levelCount = 1;
+      ColorAttachmentViewInfo.subresourceRange.baseArrayLayer = 0;
+      ColorAttachmentViewInfo.subresourceRange.layerCount = 1;
+    }
+
+    VulkanVerify(Device.vkCreateImageView(DeviceHandle,
+                                          &ColorAttachmentViewInfo,
+                                          nullptr,
+                                          &ViewHandle));
+
+    Expand(&Swapchain->ImageViews) = ViewHandle;
+  }
+
+  return true;
+}
+
+auto
+::VulkanCleanupSwapchain(vulkan const& Vulkan, vulkan_swapchain* Swapchain)
+  -> void
+{
+  auto const& Device = *Swapchain->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  for(auto View : Slice(&Swapchain->ImageViews))
+  {
+    Device.vkDestroyImageView(DeviceHandle, View, nullptr);
+  }
+  Clear(&Swapchain->ImageViews);
+
+  Device.vkDestroySwapchainKHR(DeviceHandle, Swapchain->SwapchainHandle, nullptr);
+  Swapchain->SwapchainHandle = VK_NULL_HANDLE;
+}
+
+auto
+::VulkanAcquireNextSwapchainImage(vulkan_swapchain const& Swapchain,
+                                  VkSemaphore             PresentCompleteSemaphore,
+                                  vulkan_swapchain_image* CurrentImage)
+  -> VkResult
+{
+  auto const& Device = *Swapchain.Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+  auto const Timeout = IntMaxValue<uint64>();
+  VkFence const NullFence = {};
+  return Device.vkAcquireNextImageKHR(DeviceHandle,
+                                      Swapchain.SwapchainHandle,
+                                      Timeout,
+                                      PresentCompleteSemaphore,
+                                      NullFence,
+                                      &CurrentImage->Index);
+}
+
+auto
+::VulkanQueuePresent(vulkan_swapchain*      Swapchain,
+                     VkQueue                Queue,
+                     vulkan_swapchain_image ImageToPresent,
+                     VkSemaphore            WaitSemaphore)
+  -> VkResult
+{
+  auto PresentInfo = InitStruct<VkPresentInfoKHR>();
+  {
+    PresentInfo.swapchainCount = 1;
+    PresentInfo.pSwapchains = &Swapchain->SwapchainHandle;
+    PresentInfo.pImageIndices = &ImageToPresent.Index;
+    if(WaitSemaphore != VK_NULL_HANDLE)
+    {
+      PresentInfo.waitSemaphoreCount = 1;
+      PresentInfo.pWaitSemaphores = &WaitSemaphore;
+    }
+  }
+
+  return Swapchain->Device->vkQueuePresentKHR(Queue, &PresentInfo);
+}
+
+auto
+::VulkanPrepareDepth(vulkan* Vulkan, vulkan_depth* Depth, extent2_<uint32> Extents)
+  -> bool
+{
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  Depth->Format = VK_FORMAT_D16_UNORM;
+  auto ImageCreateInfo = InitStruct<VkImageCreateInfo>();
+  {
+    ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+    ImageCreateInfo.format = Depth->Format;
+    ImageCreateInfo.extent = { Extents.Width, Extents.Height, 1 };
+    ImageCreateInfo.mipLevels = 1;
+    ImageCreateInfo.arrayLayers = 1;
+    ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  }
+
+  // Create image.
+  VulkanVerify(Device.vkCreateImage(DeviceHandle, &ImageCreateInfo, nullptr, &Depth->Image));
+
+  // Get memory requirements for this object.
+  VkMemoryRequirements MemoryRequirements;
+  Device.vkGetImageMemoryRequirements(DeviceHandle, Depth->Image, &MemoryRequirements);
+
+  // Select memory size and type.
+  auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
+  {
+    MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
+    MemoryAllocateInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Gpu.MemoryProperties,
+                                                                        MemoryRequirements.memoryTypeBits,
+                                                                        0); // No requirements.
+    Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
+  }
+
+  // Allocate memory.
+  VulkanVerify(Device.vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &Depth->Memory));
+
+  // Bind memory.
+  VulkanVerify(Device.vkBindImageMemory(DeviceHandle, Depth->Image, Depth->Memory, 0));
+
+  VulkanSetImageLayout(Vulkan->Device, Vulkan->CommandPool, &Vulkan->SetupCommand, Depth->Image,
+                       VkImageAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT),
+                       VkImageLayout(VK_IMAGE_LAYOUT_UNDEFINED),
+                       VkImageLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL),
+                       VkAccessFlags(0));
+
+  // Create image view.
+  auto ImageViewCreateInfo = InitStruct<VkImageViewCreateInfo>();
+  {
+    ImageViewCreateInfo.image = Depth->Image;
+    ImageViewCreateInfo.format = Depth->Format;
+    ImageViewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
+  }
+  VulkanVerify(Device.vkCreateImageView(DeviceHandle, &ImageViewCreateInfo, nullptr, &Depth->View));
+
+  return true;
+}
+
+auto
+::VulkanCleanupDepth(vulkan const& Vulkan, vulkan_depth* Depth)
+  -> void
+{
+  // TODO
 }
 
 template<typename T>
 bool
-LoadHelper(vulkan* Vulkan, char const* FuncName, T** OutPtrToProcPtr)
+LoadHelper(vulkan const& Vulkan, char const* FuncName, T** OutPtrToProcPtr)
 {
-  auto ProcPtr = Vulkan->vkGetInstanceProcAddr(Vulkan->InstanceHandle, FuncName);
+  auto ProcPtr = Vulkan.vkGetInstanceProcAddr(Vulkan.InstanceHandle, FuncName);
   if(ProcPtr)
   {
     *OutPtrToProcPtr = Reinterpret<T*>(ProcPtr);
@@ -41,9 +505,9 @@ LoadHelper(vulkan* Vulkan, char const* FuncName, T** OutPtrToProcPtr)
 
 template<typename T>
 bool
-LoadHelper(vulkan_device* Device, char const* FuncName, T** OutPtrToProcPtr)
+LoadHelper(vulkan const& Vulkan, vulkan_device const& Device, char const* FuncName, T** OutPtrToProcPtr)
 {
-  auto ProcPtr = Device->Vulkan->vkGetDeviceProcAddr(Device->DeviceHandle, FuncName);
+  auto ProcPtr = Vulkan.vkGetDeviceProcAddr(Device.DeviceHandle, FuncName);
   if(ProcPtr)
   {
     *OutPtrToProcPtr = Reinterpret<T*>(ProcPtr);
@@ -114,7 +578,7 @@ auto
   LogBeginScope("Loading Vulkan instance procedures.");
   Defer [](){ LogEndScope(""); };
 
-  #define TRY_LOAD(Name) if(!LoadHelper(Vulkan, #Name, &Vulkan->##Name)) \
+  #define TRY_LOAD(Name) if(!LoadHelper(*Vulkan, #Name, &Vulkan->##Name)) \
   { \
     LogWarning("Failed to load procedure: %s", #Name); \
   }
@@ -286,16 +750,16 @@ auto
 }
 
 auto
-::VulkanLoadDeviceFunctions(vulkan_device* Device)
+::VulkanLoadDeviceFunctions(vulkan const& Vulkan, vulkan_device* Device)
   -> void
 {
   LogBeginScope("Loading Vulkan device procedures.");
   Defer [](){ LogEndScope(""); };
 
-  #define TRY_LOAD(Name) if(!LoadHelper(Device, #Name, &Device->##Name)) \
+  #define TRY_LOAD(Name) if(!LoadHelper(Vulkan, *Device, #Name, &Device->##Name)) \
   { \
-    LogWarning("Unable to load device function: %s", #Name); \
-    Device->##Name = Device->Vulkan->##Name; \
+    LogWarning("Unable to load device procedure: %s", #Name); \
+    Device->##Name = Vulkan.##Name; \
   }
 
   TRY_LOAD(vkGetDeviceProcAddr);
@@ -953,14 +1417,15 @@ auto
 }
 
 auto
-::VulkanUploadImageToGpu(allocator_interface* TempAllocator,
-                         vulkan_device const& Device,
-                         VkCommandPool CommandPool,
-                         VkCommandBuffer* CommandBuffer,
-                         image const& Image,
-                         gpu_image* GpuImage)
+::VulkanUploadImageToGpu(vulkan_device const& Device,
+                         VkCommandPool        CommandPool,
+                         VkCommandBuffer*     CommandBuffer,
+                         image const&         Image,
+                         gpu_image*           GpuImage)
   -> bool
 {
+
+
   //
   // 1. Allocate a temporary buffer.
   // 2. Blit the image data into that.
@@ -1092,7 +1557,8 @@ auto
   // Copy the buffered data over to the image memory.
   //
   {
-    scoped_array<VkBufferImageCopy> Regions(TempAllocator);
+    temp_allocator TempAllocator;
+    scoped_array<VkBufferImageCopy> Regions(*TempAllocator);
     // TODO(Manu): Upload all MIP levels.
     for(uint32 MipLevel = 0; MipLevel < 1; ++MipLevel)
     {
@@ -1162,16 +1628,19 @@ auto
     return;
   }
 
-  Vulkan->Device.vkDestroyBuffer(Vulkan->Device.DeviceHandle, SceneObject->Indices.Buffer, nullptr);
-  Vulkan->Device.vkFreeMemory(Vulkan->Device.DeviceHandle, SceneObject->Indices.Memory, nullptr);
+  auto const Device = &Vulkan->Device;
+  auto const DeviceHandle = Device->DeviceHandle;
 
-  Vulkan->Device.vkDestroyBuffer(Vulkan->Device.DeviceHandle, SceneObject->Vertices.Buffer, nullptr);
-  Vulkan->Device.vkFreeMemory(Vulkan->Device.DeviceHandle, SceneObject->Vertices.Memory, nullptr);
+  Device->vkDestroyBuffer(DeviceHandle, SceneObject->Indices.Buffer, nullptr);
+  Device->vkFreeMemory(DeviceHandle, SceneObject->Indices.Memory, nullptr);
 
-  Vulkan->Device.vkDestroySampler(Vulkan->Device.DeviceHandle,   SceneObject->Texture.SamplerHandle, nullptr);
-  Vulkan->Device.vkDestroyImageView(Vulkan->Device.DeviceHandle, SceneObject->Texture.ImageViewHandle, nullptr);
-  Vulkan->Device.vkDestroyImage(Vulkan->Device.DeviceHandle,     SceneObject->Texture.GpuImage.ImageHandle, nullptr);
-  Vulkan->Device.vkFreeMemory(Vulkan->Device.DeviceHandle,       SceneObject->Texture.GpuImage.MemoryHandle, nullptr);
+  Device->vkDestroyBuffer(DeviceHandle, SceneObject->Vertices.Buffer, nullptr);
+  Device->vkFreeMemory(DeviceHandle, SceneObject->Vertices.Memory, nullptr);
+
+  Device->vkDestroySampler(DeviceHandle,   SceneObject->Texture.SamplerHandle, nullptr);
+  Device->vkDestroyImageView(DeviceHandle, SceneObject->Texture.ImageViewHandle, nullptr);
+  Device->vkDestroyImage(DeviceHandle,     SceneObject->Texture.GpuImage.ImageHandle, nullptr);
+  Device->vkFreeMemory(DeviceHandle,       SceneObject->Texture.GpuImage.MemoryHandle, nullptr);
 
   SceneObject->IsCreated = false;
 }
@@ -1180,8 +1649,8 @@ auto
 ::VulkanSetTextureFromFile(vulkan* Vulkan, char const* FileName, texture* Texture)
   -> bool
 {
-  temp_allocator TempAllocatorGuard;
-  allocator_interface* TempAllocator = TempAllocatorGuard;
+  temp_allocator TempAllocator;
+  auto Allocator = *TempAllocator;
 
   auto CreateImageLoader = Reinterpret<PFN_CreateImageLoader>(GetProcAddress(GetModuleHandle(nullptr), "CreateImageLoader_DDS"));
   Assert(CreateImageLoader);
@@ -1189,14 +1658,14 @@ auto
   auto DestroyImageLoader = Reinterpret<PFN_DestroyImageLoader>(GetProcAddress(GetModuleHandle(nullptr), "DestroyImageLoader_DDS"));
   Assert(DestroyImageLoader);
 
-  image_loader_interface* Loader = CreateImageLoader(TempAllocator);
-  Defer [=](){ DestroyImageLoader(TempAllocator, Loader); };
+  image_loader_interface* Loader = CreateImageLoader(Allocator);
+  Defer [=](){ DestroyImageLoader(Allocator, Loader); };
 
   image TheImage = {};
-  Init(&TheImage, TempAllocator);
+  Init(&TheImage, Allocator);
   Defer [&](){ Finalize(&TheImage); };
 
-  if(LoadImageFromFile(Loader, &TheImage, TempAllocator, FileName))
+  if(LoadImageFromFile(Loader, &TheImage, Allocator, FileName))
   {
     LogInfo("Loaded image file: %s", FileName);
   }
@@ -1207,8 +1676,7 @@ auto
 
   Assert(VulkanIsImageCompatibleWithGpu(*Vulkan->Device.Gpu, TheImage));
 
-  if(VulkanUploadImageToGpu(TempAllocator,
-                            Vulkan->Device, Vulkan->CommandPool, &Vulkan->SetupCommand,
+  if(VulkanUploadImageToGpu(Vulkan->Device, Vulkan->CommandPool, &Vulkan->SetupCommand,
                             TheImage, &Texture->GpuImage))
   {
     LogInfo("Image data has been uploaded to the GPU.");
@@ -1258,9 +1726,12 @@ auto
 }
 
 auto
-::VulkanSetQuadGeometry(vulkan* Vulkan, vec2 const& Extents, vertex_buffer* Vertices, index_buffer* Indices)
+::VulkanSetQuadGeometry(vulkan* Vulkan, extent2 const& Extents, vertex_buffer* Vertices, index_buffer* Indices)
   -> void
 {
+  auto const Device = &Vulkan->Device;
+  auto const DeviceHandle = Device->DeviceHandle;
+
   vertex const TopLeft    { Vec3(0.0f, -1.0f,  1.0f) * 1.0f, Vec2(0.0f, 0.0f) };
   vertex const TopRight   { Vec3(0.0f,  1.0f,  1.0f) * 1.0f, Vec2(1.0f, 0.0f) };
   vertex const BottomLeft { Vec3(0.0f, -1.0f, -1.0f) * 1.0f, Vec2(0.0f, 1.0f) };
@@ -1289,10 +1760,10 @@ auto
       BufferCreateInfo.size = SliceByteSize(GeometryData);
       BufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     }
-    VulkanVerify(Vulkan->Device.vkCreateBuffer(Vulkan->Device.DeviceHandle, &BufferCreateInfo, nullptr, &Vertices->Buffer));
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &Vertices->Buffer));
 
     VkMemoryRequirements MemoryRequirements;
-    Vulkan->Device.vkGetBufferMemoryRequirements(Vulkan->Device.DeviceHandle, Vertices->Buffer, &MemoryRequirements);
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, Vertices->Buffer, &MemoryRequirements);
 
     auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
@@ -1303,19 +1774,19 @@ auto
       Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
     }
 
-    VulkanVerify(Vulkan->Device.vkAllocateMemory(Vulkan->Device.DeviceHandle, &MemoryAllocateInfo, nullptr, &Vertices->Memory));
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &Vertices->Memory));
 
     // Copy data from host to the device.
     {
       void* RawData;
-      VulkanVerify(Vulkan->Device.vkMapMemory(Vulkan->Device.DeviceHandle, Vertices->Memory, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, Vertices->Memory, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
 
       MemCopy(GeometryData.Num, Reinterpret<vertex*>(RawData), GeometryData.Ptr);
 
-      Vulkan->Device.vkUnmapMemory(Vulkan->Device.DeviceHandle, Vertices->Memory);
+      Device->vkUnmapMemory(DeviceHandle, Vertices->Memory);
     }
 
-    VulkanVerify(Vulkan->Device.vkBindBufferMemory(Vulkan->Device.DeviceHandle, Vertices->Buffer, Vertices->Memory, 0));
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Vertices->Buffer, Vertices->Memory, 0));
 
     Vertices->BindID = 0;
   }
@@ -1327,10 +1798,10 @@ auto
       BufferCreateInfo.size = SliceByteSize(IndexData);
       BufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     }
-    VulkanVerify(Vulkan->Device.vkCreateBuffer(Vulkan->Device.DeviceHandle, &BufferCreateInfo, nullptr, &Indices->Buffer));
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &Indices->Buffer));
 
     VkMemoryRequirements MemoryRequirements;
-    Vulkan->Device.vkGetBufferMemoryRequirements(Vulkan->Device.DeviceHandle, Indices->Buffer, &MemoryRequirements);
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, Indices->Buffer, &MemoryRequirements);
 
     auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
@@ -1341,18 +1812,18 @@ auto
       Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
     }
 
-    VulkanVerify(Vulkan->Device.vkAllocateMemory(Vulkan->Device.DeviceHandle, &MemoryAllocateInfo, nullptr, &Indices->Memory));
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &Indices->Memory));
 
     // Copy data from host to the device.
     {
       void* RawData;
-      VulkanVerify(Vulkan->Device.vkMapMemory(Vulkan->Device.DeviceHandle, Indices->Memory, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, Indices->Memory, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
 
       MemCopy(IndexData.Num, Reinterpret<uint32*>(RawData), IndexData.Ptr);
 
-      Vulkan->Device.vkUnmapMemory(Vulkan->Device.DeviceHandle, Indices->Memory);
+      Device->vkUnmapMemory(DeviceHandle, Indices->Memory);
     }
 
-    VulkanVerify(Vulkan->Device.vkBindBufferMemory(Vulkan->Device.DeviceHandle, Indices->Buffer, Indices->Memory, 0));
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Indices->Buffer, Indices->Memory, 0));
   }
 }

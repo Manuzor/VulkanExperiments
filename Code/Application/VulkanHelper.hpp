@@ -11,6 +11,7 @@
 
 #include "VulkanHelper.inl"
 
+struct image;
 struct vulkan;
 
 struct vulkan_gpu
@@ -27,25 +28,23 @@ struct vulkan_gpu
 
 struct vulkan_device : public vulkan_device_functions
 {
-  vulkan* Vulkan;
-  vulkan_gpu* Gpu;
   VkDevice DeviceHandle;
+  vulkan_gpu* Gpu;
 };
 
-struct swapchain_buffer
-{
-  VkImage Image;
-  VkCommandBuffer Command;
-  VkImageView View;
-};
-
-struct depth
+struct vulkan_depth
 {
   VkFormat Format;
 
   VkImage Image;
   VkDeviceMemory Memory;
   VkImageView View;
+};
+
+struct vulkan_uniform_buffer
+{
+  VkBuffer Buffer;
+  VkDeviceMemory Memory;
 };
 
 struct gpu_image
@@ -94,6 +93,39 @@ struct scene_object
   texture Texture;
   vertex_buffer Vertices;
   index_buffer Indices;
+  VkPipeline Pipeline;
+};
+
+struct vulkan_queue_node
+{
+  uint32 Index = IntMaxValue<uint32>();
+};
+
+struct vulkan_surface
+{
+  VkSurfaceKHR SurfaceHandle;
+  VkFormat Format;
+  VkColorSpaceKHR ColorSpace;
+  vulkan_queue_node PresentNode;
+};
+
+struct vulkan_swapchain
+{
+  VkSwapchainKHR SwapchainHandle;
+  vulkan_device* Device;
+  vulkan_surface* Surface;
+  extent2_<uint32> Extent;
+
+  uint32 ImageCount;
+  dynamic_array<VkImage> Images;
+  dynamic_array<VkImageView> ImageViews;
+};
+
+enum class vsync : bool { Off = false, On = true };
+
+struct vulkan_swapchain_image
+{
+  uint32 Index;
 };
 
 struct vulkan : public vulkan_instance_functions
@@ -109,33 +141,22 @@ struct vulkan : public vulkan_instance_functions
   VkDebugReportCallbackEXT DebugCallbackHandle;
 
   vulkan_gpu Gpu;
-  uint32 QueueNodeIndex = IntMaxValue<uint32>();
 
   vulkan_device Device;
+  vulkan_surface Surface;
+  vulkan_swapchain Swapchain;
+  vulkan_depth Depth;
 
-  VkSurfaceKHR Surface;
+  VkCommandPool CommandPool;
 
   VkQueue Queue;
-
-  VkFormat Format;
-  VkColorSpaceKHR ColorSpace;
 
   //
   // Swapchain Data
   //
-  uint32 Width;
-  uint32 Height;
 
-  VkCommandPool CommandPool;
   VkCommandBuffer SetupCommand;
   VkCommandBuffer DrawCommand;
-
-  VkSwapchainKHR Swapchain;
-  uint32 SwapchainImageCount;
-  dynamic_array<swapchain_buffer> SwapchainBuffers;
-  uint32 CurrentBufferIndex;
-
-  depth Depth;
 
   //
   // Misc
@@ -144,15 +165,14 @@ struct vulkan : public vulkan_instance_functions
   VkDescriptorSetLayout DescriptorSetLayout;
 
   VkRenderPass RenderPass;
-  VkPipeline Pipeline;
-
   VkDescriptorPool DescriptorPool;
   VkDescriptorSet DescriptorSet;
+  VkPipeline Pipeline;
 
   dynamic_array<VkFramebuffer> Framebuffers;
+  vulkan_swapchain_image CurrentSwapchainImage;
 
-  VkBuffer GlobalUBO_BufferHandle;
-  VkDeviceMemory GlobalUBO_MemoryHandle;
+  vulkan_uniform_buffer GlobalsUBO;
 
   float DepthStencilValue = 1.0f;
 
@@ -160,10 +180,16 @@ struct vulkan : public vulkan_instance_functions
 };
 
 
-void
-Init(vulkan* Vulkan, allocator_interface* Allocator);
+//
+// `vulkan`
+//
 
-void Finalize(vulkan* Vulkan);
+void
+Init(vulkan*              Vulkan,
+     allocator_interface* Allocator);
+
+void
+Finalize(vulkan* Vulkan);
 
 
 /// Loads the DLL and some crucial functions needed to create an instance.
@@ -173,8 +199,121 @@ VulkanLoadDLL(vulkan* Vulkan);
 void
 VulkanLoadInstanceFunctions(vulkan* Vulkan);
 
+scene_object*
+VulkanCreateSceneObject(vulkan* Vulkan);
+
 void
-VulkanLoadDeviceFunctions(vulkan_device* Device);
+VulkanDestroySceneObject(vulkan*       Vulkan,
+                         scene_object* SceneObject);
+
+bool
+VulkanSetTextureFromFile(vulkan*     Vulkan,
+                         char const* FileName,
+                         texture*    Texture);
+
+void
+VulkanSetQuadGeometry(vulkan*        Vulkan,
+                      extent2 const& Extents,
+                      vertex_buffer* Vertices,
+                      index_buffer*  Indices);
+
+
+//
+// `vulkan_device`
+//
+
+void
+VulkanLoadDeviceFunctions(vulkan const& Vulkan, vulkan_device* Device);
+
+void
+VulkanSetImageLayout(vulkan_device const& Device,
+                     VkCommandPool        CommandPool,
+                     VkCommandBuffer*     CommandBuffer,
+                     VkImage              Image,
+                     VkImageAspectFlags   AspectMask,
+                     VkImageLayout        OldImageLayout,
+                     VkImageLayout        NewImageLayout,
+                     VkAccessFlags        SourceAccessMask);
+
+void
+VulkanEnsureSetupCommandIsReady(vulkan_device const& Device,
+                                VkCommandPool        CommandPool,
+                                VkCommandBuffer*     CommandBuffer);
+
+void
+VulkanFlushSetupCommand(vulkan_device const& Device,
+                        VkQueue              Queue,
+                        VkCommandPool        CommandPool,
+                        VkCommandBuffer*     CommandBuffer);
+
+bool
+VulkanUploadImageToGpu(vulkan_device const& Device,
+                       VkCommandPool        CommandPool,
+                       VkCommandBuffer*     CommandBuffer,
+                       image const&         Image,
+                       gpu_image*           GpuImage);
+
+
+//
+// `vulkan_swapchain`
+//
+
+void
+Init(vulkan_swapchain*    Swapchain,
+     vulkan_device*       Device,
+     allocator_interface* Allocator);
+
+void
+Finalize(vulkan_swapchain* Swapchain);
+
+void
+VulkanSwapchainConnect(vulkan_swapchain* Swapchain,
+                       vulkan_device* Device,
+                       vulkan_surface* Surface);
+
+bool
+VulkanPrepareSurface(vulkan const&   Vulkan,
+                     vulkan_surface* Surface,
+                     HINSTANCE       ProcessHandle,
+                     HWND            WindowHandle);
+
+void
+VulkanCleanupSurface(vulkan const&   Vulkan,
+                     vulkan_surface* Surface);
+
+bool
+VulkanPrepareSwapchain(vulkan const&     Vulkan,
+                       vulkan_swapchain* Swapchain,
+                       extent2_<uint32>  Extents,
+                       vsync             VSync);
+
+void
+VulkanCleanupSwapchain(vulkan const& Vulkan, vulkan_swapchain* Swapchain);
+
+VkResult
+VulkanAcquireNextSwapchainImage(vulkan_swapchain const& Swapchain,
+                                VkSemaphore             PresentCompleteSemaphore,
+                                vulkan_swapchain_image* CurrentImage);
+
+VkResult
+VulkanQueuePresent(vulkan_swapchain*      Swapchain,
+                   VkQueue                Queue,
+                   vulkan_swapchain_image ImageToPresent,
+                   VkSemaphore            WaitSemaphore);
+
+bool
+VulkanPrepareDepth(vulkan*          Vulkan,
+                   vulkan_depth*    Depth,
+                   extent2_<uint32> Extents);
+
+void
+VulkanCleanupDepth(vulkan const& Vulkan,
+                   vulkan_depth* Depth);
+
+
+//
+// Misc
+//
 
 char const*
 VulkanEnumName(VkFormat Format);
@@ -182,60 +321,20 @@ VulkanEnumName(VkFormat Format);
 char const*
 VulkanEnumName(VkColorSpaceKHR ColorSpace);
 
-void
-VulkanSetImageLayout(vulkan_device const& Device,
-                     VkCommandPool CommandPool,
-                     VkCommandBuffer* CommandBuffer,
-                     VkImage Image,
-                     VkImageAspectFlags AspectMask,
-                     VkImageLayout OldImageLayout,
-                     VkImageLayout NewImageLayout,
-                     VkAccessFlags SourceAccessMask);
-
 uint32
 VulkanDetermineMemoryTypeIndex(VkPhysicalDeviceMemoryProperties const& MemoryProperties,
-                               uint32 TypeBits,
-                               VkFlags RequirementsMask);
-
-void
-VulkanEnsureSetupCommandIsReady(vulkan_device const& Device,
-                                VkCommandPool CommandPool,
-                                VkCommandBuffer* CommandBuffer);
-
-void
-VulkanFlushSetupCommand(vulkan_device const& Device,
-                        VkQueue Queue,
-                        VkCommandPool CommandPool,
-                        VkCommandBuffer* CommandBuffer);
+                               uint32                                  TypeBits,
+                               VkFlags                                 RequirementsMask);
 
 void
 VulkanVerify(VkResult Result);
 
 bool
-VulkanIsImageCompatibleWithGpu(vulkan_gpu const& Gpu, struct image const& Image);
+VulkanIsImageCompatibleWithGpu(vulkan_gpu const& Gpu,
+                               image const&      Image);
 
 VkFormat
 ImageFormatToVulkan(enum class image_format KrepelFormat);
 
 enum class image_format
 ImageFormatFromVulkan(VkFormat VulkanFormat);
-
-bool
-VulkanUploadImageToGpu(allocator_interface* TempAllocator,
-                       vulkan_device const& Device,
-                       VkCommandPool CommandPool,
-                       VkCommandBuffer* CommandBuffer,
-                       image const& Image,
-                       gpu_image* GpuImage);
-
-scene_object*
-VulkanCreateSceneObject(vulkan* Vulkan);
-
-void
-VulkanDestroySceneObject(vulkan* Vulkan, scene_object* SceneObject);
-
-bool
-VulkanSetTextureFromFile(vulkan* Vulkan, char const* FileName, texture* Texture);
-
-void
-VulkanSetQuadGeometry(vulkan* Vulkan, vec2 const& Extents, vertex_buffer* Vertices, index_buffer* Indices);

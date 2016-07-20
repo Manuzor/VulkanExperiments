@@ -754,6 +754,15 @@ struct impl_init_struct<VkDebugMarkerMarkerInfoEXT>
   Create() { return { VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT }; }
 };
 
-
-
-#undef IMPL_INIT_STRUCT_HELPER
+template<>
+struct impl_init_struct<VkComponentMapping>
+{
+  static constexpr VkComponentMapping
+  Create()
+  {
+    return { VK_COMPONENT_SWIZZLE_R,
+             VK_COMPONENT_SWIZZLE_G,
+             VK_COMPONENT_SWIZZLE_B,
+             VK_COMPONENT_SWIZZLE_A };
+  }
+};
