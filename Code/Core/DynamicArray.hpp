@@ -60,6 +60,13 @@ Slice(dynamic_array<T>* Array)
 }
 
 template<typename T>
+slice<T const>
+Slice(dynamic_array<T> const* Array)
+{
+  return Slice(Array->Num, AsPtrToConst(Array->Ptr));
+}
+
+template<typename T>
 slice<T>
 AllocatedMemory(dynamic_array<T>* Array)
 {
