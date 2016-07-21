@@ -13,6 +13,9 @@ auto
   Init(&Vulkan->Framebuffers, Allocator);
   Init(&Vulkan->SceneObjects, Allocator);
   Init(&Vulkan->Swapchain, &Vulkan->Device, Allocator);
+  Init(&Vulkan->DrawCommands, Allocator);
+  Init(&Vulkan->PrePresentCommands, Allocator);
+  Init(&Vulkan->PostPresentCommands, Allocator);
   Vulkan->Gpu.Vulkan = Vulkan;
   Vulkan->Device.Gpu = &Vulkan->Gpu;
 }
@@ -21,6 +24,9 @@ auto
 ::Finalize(vulkan* Vulkan)
   -> void
 {
+  Finalize(&Vulkan->PostPresentCommands);
+  Finalize(&Vulkan->PrePresentCommands);
+  Finalize(&Vulkan->DrawCommands);
   Finalize(&Vulkan->Swapchain);
   Finalize(&Vulkan->SceneObjects);
   Finalize(&Vulkan->Framebuffers);
@@ -430,11 +436,13 @@ auto
   auto const DeviceHandle = Device.DeviceHandle;
 
   Depth->Format = VK_FORMAT_D16_UNORM;
+  Depth->Extent = Extents;
+
   auto ImageCreateInfo = InitStruct<VkImageCreateInfo>();
   {
     ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
     ImageCreateInfo.format = Depth->Format;
-    ImageCreateInfo.extent = { Extents.Width, Extents.Height, 1 };
+    ImageCreateInfo.extent = { Depth->Extent.Width, Depth->Extent.Height, 1 };
     ImageCreateInfo.mipLevels = 1;
     ImageCreateInfo.arrayLayers = 1;
     ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -465,7 +473,8 @@ auto
   // Bind memory.
   VulkanVerify(Device.vkBindImageMemory(DeviceHandle, Depth->Image, Depth->Memory, 0));
 
-  VulkanSetImageLayout(Vulkan->Device, Vulkan->CommandPool, &Vulkan->SetupCommand, Depth->Image,
+  VulkanSetImageLayout(Vulkan->Device, Vulkan->SetupCommand,
+                       Depth->Image,
                        VkImageAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT),
                        VkImageLayout(VK_IMAGE_LAYOUT_UNDEFINED),
                        VkImageLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL),
@@ -1106,7 +1115,7 @@ auto
 }
 
 auto
-::VulkanSetImageLayout(vulkan_device const& Device, VkCommandPool CommandPool, VkCommandBuffer* CommandBuffer,
+::VulkanSetImageLayout(vulkan_device const& Device, VkCommandBuffer CommandBuffer,
                        VkImage Image,
                        VkImageAspectFlags AspectMask,
                        VkImageLayout OldImageLayout,
@@ -1114,8 +1123,6 @@ auto
                        VkAccessFlags SourceAccessMask)
   -> void
 {
-  VulkanEnsureSetupCommandIsReady(Device, CommandPool, CommandBuffer);
-
   auto ImageMemoryBarrier = InitStruct<VkImageMemoryBarrier>();
   {
     ImageMemoryBarrier.srcAccessMask = SourceAccessMask;
@@ -1152,7 +1159,7 @@ auto
   VkPipelineStageFlags SourceStages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
   VkPipelineStageFlags DestinationStages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
-  Device.vkCmdPipelineBarrier(*CommandBuffer,                  // commandBuffer
+  Device.vkCmdPipelineBarrier(CommandBuffer,                   // commandBuffer
                               SourceStages, DestinationStages, // dstStageMask, srcStageMask
                               0,                               // dependencyFlags
                               0, nullptr,                      // memoryBarrierCount, pMemoryBarriers
@@ -1188,49 +1195,60 @@ auto
 
 /// Create and begin setup command buffer.
 auto
-::VulkanEnsureSetupCommandIsReady(vulkan_device const& Device, VkCommandPool CommandPool, VkCommandBuffer* CommandBuffer)
+::VulkanPrepareSetupCommandBuffer(vulkan* Vulkan)
   -> void
 {
-  if(*CommandBuffer != VK_NULL_HANDLE)
+  if(Vulkan->SetupCommand != VK_NULL_HANDLE)
     return;
 
-  auto SetupCommandBufferAllocateInfo = InitStruct<VkCommandBufferAllocateInfo>();
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  auto AllocateInfo = InitStruct<VkCommandBufferAllocateInfo>();
   {
-    SetupCommandBufferAllocateInfo.commandPool = CommandPool;
-    SetupCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    SetupCommandBufferAllocateInfo.commandBufferCount = 1;
+    AllocateInfo.commandPool = Vulkan->CommandPool;
+    AllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    AllocateInfo.commandBufferCount = 1;
   }
 
-  VulkanVerify(Device.vkAllocateCommandBuffers(Device.DeviceHandle, &SetupCommandBufferAllocateInfo, CommandBuffer));
+  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle,
+                                               &AllocateInfo,
+                                               &Vulkan->SetupCommand));
 
   auto InheritanceInfo = InitStruct<VkCommandBufferInheritanceInfo>();
   auto BeginInfo = InitStruct<VkCommandBufferBeginInfo>();
   BeginInfo.pInheritanceInfo = &InheritanceInfo;
 
-  VulkanVerify(Device.vkBeginCommandBuffer(*CommandBuffer, &BeginInfo));
+  VulkanVerify(Device.vkBeginCommandBuffer(Vulkan->SetupCommand, &BeginInfo));
 }
 
 auto
-::VulkanFlushSetupCommand(vulkan_device const& Device, VkQueue Queue, VkCommandPool CommandPool, VkCommandBuffer* CommandBuffer)
+::VulkanCleanupSetupCommandBuffer(vulkan* Vulkan, flush_command_buffer Flush)
   -> void
 {
-  if(*CommandBuffer == VK_NULL_HANDLE)
+  if(Vulkan->SetupCommand == VK_NULL_HANDLE)
     return;
 
-  VulkanVerify(Device.vkEndCommandBuffer(*CommandBuffer));
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
 
-  auto SubmitInfo = InitStruct<VkSubmitInfo>();
+  if(Flush == flush_command_buffer::Yes)
   {
-    SubmitInfo.commandBufferCount = 1;
-    SubmitInfo.pCommandBuffers = CommandBuffer;
+    VulkanVerify(Device.vkEndCommandBuffer(Vulkan->SetupCommand));
+
+    auto SubmitInfo = InitStruct<VkSubmitInfo>();
+    {
+      SubmitInfo.commandBufferCount = 1;
+      SubmitInfo.pCommandBuffers = &Vulkan->SetupCommand;
+    }
+    VkFence NullFence = {};
+    VulkanVerify(Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, NullFence));
+
+    VulkanVerify(Device.vkQueueWaitIdle(Vulkan->Queue));
   }
-  VkFence NullFence = {};
-  VulkanVerify(Device.vkQueueSubmit(Queue, 1, &SubmitInfo, NullFence));
 
-  VulkanVerify(Device.vkQueueWaitIdle(Queue));
-
-  Device.vkFreeCommandBuffers(Device.DeviceHandle, CommandPool, 1, CommandBuffer);
-  *CommandBuffer = VK_NULL_HANDLE;
+  Device.vkFreeCommandBuffers(DeviceHandle, Vulkan->CommandPool, 1, &Vulkan->SetupCommand);
+  Vulkan->SetupCommand = VK_NULL_HANDLE;
 }
 
 auto
@@ -1418,8 +1436,7 @@ auto
 
 auto
 ::VulkanUploadImageToGpu(vulkan_device const& Device,
-                         VkCommandPool        CommandPool,
-                         VkCommandBuffer*     CommandBuffer,
+                         VkCommandBuffer      CommandBuffer,
                          image const&         Image,
                          gpu_image*           GpuImage)
   -> bool
@@ -1546,7 +1563,7 @@ auto
     // Since the initial layout is VK_IMAGE_LAYOUT_UNDEFINED, and this image
     // is a blit-target, we set its current layout to
     // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL.
-    VulkanSetImageLayout(Device, CommandPool, CommandBuffer,
+    VulkanSetImageLayout(Device, CommandBuffer,
                          GpuImage->ImageHandle,
                          VkImageAspectFlags(VK_IMAGE_ASPECT_COLOR_BIT),
                          VkImageLayout(VK_IMAGE_LAYOUT_UNDEFINED),
@@ -1570,7 +1587,7 @@ auto
       Region->imageSubresource.baseArrayLayer = 0;
       Region->imageSubresource.layerCount = 1; // TODO(Manu): Should be more than 1.
     }
-    Device.vkCmdCopyBufferToImage(*CommandBuffer,
+    Device.vkCmdCopyBufferToImage(CommandBuffer,
                                   Temp_Buffer,
                                   GpuImage->ImageHandle,
                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -1580,7 +1597,7 @@ auto
   //
   // Set the image layout.
   //
-    VulkanSetImageLayout(Device, CommandPool, CommandBuffer,
+    VulkanSetImageLayout(Device, CommandBuffer,
                          GpuImage->ImageHandle,
                          VkImageAspectFlags(VK_IMAGE_ASPECT_COLOR_BIT),
                          VkImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
@@ -1676,7 +1693,7 @@ auto
 
   Assert(VulkanIsImageCompatibleWithGpu(*Vulkan->Device.Gpu, TheImage));
 
-  if(VulkanUploadImageToGpu(Vulkan->Device, Vulkan->CommandPool, &Vulkan->SetupCommand,
+  if(VulkanUploadImageToGpu(Vulkan->Device, Vulkan->SetupCommand,
                             TheImage, &Texture->GpuImage))
   {
     LogInfo("Image data has been uploaded to the GPU.");

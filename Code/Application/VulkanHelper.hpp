@@ -37,6 +37,7 @@ struct vulkan_depth
   VkFormat Format;
 
   VkImage Image;
+  extent2_<uint32> Extent;
   VkDeviceMemory Memory;
   VkImageView View;
 };
@@ -116,7 +117,7 @@ struct vulkan_swapchain
   vulkan_surface* Surface;
   extent2_<uint32> Extent;
 
-  uint32 ImageCount;
+  uint32 ImageCount; // TODO: Rename => NumImages
   dynamic_array<VkImage> Images;
   dynamic_array<VkImageView> ImageViews;
 };
@@ -151,18 +152,30 @@ struct vulkan : public vulkan_instance_functions
 
   VkQueue Queue;
 
-  //
-  // Swapchain Data
-  //
 
+  //
+  // Command Buffers
+  //
+  // TODO: Rename {Commands} => {CommandBuffers}
   VkCommandBuffer SetupCommand;
-  VkCommandBuffer DrawCommand;
+  // TODO Combine arrays into one and assign slices instead.
+  dynamic_array<VkCommandBuffer> DrawCommands;
+  dynamic_array<VkCommandBuffer> PrePresentCommands;
+  dynamic_array<VkCommandBuffer> PostPresentCommands;
+
+  //
+  // Semaphores
+  //
+  VkSemaphore PresentCompleteSemaphore;
+  VkSemaphore RenderCompleteSemaphore;
+
 
   //
   // Misc
   //
   VkPipelineLayout PipelineLayout;
   VkDescriptorSetLayout DescriptorSetLayout;
+  VkPipelineCache PipelineCache;
 
   VkRenderPass RenderPass;
   VkDescriptorPool DescriptorPool;
@@ -227,8 +240,7 @@ VulkanLoadDeviceFunctions(vulkan const& Vulkan, vulkan_device* Device);
 
 void
 VulkanSetImageLayout(vulkan_device const& Device,
-                     VkCommandPool        CommandPool,
-                     VkCommandBuffer*     CommandBuffer,
+                     VkCommandBuffer      CommandBuffer,
                      VkImage              Image,
                      VkImageAspectFlags   AspectMask,
                      VkImageLayout        OldImageLayout,
@@ -236,20 +248,16 @@ VulkanSetImageLayout(vulkan_device const& Device,
                      VkAccessFlags        SourceAccessMask);
 
 void
-VulkanEnsureSetupCommandIsReady(vulkan_device const& Device,
-                                VkCommandPool        CommandPool,
-                                VkCommandBuffer*     CommandBuffer);
+VulkanPrepareSetupCommandBuffer(vulkan* Vulkan);
+
+enum class flush_command_buffer { No, Yes };
 
 void
-VulkanFlushSetupCommand(vulkan_device const& Device,
-                        VkQueue              Queue,
-                        VkCommandPool        CommandPool,
-                        VkCommandBuffer*     CommandBuffer);
+VulkanCleanupSetupCommandBuffer(vulkan* Vulkan, flush_command_buffer Flush);
 
 bool
 VulkanUploadImageToGpu(vulkan_device const& Device,
-                       VkCommandPool        CommandPool,
-                       VkCommandBuffer*     CommandBuffer,
+                       VkCommandBuffer      CommandBuffer,
                        image const&         Image,
                        gpu_image*           GpuImage);
 

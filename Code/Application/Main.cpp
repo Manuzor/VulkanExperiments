@@ -446,8 +446,7 @@ VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAll
 
     uint32 QueueCount;
     Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, nullptr);
-    Clear(&Vulkan->Gpu.QueueProperties);
-    ExpandBy(&Vulkan->Gpu.QueueProperties, QueueCount);
+    SetNum(&Vulkan->Gpu.QueueProperties, QueueCount);
     Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, Vulkan->Gpu.QueueProperties.Ptr);
   }
 
@@ -455,11 +454,8 @@ VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAll
 }
 
 static bool
-VulkanInitializeForGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHandle, allocator_interface* TempAllocator)
+VulkanInitializeGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHandle, allocator_interface* TempAllocator)
 {
-  // TODO: Split this procedure into creating a graphics device and creating
-  //       all command buffers. Maybe also split for creation of command pool.
-
   //
   // Create Logical Device
   //
@@ -574,23 +570,39 @@ VulkanInitializeForGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND Window
   }
 
   //
-  // Create Command Buffer
+  // Create Seamphores
   //
   {
-    LogBeginScope("Creating command buffer.");
-    Defer [](){ LogEndScope("Finished creating command buffer."); };
-
-    auto AllocateInfo = InitStruct<VkCommandBufferAllocateInfo>();
-    {
-      AllocateInfo.commandPool = Vulkan->CommandPool;
-      AllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-      AllocateInfo.commandBufferCount = 1;
-    }
-    VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, &Vulkan->DrawCommand));
+    auto CreateInfo = InitStruct<VkSemaphoreCreateInfo>();
+    VulkanVerify(Device.vkCreateSemaphore(DeviceHandle, &CreateInfo, nullptr, &Vulkan->PresentCompleteSemaphore));
+    VulkanVerify(Device.vkCreateSemaphore(DeviceHandle, &CreateInfo, nullptr, &Vulkan->RenderCompleteSemaphore));
   }
 
   // Done.
   return true;
+}
+
+static void
+VulkanFinalizeGraphics(vulkan* Vulkan)
+{
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  //
+  // Destroy Seamphores
+  //
+  Device.vkDestroySemaphore(DeviceHandle, Vulkan->PresentCompleteSemaphore, nullptr);
+  Device.vkDestroySemaphore(DeviceHandle, Vulkan->RenderCompleteSemaphore, nullptr);
+
+  //
+  // Destroy Command Pool
+  //
+  Device.vkDestroyCommandPool(DeviceHandle, Vulkan->CommandPool, nullptr);
+
+  //
+  // Destroy Logical Device
+  //
+  Vulkan->vkDestroyDevice(DeviceHandle, nullptr);
 }
 
 static bool
@@ -712,6 +724,14 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     }
 
     VulkanVerify(Device.vkCreateRenderPass(DeviceHandle, &RenderPassCreateInfo, nullptr, &Vulkan->RenderPass));
+  }
+
+  //
+  // Create Pipeline Cache
+  //
+  {
+    auto CreateInfo = InitStruct<VkPipelineCacheCreateInfo>();
+    VulkanVerify(Device.vkCreatePipelineCache(DeviceHandle, &CreateInfo, nullptr, &Vulkan->PipelineCache));
   }
 
   //
@@ -844,12 +864,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       DepthStencilState.depthTestEnable = VK_TRUE;
       DepthStencilState.depthWriteEnable = VK_TRUE;
       DepthStencilState.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-      DepthStencilState.depthBoundsTestEnable = VK_FALSE;
-      DepthStencilState.back.failOp = VK_STENCIL_OP_KEEP;
-      DepthStencilState.back.passOp = VK_STENCIL_OP_KEEP;
       DepthStencilState.back.compareOp = VK_COMPARE_OP_ALWAYS;
-      DepthStencilState.stencilTestEnable = VK_FALSE;
-      DepthStencilState.front = DepthStencilState.back;
     }
 
     fixed_block<1, VkPipelineColorBlendAttachmentState> ColorBlendStateAttachmentsBlock;
@@ -868,12 +883,13 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       ColorBlendState.pAttachments = ColorBlendStateAttachments.Ptr;
     }
 
-    fixed_block<VK_DYNAMIC_STATE_RANGE_SIZE, VkDynamicState> DynamicStates;
+    fixed_block<2, VkDynamicState> DynamicStatesBlock;
+    DynamicStatesBlock[0] = VK_DYNAMIC_STATE_VIEWPORT;
+    DynamicStatesBlock[1] = VK_DYNAMIC_STATE_SCISSOR;
     auto DynamicState = InitStruct<VkPipelineDynamicStateCreateInfo>();
     {
-      DynamicStates[DynamicState.dynamicStateCount++] = VK_DYNAMIC_STATE_VIEWPORT;
-      DynamicStates[DynamicState.dynamicStateCount++] = VK_DYNAMIC_STATE_SCISSOR;
-      DynamicState.pDynamicStates = &DynamicStates[0];
+      DynamicState.dynamicStateCount = Cast<uint32>(DynamicStatesBlock.Num);
+      DynamicState.pDynamicStates = &DynamicStatesBlock[0];
     }
 
     auto GraphicsPipelineCreateInfo = InitStruct<VkGraphicsPipelineCreateInfo>();
@@ -892,19 +908,10 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       GraphicsPipelineCreateInfo.renderPass = Vulkan->RenderPass;
     }
 
-    auto PipelineCacheCreateInfo = InitStruct<VkPipelineCacheCreateInfo>();
-    VkPipelineCache PipelineCache;
-    VulkanVerify(Device.vkCreatePipelineCache(DeviceHandle,
-                                              &PipelineCacheCreateInfo,
-                                              nullptr,
-                                              &PipelineCache));
-
-    VulkanVerify(Device.vkCreateGraphicsPipelines(DeviceHandle, PipelineCache,
+    VulkanVerify(Device.vkCreateGraphicsPipelines(DeviceHandle, Vulkan->PipelineCache,
                                                   1, &GraphicsPipelineCreateInfo,
                                                   nullptr,
                                                   &Vulkan->Pipeline));
-
-    Device.vkDestroyPipelineCache(DeviceHandle, PipelineCache, nullptr);
   }
 
   //
@@ -1033,8 +1040,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       FramebufferCreateInfo.layers = 1;
     }
 
-    Clear(&Vulkan->Framebuffers);
-    ExpandBy(&Vulkan->Framebuffers, Vulkan->Swapchain.ImageCount);
+    SetNum(&Vulkan->Framebuffers, Vulkan->Swapchain.ImageCount);
 
     auto const ImageCount = Vulkan->Swapchain.ImageCount;
     for(uint32 Index = 0; Index < ImageCount; ++Index)
@@ -1077,6 +1083,9 @@ VulkanCleanupRenderPass(vulkan* Vulkan)
   // Pipeline
   Device.vkDestroyPipeline(DeviceHandle, Vulkan->Pipeline, nullptr);
 
+  // Pipeline Cache
+  Device.vkDestroyPipelineCache(DeviceHandle, Vulkan->PipelineCache, nullptr);
+
   // Render Pass
   Device.vkDestroyRenderPass(DeviceHandle, Vulkan->RenderPass, nullptr);
 
@@ -1087,6 +1096,47 @@ VulkanCleanupRenderPass(vulkan* Vulkan)
   Device.vkDestroyDescriptorSetLayout(DeviceHandle, Vulkan->DescriptorSetLayout, nullptr);
 }
 
+static void
+VulkanCreateCommandBuffers(vulkan* Vulkan, VkCommandPool CommandPool, uint32 Num)
+{
+  LogBeginScope("Creating command buffers.");
+  Defer [](){ LogEndScope("Finished creating command buffers."); };
+
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  auto AllocateInfo = InitStruct<VkCommandBufferAllocateInfo>();
+  {
+    AllocateInfo.commandPool = Vulkan->CommandPool;
+    AllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    AllocateInfo.commandBufferCount = Num;
+  }
+
+  SetNum(&Vulkan->DrawCommands, Num);
+  SetNum(&Vulkan->PrePresentCommands, Num);
+  SetNum(&Vulkan->PostPresentCommands, Num);
+
+  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->DrawCommands.Ptr));
+  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->PrePresentCommands.Ptr));
+  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->PostPresentCommands.Ptr));
+}
+
+static void VulkanDestroyCommandBuffers(vulkan* Vulkan, VkCommandPool CommandPool)
+{
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->PostPresentCommands.Num), Vulkan->PostPresentCommands.Ptr);
+  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->PrePresentCommands.Num), Vulkan->PrePresentCommands.Ptr);
+  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->DrawCommands.Num), Vulkan->DrawCommands.Ptr);
+
+  Clear(&Vulkan->DrawCommands);
+  Clear(&Vulkan->PrePresentCommands);
+  Clear(&Vulkan->PostPresentCommands);
+}
+
+// TODO
+#if 0
 static void
 VulkanDestroySwapchain(vulkan* Vulkan)
 {
@@ -1120,10 +1170,14 @@ VulkanDestroySwapchain(vulkan* Vulkan)
   Device.vkDestroyImage(DeviceHandle,     Vulkan->Depth.Image, nullptr);
   Device.vkFreeMemory(DeviceHandle,       Vulkan->Depth.Memory, nullptr);
 }
+#endif
 
 static void
 VulkanCleanup(vulkan* Vulkan)
 {
+  // TODO
+
+  #if 0
   LogBeginScope("Vulkan cleanup.");
   Defer [](){ LogEndScope("Finished Vulkan cleanup."); };
 
@@ -1138,10 +1192,11 @@ VulkanCleanup(vulkan* Vulkan)
   Vulkan->vkDestroyInstance(Vulkan->InstanceHandle, nullptr);
 
   Clear(&Vulkan->Gpu.QueueProperties);
+  #endif
 }
 
 static void
-VulkanResize(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, allocator_interface* TempAllocator)
+VulkanResize(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight)
 {
   // TODO
 
@@ -1164,281 +1219,209 @@ VulkanResize(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight, allocator_interf
 }
 
 static void
-VulkanRenderPass(vulkan* Vulkan)
+VulkanBuildDrawCommands(vulkan const&          Vulkan,
+                        slice<VkCommandBuffer> DrawCommandBuffers,
+                        slice<VkFramebuffer>   Framebuffers,
+                        color_linear const&    ClearColor,
+                        float                  ClearDepth,
+                        uint32                 ClearStencil)
 {
-  // Begin render pass.
+  BoundsCheck(DrawCommandBuffers.Num == Framebuffers.Num);
+
+  auto const& Device = Vulkan.Device;
+
+  fixed_block<2, VkClearValue> ClearValuesBlock;
+  auto ClearValues = Slice(ClearValuesBlock);
+
+  // Regular clear color.
+  SliceCopy(Slice(ClearValues[0].color.float32),
+            AsConst(Slice(ClearColor.Data)));
+
+  // DepthStencil clear values.
+  ClearValues[1].depthStencil.depth = ClearDepth;
+  ClearValues[1].depthStencil.stencil = ClearStencil;
+
+  auto RenderPassBeginInfo = InitStruct<VkRenderPassBeginInfo>();
   {
-    fixed_block<2, VkClearValue> ClearValuesBlock;
-    auto ClearValues = Slice(ClearValuesBlock);
-
-    // First color
-    {
-      SliceCopy(Slice(ClearValues[0].color.float32),
-                AsConst(Slice(color::CornflowerBlue.Data)));
-    }
-
-    // Second color
-    {
-      ClearValues[1].depthStencil.depth = Vulkan->DepthStencilValue;
-      ClearValues[1].depthStencil.stencil = 0;
-    }
-
-    auto RenderPassBeginInfo = InitStruct<VkRenderPassBeginInfo>();
-    {
-      RenderPassBeginInfo.renderPass = Vulkan->RenderPass;
-      RenderPassBeginInfo.framebuffer = Vulkan->Framebuffers[Vulkan->CurrentSwapchainImage.Index];
-      RenderPassBeginInfo.renderArea.extent.width = Vulkan->Swapchain.Extent.Width;
-      RenderPassBeginInfo.renderArea.extent.height = Vulkan->Swapchain.Extent.Height;
-      RenderPassBeginInfo.clearValueCount = Cast<uint32>(ClearValues.Num);
-      RenderPassBeginInfo.pClearValues = ClearValues.Ptr;
-    }
-    Vulkan->Device.vkCmdBeginRenderPass(Vulkan->DrawCommand,
-                                        &RenderPassBeginInfo,
-                                        VK_SUBPASS_CONTENTS_INLINE);
-  }
-  Defer [=](){ Vulkan->Device.vkCmdEndRenderPass(Vulkan->DrawCommand); };
-
-  Vulkan->Device.vkCmdBindPipeline(Vulkan->DrawCommand, VK_PIPELINE_BIND_POINT_GRAPHICS, Vulkan->Pipeline);
-  Vulkan->Device.vkCmdBindDescriptorSets(Vulkan->DrawCommand, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          Vulkan->PipelineLayout, 0,
-                          1, &Vulkan->DescriptorSet,
-                          0, nullptr);
-
-  // Set Viewport
-  {
-    auto Viewport = InitStruct<VkViewport>();
-    {
-      Viewport.height = Cast<float>(Vulkan->Swapchain.Extent.Height);
-      Viewport.width = Cast<float>(Vulkan->Swapchain.Extent.Width);
-      Viewport.minDepth = 0.0f;
-      Viewport.maxDepth = 1.0f;
-    }
-    Vulkan->Device.vkCmdSetViewport(Vulkan->DrawCommand, 0, 1, &Viewport);
+    RenderPassBeginInfo.renderPass = Vulkan.RenderPass;
+    RenderPassBeginInfo.renderArea.extent.width = Vulkan.Swapchain.Extent.Width;
+    RenderPassBeginInfo.renderArea.extent.height = Vulkan.Swapchain.Extent.Height;
+    RenderPassBeginInfo.clearValueCount = Cast<uint32>(ClearValues.Num);
+    RenderPassBeginInfo.pClearValues = ClearValues.Ptr;
   }
 
-  // Set Scissor
+  auto BeginCommandBufferInfo = InitStruct<VkCommandBufferBeginInfo>();
+
+  auto const Num = DrawCommandBuffers.Num;
+  for(size_t Index = 0; Index < Num; ++Index)
   {
-    auto Scissor = InitStruct<VkRect2D>();
+    RenderPassBeginInfo.framebuffer = Framebuffers[Index];
+
+    auto DrawCommandBuffer = DrawCommandBuffers[Index];
+
+    VulkanVerify(Device.vkBeginCommandBuffer(DrawCommandBuffer, &BeginCommandBufferInfo));
+    Device.vkCmdBeginRenderPass(DrawCommandBuffer, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
     {
-      Scissor.extent.width = Vulkan->Swapchain.Extent.Width;
-      Scissor.extent.height = Vulkan->Swapchain.Extent.Height;
+      // Set viewport
+      {
+        auto Viewport = InitStruct<VkViewport>();
+        {
+          Viewport.height = Cast<float>(Vulkan.Swapchain.Extent.Height);
+          Viewport.width = Cast<float>(Vulkan.Swapchain.Extent.Width);
+          Viewport.minDepth = 0.0f;
+          Viewport.maxDepth = 1.0f;
+        }
+        Device.vkCmdSetViewport(DrawCommandBuffer, 0, 1, &Viewport);
+      }
+
+      // Set scissor
+      {
+        auto Scissor = InitStruct<VkRect2D>();
+        {
+          Scissor.extent.width = Vulkan.Swapchain.Extent.Width;
+          Scissor.extent.height = Vulkan.Swapchain.Extent.Height;
+        }
+        Device.vkCmdSetScissor(DrawCommandBuffer, 0, 1, &Scissor);
+      }
+
+      // Bind descriptor set
+      Device.vkCmdBindDescriptorSets(DrawCommandBuffer,
+                                     VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                     Vulkan.PipelineLayout,
+                                     0, // Descriptor set offset
+                                     1, &Vulkan.DescriptorSet,
+                                     0, nullptr); // Dynamic offsets
+
+      // Draw scene objects
+      VkDeviceSize NoOffset = {};
+
+      for(auto& SceneObject : Slice(&Vulkan.SceneObjects))
+      {
+        Device.vkCmdBindPipeline(DrawCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, SceneObject.Pipeline);
+        Device.vkCmdBindVertexBuffers(DrawCommandBuffer, SceneObject.Vertices.BindID, 1, &SceneObject.Vertices.Buffer, &NoOffset);
+        Device.vkCmdBindIndexBuffer(DrawCommandBuffer, SceneObject.Indices.Buffer, NoOffset, VK_INDEX_TYPE_UINT32);
+        Device.vkCmdDrawIndexed(DrawCommandBuffer, SceneObject.Indices.NumIndices, 1, 0, 0, 0);
+      }
     }
-    Vulkan->Device.vkCmdSetScissor(Vulkan->DrawCommand, 0, 1, &Scissor);
+    Device.vkCmdEndRenderPass(DrawCommandBuffer);
+    VulkanVerify(Device.vkEndCommandBuffer(DrawCommandBuffer));
   }
+}
 
-  for(auto& SceneObject : Slice(&Vulkan->SceneObjects))
+static void
+VulkanBuildPrePresentCommands(vulkan_device const& Device,
+                              slice<VkCommandBuffer> PrePresentCommandBuffers,
+                              slice<VkImage> PresentationImages)
+{
+  BoundsCheck(PrePresentCommandBuffers.Num == PresentationImages.Num);
+
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  auto BeginCommandBufferInfo = InitStruct<VkCommandBufferBeginInfo>();
+
+  size_t const Num = PrePresentCommandBuffers.Num;
+  for(size_t Index = 0; Index < Num; ++Index)
   {
-    //
-    // Bind vertex buffer
-    //
+    auto const PrePresentCommandBuffer = PrePresentCommandBuffers[Index];
+    auto const PresentationImage = PresentationImages[Index];
+
+    VulkanVerify(Device.vkBeginCommandBuffer(PrePresentCommandBuffer, &BeginCommandBufferInfo));
+
     {
-      auto VertexBufferOffset = InitStruct<VkDeviceSize>();
-      Vulkan->Device.vkCmdBindVertexBuffers(Vulkan->DrawCommand, SceneObject.Vertices.BindID,
-                                            1, &SceneObject.Vertices.Buffer, &VertexBufferOffset);
+      auto ImageBarrier = InitStruct<VkImageMemoryBarrier>();
+      ImageBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      ImageBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+      ImageBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      ImageBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+      ImageBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+      ImageBarrier.image = PresentationImage;
+
+      Device.vkCmdPipelineBarrier(PrePresentCommandBuffer,
+                                  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                                  VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                  0,
+                                  0, nullptr, // memory barriers
+                                  0, nullptr, // buffer barriers
+                                  1, &ImageBarrier);
     }
 
-    //
-    // Bind index buffer
-    //
+    VulkanVerify(Device.vkEndCommandBuffer(PrePresentCommandBuffer));
+  }
+}
+
+static void
+VulkanBuildPostPresentCommands(vulkan_device const& Device,
+                               slice<VkCommandBuffer> PostPresentCommandBuffers,
+                               slice<VkImage> PresentationImages)
+{
+  BoundsCheck(PostPresentCommandBuffers.Num == PresentationImages.Num);
+
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  auto BeginCommandBufferInfo = InitStruct<VkCommandBufferBeginInfo>();
+
+  size_t const Num = PostPresentCommandBuffers.Num;
+  for(size_t Index = 0; Index < Num; ++Index)
+  {
+    auto const PostPresentCommandBuffer = PostPresentCommandBuffers[Index];
+    auto const PresentationImage = PresentationImages[Index];
+
+    VulkanVerify(Device.vkBeginCommandBuffer(PostPresentCommandBuffer, &BeginCommandBufferInfo));
+
     {
-      auto IndexBufferOffset = InitStruct<VkDeviceSize>();
-      Vulkan->Device.vkCmdBindIndexBuffer(Vulkan->DrawCommand,
-                                          SceneObject.Indices.Buffer,
-                                          IndexBufferOffset,
-                                          VK_INDEX_TYPE_UINT32);
+      auto ImageBarrier = InitStruct<VkImageMemoryBarrier>();
+      ImageBarrier.srcAccessMask = 0;
+      ImageBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      ImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+      ImageBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      ImageBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+      ImageBarrier.image = PresentationImage;
+
+      Device.vkCmdPipelineBarrier(PostPresentCommandBuffer,
+                                  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                                  VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                  0,
+                                  0, nullptr, // memory barriers
+                                  0, nullptr, // buffer barriers
+                                  1, &ImageBarrier);
     }
 
-    //
-    // Draw
-    //
-    Vulkan->Device.vkCmdDrawIndexed(Vulkan->DrawCommand,
-                                    SceneObject.Indices.NumIndices, // indexCount
-                                    1,                              // instanceCount
-                                    0,                              // firstIndex
-                                    0,                              // vertexOffset
-                                    0);                             // firstInstance
+    VulkanVerify(Device.vkEndCommandBuffer(PostPresentCommandBuffer));
   }
 }
 
 static bool GlobalIsDrawing = false;
 
 static void
-VulkanDraw(vulkan* Vulkan, allocator_interface* TempAllocator)
+VulkanDraw(vulkan* Vulkan)
 {
   ::GlobalIsDrawing = true;
   Defer [](){ ::GlobalIsDrawing = false; };
 
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
   VkFence NullFence = {};
   VkResult Error = {};
 
-  auto PresentCompleteSemaphore = InitStruct<VkSemaphore>();
+
+  //
+  // Get next swapchain image.
+  //
   {
-    auto PresentCompleteSemaphoreCreateInfo = InitStruct<VkSemaphoreCreateInfo>();
-    VulkanVerify(Vulkan->Device.vkCreateSemaphore(Vulkan->Device.DeviceHandle, &PresentCompleteSemaphoreCreateInfo, nullptr, &PresentCompleteSemaphore));
-  }
-  Defer [=](){ Vulkan->Device.vkDestroySemaphore(Vulkan->Device.DeviceHandle, PresentCompleteSemaphore, nullptr); };
+    Error = VulkanAcquireNextSwapchainImage(Vulkan->Swapchain,
+                                            Vulkan->PresentCompleteSemaphore,
+                                            &Vulkan->CurrentSwapchainImage);
 
-  // Get the index of the next available swapchain image:
-  Error = VulkanAcquireNextSwapchainImage(Vulkan->Swapchain,
-                                          PresentCompleteSemaphore,
-                                          &Vulkan->CurrentSwapchainImage);
-
-  switch(Error)
-  {
-    case VK_ERROR_OUT_OF_DATE_KHR:
-    {
-      // Swapchain is out of date (e.g. the window was resized) and must be
-      // recreated:
-      VulkanResize(Vulkan, Vulkan->Swapchain.Extent.Width, Vulkan->Swapchain.Extent.Height, TempAllocator);
-      VulkanDraw(Vulkan, TempAllocator);
-    } break;
-    case VK_SUBOPTIMAL_KHR:
-    {
-      // Swapchain is not as optimal as it could be, but the platform's
-      // presentation engine will still present the image correctly.
-    } break;
-    default: VulkanVerify(Error);
-  }
-
-  auto const CurrentSwapchainImage = Vulkan->Swapchain.Images[Vulkan->CurrentSwapchainImage.Index];
-
-  // Assume the command buffer has been run on current_buffer before so
-  // we need to set the image layout back to COLOR_ATTACHMENT_OPTIMAL
-  {
-    VulkanEnsureSetupCommandIsReady(Vulkan->Device, Vulkan->CommandPool, &Vulkan->SetupCommand);
-
-    auto ImageMemoryBarrier = InitStruct<VkImageMemoryBarrier>();
-    {
-      ImageMemoryBarrier.srcAccessMask = 0;
-      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-      ImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-      ImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      {
-        auto& Range = ImageMemoryBarrier.subresourceRange;
-        Range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        Range.baseMipLevel = 0;
-        Range.levelCount = 1;
-        Range.baseArrayLayer = 0;
-        Range.layerCount = 1;
-      }
-      ImageMemoryBarrier.image = CurrentSwapchainImage;
-    }
-
-    VkPipelineStageFlags SourceStages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    VkPipelineStageFlags DestinationStages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-
-    Vulkan->Device.vkCmdPipelineBarrier(Vulkan->SetupCommand,            // commandBuffer
-                                        SourceStages, DestinationStages, // srcStageMask, dstStageMask
-                                        0,                               // dependencyFlags
-                                        0, nullptr,                      // memoryBarrierCount, pMemoryBarriers
-                                        0, nullptr,                      // bufferMemoryBarrierCount, pBufferMemoryBarriers
-                                        1, &ImageMemoryBarrier);         // imageMemoryBarrierCount, pImageMemoryBarriers
-  }
-
-  VulkanFlushSetupCommand(Vulkan->Device, Vulkan->Queue, Vulkan->CommandPool, &Vulkan->SetupCommand);
-
-
-  {
-    auto CommandBufferInheritanceInfo = InitStruct<VkCommandBufferInheritanceInfo>();
-    auto CommandBufferBeginInfo = InitStruct<VkCommandBufferBeginInfo>();
-    CommandBufferBeginInfo.pInheritanceInfo = &CommandBufferInheritanceInfo;
-    VulkanVerify(Vulkan->Device.vkBeginCommandBuffer(Vulkan->DrawCommand, &CommandBufferBeginInfo));
-  }
-  // FIXME/TODO: Deal with VK_IMAGE_LAYOUT_PRESENT_SRC_KHR?!?!?
-  VulkanRenderPass(Vulkan);
-
-  {
-    auto PrePresentBarrier = InitStruct<VkImageMemoryBarrier>();
-    {
-      PrePresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-      PrePresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-      PrePresentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      PrePresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-      {
-        auto& Range = PrePresentBarrier.subresourceRange;
-        Range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        Range.baseMipLevel = 0;
-        Range.levelCount = 1;
-        Range.baseArrayLayer = 0;
-        Range.layerCount = 1;
-      }
-      PrePresentBarrier.image = CurrentSwapchainImage;
-    }
-
-    Vulkan->Device.vkCmdPipelineBarrier(Vulkan->DrawCommand,                  // commandBuffer
-                                        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,   // srcStageMask
-                                        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, // dstStageMask
-                                        0,                                    // dependencyFlags
-                                        0, nullptr,                           // memoryBarrierCount, pMemoryBarriers
-                                        0, nullptr,                           // bufferMemoryBarrierCount, pBufferMemoryBarriers
-                                        1, &PrePresentBarrier);               // imageMemoryBarrierCount, pImageMemoryBarriers
-  }
-
-  VulkanVerify(Vulkan->Device.vkEndCommandBuffer(Vulkan->DrawCommand));
-
-  auto DrawFence = InitStruct<VkFence>();
-  {
-    auto FenceInfo = InitStruct<VkFenceCreateInfo>();
-    VulkanVerify(Vulkan->Device.vkCreateFence(Vulkan->Device.DeviceHandle, &FenceInfo, nullptr, &DrawFence));
-  }
-  Defer [=](){ Vulkan->Device.vkDestroyFence(Vulkan->Device.DeviceHandle, DrawFence, nullptr); };
-
-  // Submit the draw command to the queue.
-  {
-    VkPipelineStageFlags PipelineStageFlags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    auto SubmitInfo = InitStruct<VkSubmitInfo>();
-    {
-      SubmitInfo.waitSemaphoreCount = 1;
-      SubmitInfo.pWaitSemaphores = &PresentCompleteSemaphore;
-      SubmitInfo.pWaitDstStageMask = &PipelineStageFlags;
-      SubmitInfo.commandBufferCount = 1;
-      SubmitInfo.pCommandBuffers = &Vulkan->DrawCommand;
-      SubmitInfo.signalSemaphoreCount = 0;
-      SubmitInfo.pSignalSemaphores = nullptr;
-    }
-
-    VulkanVerify(Vulkan->Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, DrawFence));
-  }
-
-  // Wait for the present complete semaphore to be signaled to ensure
-  // that the image won't be rendered to until the presentation
-  // engine has fully released ownership to the application, and it is
-  // okay to render to the image.
-
-  // Make sure the command buffer is finished before presenting.
-  {
-    VkResult WaitResult = {};
-    auto Timeout = Milliseconds(100);
-    while(true)
-    {
-      WaitResult = Vulkan->Device.vkWaitForFences(Vulkan->Device.DeviceHandle,
-                                                  1, &DrawFence,
-                                                  VK_TRUE,
-                                                  Convert<uint64>(TimeAsNanoseconds(Timeout)));
-      if(WaitResult == VK_TIMEOUT)
-        continue;
-      VulkanVerify(WaitResult);
-      break;
-    }
-  }
-
-  // Present the results.
-  {
-    auto Present = InitStruct<VkPresentInfoKHR>();
-    {
-      Present.swapchainCount = 1;
-      Present.pSwapchains = &Vulkan->Swapchain.SwapchainHandle;
-      Present.pImageIndices = &Vulkan->CurrentSwapchainImage.Index;
-    }
-
-    Error = Vulkan->Device.vkQueuePresentKHR(Vulkan->Queue, &Present);
+    // TODO: Check if this ever happens.
     switch(Error)
     {
       case VK_ERROR_OUT_OF_DATE_KHR:
       {
         // Swapchain is out of date (e.g. the window was resized) and must be
         // recreated:
-        VulkanResize(Vulkan, Vulkan->Swapchain.Extent.Width, Vulkan->Swapchain.Extent.Height, TempAllocator);
+        VulkanResize(Vulkan, Vulkan->Swapchain.Extent.Width, Vulkan->Swapchain.Extent.Height);
+        VulkanDraw(Vulkan);
       } break;
       case VK_SUBOPTIMAL_KHR:
       {
@@ -1449,8 +1432,83 @@ VulkanDraw(vulkan* Vulkan, allocator_interface* TempAllocator)
     }
   }
 
-  // Wait for the queue to complete.
-  VulkanVerify(Vulkan->Device.vkQueueWaitIdle(Vulkan->Queue));
+
+  //
+  // Submit post-present commands.
+  //
+  {
+    auto SubmitInfo = InitStruct<VkSubmitInfo>();
+    SubmitInfo.commandBufferCount = 1;
+    SubmitInfo.pCommandBuffers = &Vulkan->PostPresentCommands[Vulkan->CurrentSwapchainImage.Index];
+    VulkanVerify(Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, NullFence));
+  }
+
+
+  //
+  // Submit draw commands.
+  //
+  {
+    VkPipelineStageFlags const SubmitPipelineStages = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
+    auto SubmitInfo = InitStruct<VkSubmitInfo>();
+    SubmitInfo.pWaitDstStageMask = &SubmitPipelineStages;
+    SubmitInfo.waitSemaphoreCount = 1;
+    SubmitInfo.pWaitSemaphores = &Vulkan->PresentCompleteSemaphore;
+    SubmitInfo.signalSemaphoreCount = 1;
+    SubmitInfo.pSignalSemaphores = &Vulkan->RenderCompleteSemaphore;
+    SubmitInfo.commandBufferCount = 1;
+    SubmitInfo.pCommandBuffers = &Vulkan->DrawCommands[Vulkan->CurrentSwapchainImage.Index];
+    VulkanVerify(Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, NullFence));
+  }
+
+
+  //
+  // Submit pre-present commands.
+  //
+  {
+    auto SubmitInfo = InitStruct<VkSubmitInfo>();
+    SubmitInfo.commandBufferCount = 1;
+    SubmitInfo.pCommandBuffers = &Vulkan->PrePresentCommands[Vulkan->CurrentSwapchainImage.Index];
+    VulkanVerify(Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, NullFence));
+  }
+
+
+  //
+  // Present
+  //
+  {
+    Error = VulkanQueuePresent(&Vulkan->Swapchain,
+                               Vulkan->Queue,
+                               Vulkan->CurrentSwapchainImage,
+                               Vulkan->RenderCompleteSemaphore);
+
+    // TODO: See if we need to handle the cases in the switch below.
+    VulkanVerify(Error);
+
+    #if 0
+    switch(Error)
+    {
+      case VK_ERROR_OUT_OF_DATE_KHR:
+      {
+        // Swapchain is out of date (e.g. the window was resized) and must be
+        // recreated:
+        VulkanResize(Vulkan, Vulkan->Swapchain.Extent.Width, Vulkan->Swapchain.Extent.Height);
+        VulkanDraw(Vulkan);
+      } break;
+      case VK_SUBOPTIMAL_KHR:
+      {
+        // Swapchain is not as optimal as it could be, but the platform's
+        // presentation engine will still present the image correctly.
+      } break;
+      default: VulkanVerify(Error);
+    }
+    #endif
+  }
+
+  //
+  // Wait for the presenting to finish.
+  //
+  Device.vkQueueWaitIdle(Vulkan->Queue);
 }
 
 void Win32MessagePump()
@@ -1574,7 +1632,8 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     {
       LogBeginScope("Initializing Vulkan for graphics.");
 
-      if(!VulkanInitializeForGraphics(Vulkan, Instance, Window->WindowHandle, Allocator))
+      ++CurrentExitCode;
+      if(!VulkanInitializeGraphics(Vulkan, Instance, Window->WindowHandle, Allocator))
       {
         LogEndScope("Vulkan initialization failed.");
         return CurrentExitCode;
@@ -1582,9 +1641,12 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
       LogEndScope("Vulkan successfully initialized.");
     }
-    // TODO: Cleanup device etc.
+    Defer [Vulkan](){ VulkanFinalizeGraphics(Vulkan); };
 
     VulkanSwapchainConnect(&Vulkan->Swapchain, &Vulkan->Device, &Vulkan->Surface);
+
+    // Now that we have a command pool, we can create the setup command
+    VulkanPrepareSetupCommandBuffer(Vulkan);
 
     //
     // Swapchain
@@ -1606,14 +1668,23 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
 
     //
+    // Create Command Buffers
+    //
+    {
+      VulkanCreateCommandBuffers(Vulkan, Vulkan->CommandPool, Vulkan->Swapchain.ImageCount);
+    }
+    Defer [Vulkan](){ VulkanDestroyCommandBuffers(Vulkan, Vulkan->CommandPool); };
+
+
+    //
     // Depth
     //
     {
       LogBeginScope("Preparing depth.");
 
+      ++CurrentExitCode;
       if(!VulkanPrepareDepth(Vulkan, &Vulkan->Depth, Vulkan->Swapchain.Extent))
       {
-        ++CurrentExitCode;
         LogEndScope("Failed preparing depth.");
         return CurrentExitCode;
       }
@@ -1630,6 +1701,11 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       VulkanPrepareRenderPass(Vulkan);
     }
     Defer [Vulkan](){ VulkanCleanupRenderPass(Vulkan); };
+
+    // Flush the setup command once now to finalize initialization but prepare it for further use also.
+    VulkanCleanupSetupCommandBuffer(Vulkan, flush_command_buffer::Yes);
+    VulkanPrepareSetupCommandBuffer(Vulkan);
+    Defer [Vulkan](){ VulkanCleanupSetupCommandBuffer(Vulkan, flush_command_buffer::No); };
 
     Window->Vulkan = Vulkan;
 
@@ -1726,10 +1802,10 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       LogBeginScope("Creating scene objects");
       Defer [](){ LogEndScope("Finished creating scene objects."); };
 
-      auto KittenQuad = VulkanCreateSceneObject(Vulkan);
+      auto Kitten = VulkanCreateSceneObject(Vulkan);
       auto KittenFileName = "Data/Kitten_DXT1_Mipmaps.dds";
-      VulkanSetTextureFromFile(Vulkan, KittenFileName, &KittenQuad->Texture);
-      VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &KittenQuad->Vertices, &KittenQuad->Indices);
+      VulkanSetTextureFromFile(Vulkan, KittenFileName, &Kitten->Texture);
+      VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->Vertices, &Kitten->Indices);
 
       // TODO: This should be done per object in the render loop, but somehow
       // the command buffer recording is stopped by the call to
@@ -1742,8 +1818,8 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         //
         auto TextureDescriptor = InitStruct<VkDescriptorImageInfo>();
         {
-          TextureDescriptor.sampler = KittenQuad->Texture.SamplerHandle;
-          TextureDescriptor.imageView = KittenQuad->Texture.ImageViewHandle;
+          TextureDescriptor.sampler = Kitten->Texture.SamplerHandle;
+          TextureDescriptor.imageView = Kitten->Texture.ImageViewHandle;
           TextureDescriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
         }
 
@@ -1760,6 +1836,26 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
                                               1, &TextureAndSamplerUpdateInfo,
                                               0, nullptr);
       }
+
+      Kitten->Pipeline = Vulkan->Pipeline;
+    }
+
+    //
+    // Build Command Buffers
+    //
+    {
+      VulkanBuildDrawCommands(*Vulkan,
+                              Slice(&Vulkan->DrawCommands),
+                              Slice(&Vulkan->Framebuffers),
+                              color::CornflowerBlue,
+                              Vulkan->DepthStencilValue,
+                              0);
+      VulkanBuildPrePresentCommands(Vulkan->Device,
+                                    Slice(&Vulkan->PrePresentCommands),
+                                    Slice(&Vulkan->Swapchain.Images));
+      VulkanBuildPostPresentCommands(Vulkan->Device,
+                                     Slice(&Vulkan->PostPresentCommands),
+                                     Slice(&Vulkan->Swapchain.Images));
     }
 
     //
@@ -1843,7 +1939,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       if(::GlobalIsResizeRequested)
       {
         LogBeginScope("Resizing swapchain");
-        VulkanResize(Vulkan, ::GlobalResizeRequest_Width, ::GlobalResizeRequest_Height, Allocator);
+        VulkanResize(Vulkan, ::GlobalResizeRequest_Width, ::GlobalResizeRequest_Height);
         ::GlobalIsResizeRequested = false;
         LogEndScope("Finished resizing swapchain");
       }
@@ -1911,9 +2007,8 @@ Win32MainWindowCallback(HWND WindowHandle, UINT Message,
 
     if(Vulkan && Vulkan->IsPrepared)
     {
-      // TODO: More appropriate temp allocator?
-      mallocator TempAllocator = {};
-      VulkanDraw(Vulkan, &TempAllocator);
+      temp_allocator TempAllocator;
+      VulkanDraw(Vulkan);
     }
 
     if(MustBeginAndEndPaint)
