@@ -220,13 +220,12 @@ VulkanDestroyAndDeallocateSceneObject(vulkan*              Vulkan,
 enum class vulkan_force_linear_tiling : bool { No = false, Yes = true };
 
 bool
-VulkanLoadTextureFromFile(
-  vulkan const&                      Vulkan,
-  VkCommandBuffer                    CommandBuffer,
-  char const*                        FileName,
-  vulkan_texture2d*                  Texture,
-  vulkan_force_linear_tiling         ForceLinearTiling = vulkan_force_linear_tiling::No,
-  VkImageUsageFlags                  ImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT
+VulkanUploadTexture(
+  vulkan const&              Vulkan,
+  VkCommandBuffer            CommandBuffer,
+  vulkan_texture2d*          Texture,
+  vulkan_force_linear_tiling ForceLinearTiling = vulkan_force_linear_tiling::No,
+  VkImageUsageFlags          ImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT
 );
 
 void

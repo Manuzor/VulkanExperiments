@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CoreAPI.hpp"
 #include "DynamicArray.hpp"
 #include "ImageHeader.hpp"
 
@@ -26,19 +27,19 @@ struct image : public image_header
   dynamic_array<uint8> Data;
 };
 
-void
+CORE_API void
 Init(image* Image, allocator_interface* Allocator);
 
-void
+CORE_API void
 Finalize(image* Image);
 
-uint32
+CORE_API uint32
 ImageNumBlocksX(image const* Image, uint32 MipLevel = 0);
 
-uint32
+CORE_API uint32
 ImageNumBlocksY(image const* Image, uint32 MipLevel = 0);
 
-uint32
+CORE_API uint32
 ImageDataSize(image const* Image);
 
 
@@ -46,27 +47,27 @@ ImageDataSize(image const* Image);
 ///
 /// When creating an image, call this method after setting the dimensions and number of mip levels, faces and array indices.
 /// Changing the image dimensions or number of sub-images will not automatically reallocate the data.
-void
+CORE_API void
 ImageAllocateData(image* Image);
 
 /// \brief Returns the offset in bytes between two subsequent rows of the given mip level.
 ///
 /// This function is only valid to use when the image format is a linear pixel format.
-uint32
+CORE_API uint32
 ImageRowPitch(image const* Image, uint32 MipLevel = 0);
 
 /// \brief Returns the offset in bytes between two subsequent depth slices of the given mip level.
-uint32
+CORE_API uint32
 ImageDepthPitch(image const* Image, uint32 MipLevel = 0);
 
 /// \brief Returns the position in bytes in the data array of the given sub-image.
-uint32
+CORE_API uint32
 ImageDataOffSet(image const* Image, uint32 MipLevel = 0, uint32 Face = 0, uint32 ArrayIndex = 0);
 
-image::sub_image const*
+CORE_API image::sub_image const*
 ImageInternalSubImage(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex);
 
-image::sub_image*
+CORE_API image::sub_image*
 ImageInternalSubImage(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex);
 
 
@@ -156,3 +157,11 @@ ImageBlockPointer(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex,
 {
   return const_cast<T*>(ImageBlockPointer<T>(AsPtrToConst(Image), MipLevel, Face, ArrayIndex, BlockX, BlockY, Z));
 }
+
+//
+// Default Load Functions
+//
+
+/// Set's the image data to be a solid color in the given format.
+bool
+ImageSetAsSolidColor(image* Image, union color_linear const& Color, image_format Format);

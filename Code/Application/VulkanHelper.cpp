@@ -1340,7 +1340,7 @@ auto
   VkFormat VulkanTextureFormat = ImageFormatToVulkan(Image.Format);
   if(VulkanTextureFormat == VK_FORMAT_UNDEFINED)
   {
-    LogError("Unable to find corresponding Vulkan format for %s.", Image.Format);
+    LogError("Unable to find corresponding Vulkan format for %s.", ImageFormatName(Image.Format));
     return false;
   }
 
@@ -1397,7 +1397,7 @@ auto
 ::ImageFormatToVulkan(image_format KrepelFormat)
   -> VkFormat
 {
-  // TODO(Manu): final switch.
+  // TODO(Manu): complete switch.
   switch(KrepelFormat)
   {
     default: return VK_FORMAT_UNDEFINED;
@@ -1416,6 +1416,8 @@ auto
     //case image_format::R8G8B8A8_TYPELESS:   return VK_FORMAT_R8G8B8A8_SSCALED;
     case image_format::R8G8B8A8_UINT:       return VK_FORMAT_R8G8B8A8_UINT;
     case image_format::R8G8B8A8_SINT:       return VK_FORMAT_R8G8B8A8_SINT;
+
+    case image_format::R32G32B32A32_FLOAT:  return VK_FORMAT_R32G32B32A32_SFLOAT;
 
     //
     // BGRA formats
@@ -1468,12 +1470,14 @@ auto
     //
     // RGBA formats
     //
-    case VK_FORMAT_R8G8B8A8_UNORM:   return image_format::R8G8B8A8_UNORM;
-    case VK_FORMAT_R8G8B8A8_SNORM:   return image_format::R8G8B8A8_SNORM;
-    case VK_FORMAT_R8G8B8A8_SRGB:    return image_format::R8G8B8A8_UNORM_SRGB;
-    //case VK_FORMAT_R8G8B8A8_SSCALED: return image_format::R8G8B8A8_TYPELESS;
-    case VK_FORMAT_R8G8B8A8_UINT:    return image_format::R8G8B8A8_UINT;
-    case VK_FORMAT_R8G8B8A8_SINT:    return image_format::R8G8B8A8_SINT;
+    case VK_FORMAT_R8G8B8A8_UNORM:      return image_format::R8G8B8A8_UNORM;
+    case VK_FORMAT_R8G8B8A8_SNORM:      return image_format::R8G8B8A8_SNORM;
+    case VK_FORMAT_R8G8B8A8_SRGB:       return image_format::R8G8B8A8_UNORM_SRGB;
+    //case VK_FORMAT_R8G8B8A8_SSCALED:    return image_format::R8G8B8A8_TYPELESS;
+    case VK_FORMAT_R8G8B8A8_UINT:       return image_format::R8G8B8A8_UINT;
+    case VK_FORMAT_R8G8B8A8_SINT:       return image_format::R8G8B8A8_SINT;
+
+    case VK_FORMAT_R32G32B32A32_SFLOAT: return image_format::R32G32B32A32_FLOAT;
 
     //
     // BGRA formats
@@ -1743,13 +1747,11 @@ auto
 }
 
 auto
-::VulkanLoadTextureFromFile(
-  vulkan const&                      Vulkan,
-  VkCommandBuffer                    CommandBuffer,
-  char const*                        FileName,
-  vulkan_texture2d*                  Texture,
-  vulkan_force_linear_tiling         ForceLinearTiling,
-  VkImageUsageFlags                  ImageUsageFlags
+::VulkanUploadTexture(vulkan const&              Vulkan,
+                      VkCommandBuffer            CommandBuffer,
+                      vulkan_texture2d*          Texture,
+                      vulkan_force_linear_tiling ForceLinearTiling,
+                      VkImageUsageFlags          ImageUsageFlags
 )
   -> bool
 {
@@ -1758,24 +1760,6 @@ auto
 
   auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
-
-  auto CreateImageLoader = Reinterpret<PFN_CreateImageLoader>(GetProcAddress(GetModuleHandle(nullptr), "CreateImageLoader_DDS"));
-  Assert(CreateImageLoader);
-
-  auto DestroyImageLoader = Reinterpret<PFN_DestroyImageLoader>(GetProcAddress(GetModuleHandle(nullptr), "DestroyImageLoader_DDS"));
-  Assert(DestroyImageLoader);
-
-  image_loader_interface* Loader = CreateImageLoader(Allocator);
-  Defer [=](){ DestroyImageLoader(Allocator, Loader); };
-
-  if(LoadImageFromFile(Loader, &Texture->Image, Allocator, FileName))
-  {
-    LogInfo("Loaded image file: %s", FileName);
-  }
-  else
-  {
-    LogWarning("Failed to load image file: %s", FileName);
-  }
 
   // Check for compatibility.
   Assert(VulkanIsImageCompatibleWithGpu(Vulkan.Gpu, Texture->Image));

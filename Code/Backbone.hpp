@@ -1009,6 +1009,28 @@ Slice(slice<ElementType> SomeSlice, StartIndexType InclusiveStartIndex, EndIndex
   return Result;
 }
 
+/// Creates a new slice from an existing one, trimming elements at the beginning.
+template<typename ElementType, typename AmountType>
+constexpr slice<ElementType>
+SliceTrimFront(slice<ElementType> SomeSlice, AmountType Amount)
+{
+  return {
+    Amount > SomeSlice.Num ? 0 : SomeSlice.Num - Amount,
+    MemAddOffset(SomeSlice.Ptr, Amount)
+  };
+}
+
+/// Creates a new slice from an existing one, trimming elements at the beginning.
+template<typename ElementType, typename AmountType>
+constexpr slice<ElementType>
+SliceTrimBack(slice<ElementType> SomeSlice, AmountType Amount)
+{
+  return {
+    Amount > SomeSlice.Num ? 0 : SomeSlice.Num - Amount,
+    SomeSlice.Ptr
+  };
+}
+
 /// Copies the contents of one slice into another.
 ///
 /// If the number of elements don't match, the minimum of both is used.
@@ -1016,14 +1038,17 @@ template<typename T>
 size_t
 SliceCopy(slice<T> Target, slice<T const> Source)
 {
-  // TODO Optimize for PODs
-
   size_t Amount = Min(Target.Num, Source.Num);
-  for(size_t Index = 0; Index < Amount; ++Index)
-  {
-    Target.Ptr[Index] = Source.Ptr[Index];
-  }
+  MemCopy(Amount, Target.Ptr, Source.Ptr);
   return Amount;
+}
+
+/// Set each element of Target to Value.
+template<typename T>
+void
+SliceSet(slice<T> Target, T const Value)
+{
+  MemSet(Target.Num, Target.Ptr, Forward<T const>(Value));
 }
 
 template<typename T>
@@ -1301,14 +1326,20 @@ struct path_options
 /// Excludes the path separator in Out_Directory.
 ///
 /// \return The index of the separator.
-BB_Inline size_t
-ExtractPathDirectoryAndFileName(slice<char const> Path, slice<char const>* Out_Directory, slice<char const>* Out_Name, path_options Options = path_options());
+inline size_t
+ExtractPathDirectoryAndFileName(slice<char const> Path, slice<char const>* Out_Directory, slice<char const>* Out_Name, path_options Options = {});
 
-BB_Inline size_t
-ExtractPathDirectoryAndFileName(slice<char> Path, slice<char>* Out_Directory, slice<char>* Out_Name, path_options Options = path_options());
+inline size_t
+ExtractPathDirectoryAndFileName(slice<char> Path, slice<char>* Out_Directory, slice<char>* Out_Name, path_options Options = {});
 
-BB_Inline slice<char>
-ConcatPaths(slice<char const> Head, slice<char const> Tail, slice<char> Buffer, path_options Options = path_options());
+inline slice<char>
+ConcatPaths(slice<char const> Head, slice<char const> Tail, slice<char> Buffer, path_options Options = {});
+
+inline slice<char>
+FindFileExtension(slice<char> FileName, path_options Options = {});
+
+inline slice<char const>
+FindFileExtension(slice<char const> FileName, path_options Options = {});
 
 // =======================================
 // === Source: Backbone/FixedBlock.hpp ===
@@ -1449,5 +1480,38 @@ auto
   auto Result = Slice(Buffer, 0, Head.Num + 1 + Tail.Num);
   if(Options.AppendNull) Buffer[Result.Num] = '\0';
   return Result;
+}
+
+template<typename CharType>
+struct impl_find_file_extension
+{
+  static slice<CharType>
+  Do(slice<CharType> FileName, path_options Options)
+  {
+    for(size_t Index = FileName.Num; Index > 0; --Index)
+    {
+      if(FileName[Index] == '.')
+        return Slice(FileName, Index, FileName.Num);
+
+      if(FileName[Index] == Options.Separator)
+        break;
+    }
+
+    return { 0, OnePastLast(FileName) };
+  }
+};
+
+auto
+::FindFileExtension(slice<char> FileName, path_options Options)
+  -> slice<char>
+{
+  return impl_find_file_extension<char>::Do(FileName, Options);
+}
+
+auto
+::FindFileExtension(slice<char const> FileName, path_options Options)
+  -> slice<char const>
+{
+  return impl_find_file_extension<char const>::Do(FileName, Options);
 }
 

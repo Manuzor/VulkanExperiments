@@ -1,6 +1,7 @@
 #include "Image.hpp"
 
 #include "Log.hpp"
+#include "Color.hpp"
 
 
 static bool
@@ -161,4 +162,55 @@ auto
   -> uint32
 {
   return ImageInternalSubImage(Image, MipLevel, Face, ArrayIndex)->DataOffset;
+}
+
+static bool
+IsSupportedSolidColorFormat(image_format Format)
+{
+  switch(Format)
+  {
+    default:                               return false;
+    case image_format::R32G32B32A32_FLOAT: return true;
+  }
+}
+
+static void
+ColorToPixel(color_linear const& Color, image_format Format, slice<float> OutPixelData)
+{
+  BoundsCheck(OutPixelData.Num >= 4);
+
+  switch(Format)
+  {
+    default: SliceSet(OutPixelData, 0.0f); return;
+    case image_format::R32G32B32A32_FLOAT: SliceCopy(OutPixelData, AsConst(Slice(Color.Data))); return;
+  }
+}
+
+auto
+::ImageSetAsSolidColor(image* Image, color_linear const& Color, image_format Format)
+  -> bool
+{
+  if(!IsSupportedSolidColorFormat(Format))
+  {
+    LogError("Unsupported image format for use as solid color: %s", ImageFormatName(Format));
+    return false;
+  }
+  Image->Format = Format;
+
+  fixed_block<4, float> Pixel;
+  ColorToPixel(Color, Format, Slice(Pixel));
+
+  Image->Width  = 2;
+  Image->Height = 2;
+  ImageAllocateData(Image);
+  float* DestPtr = ImageDataPointer<float>(Image);
+
+  auto const NumPixels = Image->Width * Image->Height;
+  for(size_t PixelIndex = 0; PixelIndex < NumPixels; ++PixelIndex)
+  {
+    MemCopy<float>(4, DestPtr, &Pixel[0]);
+    DestPtr += 4;
+  }
+
+  return true;
 }

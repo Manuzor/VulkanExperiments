@@ -1,20 +1,30 @@
 #pragma once
 
 #include "ImageLoader.hpp"
+#include "Log.hpp"
 
 #include <Backbone.hpp>
 
 #include <cstdio>
+#include <Windows.h> // TODO: Remove this dependency here.
 
 
 auto
-::LoadImageFromFile(image_loader_interface* Loader,
-                    image* Image,
-                    allocator_interface* TempAllocator,
-                    char const* FileName)
+::LoadImageFromFile(image_loader_interface* Loader, image* Image, slice<char const> FileName)
   -> bool
 {
-  FILE* File = std::fopen(FileName, "rb");
+  temp_allocator TempAllocatorGuard;
+  allocator_interface* TempAllocator = *TempAllocatorGuard;
+
+  // Copy FileName here since neither the C-API nor windows accept strings
+  // that are sized (i.e. not zero-termianted.)
+  auto SzFileName = SliceAllocate<char>(TempAllocator, FileName.Num + 1);
+  Defer [=](){ SliceDeallocate(TempAllocator, SzFileName); };
+
+  SliceCopy(SzFileName, FileName);
+  SzFileName[SzFileName.Num] = '\0';
+
+  FILE* File = std::fopen(SzFileName.Ptr, "rb");
   if(File == nullptr)
     return false;
 
@@ -39,4 +49,30 @@ auto
   auto ContentSlice = Slice(&Content);
   auto RawContentSlice = SliceReinterpret<void const>(ContentSlice);
   return Loader->LoadImageFromData(AsConst(RawContentSlice), Image);
+}
+
+auto
+::ImageLoaderFactoryByFileExtension(slice<char const> FileExtension)
+  -> image_loader_factory
+{
+  if(FileExtension.Num == 0)
+  {
+    LogError("Empty file extension.");
+    return {};
+  }
+
+  if(FileExtension[0] == '.')
+  {
+    FileExtension = SliceTrimFront(FileExtension, 1);
+  }
+
+  if(FileExtension == SliceFromString("dds"))
+  {
+     return { Reinterpret<PFN_CreateImageLoader>(GetProcAddress(GetModuleHandle(nullptr), "CreateImageLoader_DDS")),
+              Reinterpret<PFN_DestroyImageLoader>(GetProcAddress(GetModuleHandle(nullptr), "DestroyImageLoader_DDS")) };
+  }
+
+  LogWarning("Do not know a image loader that supported this file extension: %*s",
+             Convert<int>(FileExtension.Num), FileExtension.Ptr);
+  return {};
 }

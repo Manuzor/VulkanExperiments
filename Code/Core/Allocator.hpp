@@ -66,9 +66,6 @@ struct CORE_API temp_allocator
   temp_allocator(temp_allocator const&) = delete;
   ~temp_allocator();
 
-  // TODO: Remove this operator. It is superceeded by `operator *`
-  operator allocator_interface*();
-
   /// Get the pointer to the actual allocator interface.
   allocator_interface*
   operator *();

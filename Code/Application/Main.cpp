@@ -1804,7 +1804,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       LogBeginScope("Creating scene objects");
       Defer [](){ LogEndScope("Finished creating scene objects."); };
 
-      VkCommandBuffer TextureLoadCommandBuffer = {};
+      VkCommandBuffer TextureUploadCommandBuffer = {};
       {
         auto CommandBufferInfo = InitStruct<VkCommandBufferAllocateInfo>();
         CommandBufferInfo.commandPool = Vulkan->CommandPool;
@@ -1812,24 +1812,48 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         CommandBufferInfo.commandBufferCount = 1;
         VulkanVerify(Vulkan->Device.vkAllocateCommandBuffers(Vulkan->Device.DeviceHandle,
                                                              &CommandBufferInfo,
-                                                             &TextureLoadCommandBuffer));
+                                                             &TextureUploadCommandBuffer));
       }
 
-      Defer [Vulkan, TextureLoadCommandBuffer]()
+      Defer [Vulkan, TextureUploadCommandBuffer]()
       {
         Vulkan->Device.vkFreeCommandBuffers(Vulkan->Device.DeviceHandle,
                                             Vulkan->CommandPool,
                                             1,
-                                            &TextureLoadCommandBuffer);
+                                            &TextureUploadCommandBuffer);
       };
 
       auto Kitten = VulkanCreateSceneObject(Vulkan, Allocator);
-      auto KittenFileName = "Data/Kitten_DXT1_Mipmaps.dds";
-      VulkanLoadTextureFromFile(*Vulkan,
-                                TextureLoadCommandBuffer,
-                                KittenFileName,
-                                &Kitten->Texture,
-                                vulkan_force_linear_tiling::Yes); // TODO: Should be ::No
+
+      //
+      // Load image.
+      //
+      bool const LoadFromFile = false;
+      if(LoadFromFile)
+      {
+        auto FileName = SliceFromString("Data/Kitten_DXT1_Mipmaps.dds");
+        auto ImageLoaderFactory = ImageLoaderFactoryByFileExtension(FindFileExtension(FileName));
+        auto ImageLoader = ImageLoaderFactory.CreateImageLoader(Allocator);
+        if(LoadImageFromFile(ImageLoader, &Kitten->Texture.Image, FileName))
+        {
+          LogInfo("Loaded image file: %*s", Convert<int>(FileName.Num), FileName);
+        }
+        else
+        {
+          LogWarning("Failed to load image file: %*s", Convert<int>(FileName.Num), FileName);
+        }
+        ImageLoaderFactory.DestroyImageLoader(Allocator, ImageLoader);
+      }
+      else
+      {
+        ImageSetAsSolidColor(&Kitten->Texture.Image, color::Red, image_format::R32G32B32A32_FLOAT);
+      }
+
+      VulkanUploadTexture(*Vulkan,
+                          TextureUploadCommandBuffer,
+                          &Kitten->Texture,
+                          vulkan_force_linear_tiling::Yes); // TODO: Should be ::No
+
       VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->Vertices, &Kitten->Indices);
 
       // TODO: This should be done per object in the render loop, but somehow
