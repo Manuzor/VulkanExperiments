@@ -1163,7 +1163,7 @@ VulkanDestroySwapchain(vulkan* Vulkan)
 
   for(auto& SceneObject : Slice(&Vulkan->SceneObjects))
   {
-    VulkanDestroySceneObject(Vulkan, &SceneObject);
+    VulkanDestroyAndDeallocateSceneObject(Vulkan, &SceneObject);
   }
 
   Device.vkDestroyImageView(DeviceHandle, Vulkan->Depth.View, nullptr);
@@ -1413,7 +1413,8 @@ VulkanDraw(vulkan* Vulkan)
                                             Vulkan->PresentCompleteSemaphore,
                                             &Vulkan->CurrentSwapchainImage);
 
-    // TODO: Check if this ever happens.
+    VulkanVerify(Error);
+    #if 0
     switch(Error)
     {
       case VK_ERROR_OUT_OF_DATE_KHR:
@@ -1430,6 +1431,7 @@ VulkanDraw(vulkan* Vulkan)
       } break;
       default: VulkanVerify(Error);
     }
+    #endif
   }
 
 
@@ -1802,9 +1804,32 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       LogBeginScope("Creating scene objects");
       Defer [](){ LogEndScope("Finished creating scene objects."); };
 
-      auto Kitten = VulkanCreateSceneObject(Vulkan);
+      VkCommandBuffer TextureLoadCommandBuffer = {};
+      {
+        auto CommandBufferInfo = InitStruct<VkCommandBufferAllocateInfo>();
+        CommandBufferInfo.commandPool = Vulkan->CommandPool;
+        CommandBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        CommandBufferInfo.commandBufferCount = 1;
+        VulkanVerify(Vulkan->Device.vkAllocateCommandBuffers(Vulkan->Device.DeviceHandle,
+                                                             &CommandBufferInfo,
+                                                             &TextureLoadCommandBuffer));
+      }
+
+      Defer [Vulkan, TextureLoadCommandBuffer]()
+      {
+        Vulkan->Device.vkFreeCommandBuffers(Vulkan->Device.DeviceHandle,
+                                            Vulkan->CommandPool,
+                                            1,
+                                            &TextureLoadCommandBuffer);
+      };
+
+      auto Kitten = VulkanCreateSceneObject(Vulkan, Allocator);
       auto KittenFileName = "Data/Kitten_DXT1_Mipmaps.dds";
-      VulkanSetTextureFromFile(Vulkan, KittenFileName, &Kitten->Texture);
+      VulkanLoadTextureFromFile(*Vulkan,
+                                TextureLoadCommandBuffer,
+                                KittenFileName,
+                                &Kitten->Texture,
+                                vulkan_force_linear_tiling::Yes); // TODO: Should be ::No
       VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->Vertices, &Kitten->Indices);
 
       // TODO: This should be done per object in the render loop, but somehow

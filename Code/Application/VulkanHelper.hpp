@@ -3,6 +3,7 @@
 
 #include <Core/DynamicArray.hpp>
 #include <Core/Math.hpp>
+#include <Core/Image.hpp>
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.h>
@@ -11,7 +12,6 @@
 
 #include "VulkanHelper.inl"
 
-struct image;
 struct vulkan;
 
 struct vulkan_gpu
@@ -48,20 +48,18 @@ struct vulkan_uniform_buffer
   VkDeviceMemory Memory;
 };
 
-struct gpu_image
-{
-  VkImage ImageHandle;
-  VkImageLayout ImageLayout;
-  VkFormat ImageFormat;
-
-  VkDeviceMemory MemoryHandle;
-};
-
-struct texture
+struct vulkan_texture2d
 {
   VkSampler SamplerHandle;
-  gpu_image GpuImage;
   VkImageView ImageViewHandle;
+  VkImageTiling ImageTiling;
+  VkImageLayout ImageLayout;
+  VkFormat ImageFormat;
+  VkImage ImageHandle;
+
+  VkDeviceMemory MemoryHandle;
+
+  image Image;
 };
 
 struct vertex_buffer
@@ -87,11 +85,11 @@ struct vertex
   vec2 TexCoord;
 };
 
-struct scene_object
+struct vulkan_scene_object
 {
-  bool IsCreated;
+  bool IsAllocated;
 
-  texture Texture;
+  vulkan_texture2d Texture;
   vertex_buffer Vertices;
   index_buffer Indices;
   VkPipeline Pipeline;
@@ -189,7 +187,7 @@ struct vulkan : public vulkan_instance_functions
 
   float DepthStencilValue = 1.0f;
 
-  dynamic_array<scene_object> SceneObjects;
+  dynamic_array<vulkan_scene_object> SceneObjects;
 };
 
 
@@ -212,17 +210,24 @@ VulkanLoadDLL(vulkan* Vulkan);
 void
 VulkanLoadInstanceFunctions(vulkan* Vulkan);
 
-scene_object*
-VulkanCreateSceneObject(vulkan* Vulkan);
+vulkan_scene_object*
+VulkanCreateSceneObject(vulkan* Vulkan, allocator_interface* Allocator);
 
 void
-VulkanDestroySceneObject(vulkan*       Vulkan,
-                         scene_object* SceneObject);
+VulkanDestroyAndDeallocateSceneObject(vulkan*              Vulkan,
+                                      vulkan_scene_object* SceneObject);
+
+enum class vulkan_force_linear_tiling : bool { No = false, Yes = true };
 
 bool
-VulkanSetTextureFromFile(vulkan*     Vulkan,
-                         char const* FileName,
-                         texture*    Texture);
+VulkanLoadTextureFromFile(
+  vulkan const&                      Vulkan,
+  VkCommandBuffer                    CommandBuffer,
+  char const*                        FileName,
+  vulkan_texture2d*                  Texture,
+  vulkan_force_linear_tiling         ForceLinearTiling = vulkan_force_linear_tiling::No,
+  VkImageUsageFlags                  ImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT
+);
 
 void
 VulkanSetQuadGeometry(vulkan*        Vulkan,
@@ -239,13 +244,12 @@ void
 VulkanLoadDeviceFunctions(vulkan const& Vulkan, vulkan_device* Device);
 
 void
-VulkanSetImageLayout(vulkan_device const& Device,
-                     VkCommandBuffer      CommandBuffer,
-                     VkImage              Image,
-                     VkImageAspectFlags   AspectMask,
-                     VkImageLayout        OldImageLayout,
-                     VkImageLayout        NewImageLayout,
-                     VkAccessFlags        SourceAccessMask);
+VulkanSetImageLayout(vulkan_device const&    Device,
+                     VkCommandBuffer         CommandBuffer,
+                     VkImage                 Image,
+                     VkImageSubresourceRange SubresourceRange,
+                     VkImageLayout           OldImageLayout,
+                     VkImageLayout           NewImageLayout);
 
 void
 VulkanPrepareSetupCommandBuffer(vulkan* Vulkan);
@@ -255,11 +259,13 @@ enum class flush_command_buffer { No, Yes };
 void
 VulkanCleanupSetupCommandBuffer(vulkan* Vulkan, flush_command_buffer Flush);
 
+#if 0
 bool
 VulkanUploadImageToGpu(vulkan_device const& Device,
                        VkCommandBuffer      CommandBuffer,
                        image const&         Image,
                        gpu_image*           GpuImage);
+#endif
 
 
 //
@@ -346,3 +352,9 @@ ImageFormatToVulkan(enum class image_format KrepelFormat);
 
 enum class image_format
 ImageFormatFromVulkan(VkFormat VulkanFormat);
+
+void
+Init(vulkan_texture2d* Texture, allocator_interface* Allocator);
+
+void
+Finalize(vulkan_texture2d* Texture);

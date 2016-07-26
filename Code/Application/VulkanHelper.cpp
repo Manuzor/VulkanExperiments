@@ -475,10 +475,9 @@ auto
 
   VulkanSetImageLayout(Vulkan->Device, Vulkan->SetupCommand,
                        Depth->Image,
-                       VkImageAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT),
+                       { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1},
                        VkImageLayout(VK_IMAGE_LAYOUT_UNDEFINED),
-                       VkImageLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL),
-                       VkAccessFlags(0));
+                       VkImageLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL));
 
   // Create image view.
   auto ImageViewCreateInfo = InitStruct<VkImageViewCreateInfo>();
@@ -1115,47 +1114,122 @@ auto
 }
 
 auto
-::VulkanSetImageLayout(vulkan_device const& Device, VkCommandBuffer CommandBuffer,
-                       VkImage Image,
-                       VkImageAspectFlags AspectMask,
-                       VkImageLayout OldImageLayout,
-                       VkImageLayout NewImageLayout,
-                       VkAccessFlags SourceAccessMask)
+::VulkanSetImageLayout(vulkan_device const&    Device,
+                       VkCommandBuffer         CommandBuffer,
+                       VkImage                 Image,
+                       VkImageSubresourceRange SubresourceRange,
+                       VkImageLayout           OldImageLayout,
+                       VkImageLayout           NewImageLayout)
   -> void
 {
   auto ImageMemoryBarrier = InitStruct<VkImageMemoryBarrier>();
   {
-    ImageMemoryBarrier.srcAccessMask = SourceAccessMask;
     ImageMemoryBarrier.oldLayout = OldImageLayout;
     ImageMemoryBarrier.newLayout = NewImageLayout;
-    ImageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    ImageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     ImageMemoryBarrier.image = Image;
-    ImageMemoryBarrier.subresourceRange = { AspectMask, 0, 1, 0, 1 };
-
-    if(NewImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-    {
-      // Make sure anything that was copying from this image has completed.
-      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    }
-
-    if(NewImageLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-    {
-      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    }
-
-    if(NewImageLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-    {
-      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    }
-
-    if(NewImageLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-    {
-      // Make sure any Copy or CPU writes to image are flushed.
-      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-    }
+    ImageMemoryBarrier.subresourceRange = SubresourceRange;
   }
 
+  // Source access mask controls actions that have to be finished on the old layout
+  // before it will be transitioned to the new layout
+  switch(OldImageLayout)
+  {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+    {
+      // Image layout is undefined (or does not matter)
+      // Only valid as initial layout
+      // No flags required, listed only for completeness
+      ImageMemoryBarrier.srcAccessMask = 0;
+    } break;
+
+    case VK_IMAGE_LAYOUT_PREINITIALIZED:
+    {
+      // Image is preinitialized
+      // Only valid as initial layout for linear images, preserves memory contents
+      // Make sure host writes have been finished
+      ImageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+    } break;
+
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+    {
+      // Image is a color attachment
+      // Make sure any writes to the color buffer have been finished
+      ImageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    } break;
+
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+    {
+      // Image is a depth/stencil attachment
+      // Make sure any writes to the depth/stencil buffer have been finished
+      ImageMemoryBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    } break;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+    {
+      // Image is a transfer source
+      // Make sure any reads from the image have been finished
+      ImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    } break;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+    {
+      // Image is a transfer destination
+      // Make sure any writes to the image have been finished
+      ImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    } break;
+
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+    {
+      // Image is read by a shader
+      // Make sure any shader reads from the image have been finished
+      ImageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    } break;
+
+    default:
+      break;
+  }
+
+  // Destination access mask controls the dependency for the new image layout
+  switch (NewImageLayout)
+  {
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+      // Image will be used as a transfer destination
+      // Make sure any writes to the image have been finished
+      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+      // Image will be used as a transfer source
+      // Make sure any reads from and writes to the image have been finished
+      ImageMemoryBarrier.srcAccessMask = ImageMemoryBarrier.srcAccessMask | VK_ACCESS_TRANSFER_READ_BIT;
+      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+      // Image will be used as a color attachment
+      // Make sure any writes to the color buffer have been finished
+      ImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+      // Image layout will be used as a depth/stencil attachment
+      // Make sure any writes to depth/stencil buffer have been finished
+      ImageMemoryBarrier.dstAccessMask = ImageMemoryBarrier.dstAccessMask | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+      // Image will be read in a shader (sampler, input attachment)
+      // Make sure any writes to the image have been finished
+      if (ImageMemoryBarrier.srcAccessMask == 0)
+      {
+        ImageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+      }
+      ImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      break;
+  }
+
+  // Put barrier on top
   VkPipelineStageFlags SourceStages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
   VkPipelineStageFlags DestinationStages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
@@ -1169,9 +1243,9 @@ auto
 
 auto
 ::VulkanDetermineMemoryTypeIndex(VkPhysicalDeviceMemoryProperties const& MemoryProperties,
-                           uint32 TypeBits,
-                           VkFlags RequirementsMask)
-  -> uint32
+                                 uint32 TypeBits,
+                                 VkFlags RequirementsMask)
+-> uint32
 {
   // Search memtypes to find first index with those properties
   for(uint32 Index = 0; Index < 32; ++Index)
@@ -1434,6 +1508,7 @@ auto
   }
 }
 
+#if 0
 auto
 ::VulkanUploadImageToGpu(vulkan_device const& Device,
                          VkCommandBuffer      CommandBuffer,
@@ -1608,17 +1683,18 @@ auto
 
   return true;
 }
+#endif
 
 auto
-::VulkanCreateSceneObject(vulkan* Vulkan)
-  -> scene_object*
+::VulkanCreateSceneObject(vulkan* Vulkan, allocator_interface* Allocator)
+  -> vulkan_scene_object*
 {
-  scene_object* TheChosenOne = nullptr;
+  vulkan_scene_object* TheChosenOne = nullptr;
 
   // Try to find a scene object that is not in use anymore.
   for(auto& SceneObject : Slice(&Vulkan->SceneObjects))
   {
-    if(!SceneObject.IsCreated)
+    if(!SceneObject.IsAllocated)
     {
       TheChosenOne = &SceneObject;
       break;
@@ -1631,19 +1707,23 @@ auto
     TheChosenOne = &Expand(&Vulkan->SceneObjects);
   }
 
-  TheChosenOne->IsCreated = true;
+  *TheChosenOne = {};
+  TheChosenOne->IsAllocated = true;
+  Init(&TheChosenOne->Texture, Allocator);
   return TheChosenOne;
 }
 
 auto
-::VulkanDestroySceneObject(vulkan* Vulkan, scene_object* SceneObject)
+::VulkanDestroyAndDeallocateSceneObject(vulkan* Vulkan, vulkan_scene_object* SceneObject)
   -> void
 {
-  if(SceneObject->IsCreated)
+  if(SceneObject->IsAllocated)
   {
     LogWarning("Ignored: Trying to destroy a scene object that is already destroyed.");
     return;
   }
+
+  Finalize(&SceneObject->Texture);
 
   auto const Device = &Vulkan->Device;
   auto const DeviceHandle = Device->DeviceHandle;
@@ -1656,18 +1736,28 @@ auto
 
   Device->vkDestroySampler(DeviceHandle,   SceneObject->Texture.SamplerHandle, nullptr);
   Device->vkDestroyImageView(DeviceHandle, SceneObject->Texture.ImageViewHandle, nullptr);
-  Device->vkDestroyImage(DeviceHandle,     SceneObject->Texture.GpuImage.ImageHandle, nullptr);
-  Device->vkFreeMemory(DeviceHandle,       SceneObject->Texture.GpuImage.MemoryHandle, nullptr);
+  Device->vkDestroyImage(DeviceHandle,     SceneObject->Texture.ImageHandle, nullptr);
+  Device->vkFreeMemory(DeviceHandle,       SceneObject->Texture.MemoryHandle, nullptr);
 
-  SceneObject->IsCreated = false;
+  SceneObject->IsAllocated = false;
 }
 
 auto
-::VulkanSetTextureFromFile(vulkan* Vulkan, char const* FileName, texture* Texture)
+::VulkanLoadTextureFromFile(
+  vulkan const&                      Vulkan,
+  VkCommandBuffer                    CommandBuffer,
+  char const*                        FileName,
+  vulkan_texture2d*                  Texture,
+  vulkan_force_linear_tiling         ForceLinearTiling,
+  VkImageUsageFlags                  ImageUsageFlags
+)
   -> bool
 {
   temp_allocator TempAllocator;
   auto Allocator = *TempAllocator;
+
+  auto const& Device = Vulkan.Device;
+  auto const DeviceHandle = Device.DeviceHandle;
 
   auto CreateImageLoader = Reinterpret<PFN_CreateImageLoader>(GetProcAddress(GetModuleHandle(nullptr), "CreateImageLoader_DDS"));
   Assert(CreateImageLoader);
@@ -1678,11 +1768,7 @@ auto
   image_loader_interface* Loader = CreateImageLoader(Allocator);
   Defer [=](){ DestroyImageLoader(Allocator, Loader); };
 
-  image TheImage = {};
-  Init(&TheImage, Allocator);
-  Defer [&](){ Finalize(&TheImage); };
-
-  if(LoadImageFromFile(Loader, &TheImage, Allocator, FileName))
+  if(LoadImageFromFile(Loader, &Texture->Image, Allocator, FileName))
   {
     LogInfo("Loaded image file: %s", FileName);
   }
@@ -1691,52 +1777,199 @@ auto
     LogWarning("Failed to load image file: %s", FileName);
   }
 
-  Assert(VulkanIsImageCompatibleWithGpu(*Vulkan->Device.Gpu, TheImage));
+  // Check for compatibility.
+  Assert(VulkanIsImageCompatibleWithGpu(Vulkan.Gpu, Texture->Image));
 
-  if(VulkanUploadImageToGpu(Vulkan->Device, Vulkan->SetupCommand,
-                            TheImage, &Texture->GpuImage))
+  Texture->ImageFormat = ImageFormatToVulkan(Texture->Image.Format);
+  LogInfo("Image format (Ours => Vulkan): %s => %s",
+          ImageFormatName(Texture->Image.Format),
+          VulkanEnumName(Texture->ImageFormat));
+
+  //
+  // Determine whether to use linear or optimal tiling
+  //
+  bool UseOptimalTiling;
   {
-    LogInfo("Image data has been uploaded to the GPU.");
-  }
-  else
-  {
-    LogError("Failed to upload image data to GPU.");
-    return false;
+    auto FormatProperties = InitStruct<VkFormatProperties>();
+    Vulkan.vkGetPhysicalDeviceFormatProperties(Vulkan.Gpu.GpuHandle, Texture->ImageFormat, &FormatProperties);
+
+    bool const SupportsLinearSampling = (FormatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0;
+    bool const SupportsOptimalSampling = (FormatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0;
+
+    if(SupportsLinearSampling == false && SupportsOptimalSampling == false)
+    {
+      LogError("The given format can neither be sampled linearly nor optimally.");
+      return false;
+    }
+
+    if(ForceLinearTiling == vulkan_force_linear_tiling::Yes)
+    {
+      if(SupportsLinearSampling)
+      {
+        UseOptimalTiling = false;
+      }
+      else
+      {
+        LogWarning("Linear tiling for sampled images is requested but not supported for this format. Using optimal tiling instead.");
+        UseOptimalTiling = true;
+      }
+    }
+    else
+    {
+      UseOptimalTiling = SupportsOptimalSampling;
+      if(!UseOptimalTiling)
+      {
+        LogWarning("Optimal tiling for a sampled image is not supported. Falling back to linear tiling.");
+      }
+    }
   }
 
+  //
+  // Image creation
+  //
+  {
+    auto CommandBufferBeginInfo = InitStruct<VkCommandBufferBeginInfo>();
+    VulkanVerify(Device.vkBeginCommandBuffer(CommandBuffer, &CommandBufferBeginInfo));
+
+    if(UseOptimalTiling)
+    {
+      Texture->ImageTiling = VK_IMAGE_TILING_OPTIMAL;
+
+      auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
+      auto MemoryRequirements = InitStruct<VkMemoryRequirements>();
+
+      Assert(0); // Not implemented.
+    }
+    else
+    {
+      Texture->ImageTiling = VK_IMAGE_TILING_LINEAR;
+
+      // Only load mip level 0
+      auto ImageCreateInfo = InitStruct<VkImageCreateInfo>();
+      {
+        ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+        ImageCreateInfo.format = Texture->ImageFormat;
+        ImageCreateInfo.extent = { Texture->Image.Width, Texture->Image.Height, 1 };
+        ImageCreateInfo.mipLevels = 1;
+        ImageCreateInfo.arrayLayers = 1;
+        ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        ImageCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;
+        ImageCreateInfo.usage = ImageUsageFlags;
+        ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+      }
+
+      VulkanVerify(Device.vkCreateImage(DeviceHandle,
+                                        &ImageCreateInfo,
+                                        nullptr,
+                                        &Texture->ImageHandle));
+
+      VkMemoryRequirements MemoryRequirements;
+      Device.vkGetImageMemoryRequirements(DeviceHandle, Texture->ImageHandle, &MemoryRequirements);
+
+      auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
+      MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
+      MemoryAllocateInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan.Gpu.MemoryProperties,
+                                                                          MemoryRequirements.memoryTypeBits,
+                                                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+      VulkanVerify(Device.vkAllocateMemory(DeviceHandle,
+                                           &MemoryAllocateInfo,
+                                           nullptr,
+                                           &Texture->MemoryHandle));
+
+      VulkanVerify(Device.vkBindImageMemory(DeviceHandle,
+                                            Texture->ImageHandle,
+                                            Texture->MemoryHandle,
+                                            0)); // Offset
+
+      {
+        void* MappedData;
+        VulkanVerify(Device.vkMapMemory(DeviceHandle,
+                                        Texture->MemoryHandle,
+                                        0,
+                                        VK_WHOLE_SIZE,
+                                        0,
+                                        &MappedData));
+
+        MemCopy(ImageDataSize(&Texture->Image),
+                Reinterpret<uint8*>(MappedData),
+                ImageDataPointer<uint8 const>(&Texture->Image));
+
+        Device.vkUnmapMemory(DeviceHandle, Texture->MemoryHandle);
+      }
+
+      VulkanSetImageLayout(Device, CommandBuffer,
+                           Texture->ImageHandle,
+                           { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+                           VK_IMAGE_LAYOUT_PREINITIALIZED,
+                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+      Texture->ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+      VulkanVerify(Device.vkEndCommandBuffer(CommandBuffer));
+
+      VkFence NullFence = {};
+      auto SubmitInfo = InitStruct<VkSubmitInfo>();
+      SubmitInfo.commandBufferCount = 1;
+      SubmitInfo.pCommandBuffers = &CommandBuffer;
+
+      VulkanVerify(Device.vkQueueSubmit(Vulkan.Queue, 1, &SubmitInfo, NullFence));
+      VulkanVerify(Device.vkQueueWaitIdle(Vulkan.Queue));
+    }
+  }
+
+  //
   // Create sampler.
+  //
   {
     auto SamplerCreateInfo = InitStruct<VkSamplerCreateInfo>();
     {
       SamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
       SamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-      SamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+      SamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
       SamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
       SamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
       SamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-      SamplerCreateInfo.anisotropyEnable = VK_FALSE;
-      SamplerCreateInfo.maxAnisotropy = 1;
+      SamplerCreateInfo.anisotropyEnable = VK_TRUE;
+      if(UseOptimalTiling)
+      {
+        SamplerCreateInfo.maxLod = Cast<float>(Texture->Image.NumMipLevels);
+      }
+      SamplerCreateInfo.maxAnisotropy = 8;
       SamplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
       SamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
       SamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
     }
-    VulkanVerify(Vulkan->Device.vkCreateSampler(Vulkan->Device.DeviceHandle, &SamplerCreateInfo, nullptr, &Texture->SamplerHandle));
+    VulkanVerify(Device.vkCreateSampler(DeviceHandle,
+                                        &SamplerCreateInfo,
+                                        nullptr,
+                                        &Texture->SamplerHandle));
   }
 
-  // Create image view.
+  //
+  // Create image view
+  //
   {
     auto ImageViewCreateInfo = InitStruct<VkImageViewCreateInfo>();
     {
       ImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-      ImageViewCreateInfo.format = Texture->GpuImage.ImageFormat;
+      ImageViewCreateInfo.format = Texture->ImageFormat;
       ImageViewCreateInfo.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_R,
                                                            VK_COMPONENT_SWIZZLE_G,
                                                            VK_COMPONENT_SWIZZLE_B,
                                                            VK_COMPONENT_SWIZZLE_A };
       ImageViewCreateInfo.subresourceRange = VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-      ImageViewCreateInfo.image = Texture->GpuImage.ImageHandle;
+      if(UseOptimalTiling)
+      {
+        ImageViewCreateInfo.subresourceRange.levelCount = Texture->Image.NumMipLevels;
+      }
+      ImageViewCreateInfo.image = Texture->ImageHandle;
     }
-    VulkanVerify(Vulkan->Device.vkCreateImageView(Vulkan->Device.DeviceHandle, &ImageViewCreateInfo, nullptr, &Texture->ImageViewHandle));
+    VulkanVerify(Device.vkCreateImageView(DeviceHandle,
+                                          &ImageViewCreateInfo,
+                                          nullptr,
+                                          &Texture->ImageViewHandle));
   }
 
   return true;
@@ -1843,4 +2076,18 @@ auto
 
     VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Indices->Buffer, Indices->Memory, 0));
   }
+}
+
+auto
+::Init(vulkan_texture2d* Texture, allocator_interface* Allocator)
+  -> void
+{
+  Init(&Texture->Image, Allocator);
+}
+
+auto
+::Finalize(vulkan_texture2d* Texture)
+  -> void
+{
+  Finalize(&Texture->Image);
 }

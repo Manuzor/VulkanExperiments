@@ -2,38 +2,45 @@
 
 #include "Log.hpp"
 
-static void
+
+static bool
 ImageValidateSubImageIndices(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
 {
   if(MipLevel >= Image->NumMipLevels)
   {
     LogError("Invalid Mip Level: %d / %d", MipLevel, Image->NumMipLevels);
-    Assert(false);
+    return false;
   }
   if(Face >= Image->NumFaces)
   {
     LogError("Invalid Face: %d / %d", Face, Image->NumFaces);
-    Assert(false);
+    return false;
   }
   if(ArrayIndex >= Image->NumArrayIndices)
   {
     LogError("Invalid Array Slice: %d / %d", ArrayIndex, Image->NumArrayIndices);
-    Assert(false);
+    return false;
   }
+
+  return true;
 }
 
 image::sub_image const*
-ImageInternalSubImage(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
+::ImageInternalSubImage(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
 {
-  ImageValidateSubImageIndices(Image, MipLevel, Face, ArrayIndex);
+  if(!ImageValidateSubImageIndices(Image, MipLevel, Face, ArrayIndex))
+    return nullptr;
+
   auto Index = MipLevel + Image->NumMipLevels * (Face + Image->NumFaces * ArrayIndex);
   return &Image->InternalSubImages[Index];
 }
 
 image::sub_image*
-ImageInternalSubImage(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
+::ImageInternalSubImage(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
 {
-  ImageValidateSubImageIndices(Image, MipLevel, Face, ArrayIndex);
+  if(!ImageValidateSubImageIndices(Image, MipLevel, Face, ArrayIndex))
+    return nullptr;
+
   auto Index = MipLevel + Image->NumMipLevels * (Face + Image->NumFaces * ArrayIndex);
   return &Image->InternalSubImages[Index];
 }
@@ -88,12 +95,11 @@ auto
 }
 
 auto
-ImageAllocateData(image* Image)
+::ImageAllocateData(image* Image)
   -> void
 {
   const auto NumSubImages = Image->NumMipLevels * Image->NumFaces * Image->NumArrayIndices;
-  Reserve(&Image->InternalSubImages, NumSubImages);
-  Image->InternalSubImages.Num = NumSubImages;
+  SetNum(&Image->InternalSubImages, NumSubImages);
 
   int DataSize = 0;
 
@@ -127,12 +133,11 @@ ImageAllocateData(image* Image)
     }
   }
 
-  Reserve(&Image->Data, DataSize + 16);
-  Image->Data.Num = DataSize + 16;
+  SetNum(&Image->Data, DataSize + 16);
 }
 
 auto
-ImageRowPitch(image const* Image, uint32 MipLevel)
+::ImageRowPitch(image const* Image, uint32 MipLevel)
   -> uint32
 {
   if(ImageFormatType(Image->Format) != image_format_type::LINEAR)
@@ -145,14 +150,14 @@ ImageRowPitch(image const* Image, uint32 MipLevel)
 }
 
 auto
-ImageDepthPitch(image const* Image, uint32 MipLevel)
+::ImageDepthPitch(image const* Image, uint32 MipLevel)
   -> uint32
 {
   return ImageInternalSubImage(Image, MipLevel, 0, 0)->DepthPitch;
 }
 
 auto
-ImageDataOffSet(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
+::ImageDataOffSet(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
   -> uint32
 {
   return ImageInternalSubImage(Image, MipLevel, Face, ArrayIndex)->DataOffset;
