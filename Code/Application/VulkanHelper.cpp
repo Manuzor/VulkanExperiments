@@ -13,9 +13,9 @@ auto
   Init(&Vulkan->Framebuffers, Allocator);
   Init(&Vulkan->SceneObjects, Allocator);
   Init(&Vulkan->Swapchain, &Vulkan->Device, Allocator);
-  Init(&Vulkan->DrawCommands, Allocator);
-  Init(&Vulkan->PrePresentCommands, Allocator);
-  Init(&Vulkan->PostPresentCommands, Allocator);
+  Init(&Vulkan->DrawCommandBuffers, Allocator);
+  Init(&Vulkan->PrePresentCommandBuffers, Allocator);
+  Init(&Vulkan->PostPresentCommandBuffers, Allocator);
   Vulkan->Gpu.Vulkan = Vulkan;
   Vulkan->Device.Gpu = &Vulkan->Gpu;
 }
@@ -24,9 +24,9 @@ auto
 ::Finalize(vulkan* Vulkan)
   -> void
 {
-  Finalize(&Vulkan->PostPresentCommands);
-  Finalize(&Vulkan->PrePresentCommands);
-  Finalize(&Vulkan->DrawCommands);
+  Finalize(&Vulkan->PostPresentCommandBuffers);
+  Finalize(&Vulkan->PrePresentCommandBuffers);
+  Finalize(&Vulkan->DrawCommandBuffers);
   Finalize(&Vulkan->Swapchain);
   Finalize(&Vulkan->SceneObjects);
   Finalize(&Vulkan->Framebuffers);
@@ -473,7 +473,7 @@ auto
   // Bind memory.
   VulkanVerify(Device.vkBindImageMemory(DeviceHandle, Depth->Image, Depth->Memory, 0));
 
-  VulkanSetImageLayout(Vulkan->Device, Vulkan->SetupCommand,
+  VulkanSetImageLayout(Vulkan->Device, Vulkan->SetupCommandBuffer,
                        Depth->Image,
                        { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1},
                        VkImageLayout(VK_IMAGE_LAYOUT_UNDEFINED),
@@ -1272,7 +1272,7 @@ auto
 ::VulkanPrepareSetupCommandBuffer(vulkan* Vulkan)
   -> void
 {
-  if(Vulkan->SetupCommand != VK_NULL_HANDLE)
+  if(Vulkan->SetupCommandBuffer != VK_NULL_HANDLE)
     return;
 
   auto const& Device = Vulkan->Device;
@@ -1287,20 +1287,20 @@ auto
 
   VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle,
                                                &AllocateInfo,
-                                               &Vulkan->SetupCommand));
+                                               &Vulkan->SetupCommandBuffer));
 
   auto InheritanceInfo = InitStruct<VkCommandBufferInheritanceInfo>();
   auto BeginInfo = InitStruct<VkCommandBufferBeginInfo>();
   BeginInfo.pInheritanceInfo = &InheritanceInfo;
 
-  VulkanVerify(Device.vkBeginCommandBuffer(Vulkan->SetupCommand, &BeginInfo));
+  VulkanVerify(Device.vkBeginCommandBuffer(Vulkan->SetupCommandBuffer, &BeginInfo));
 }
 
 auto
 ::VulkanCleanupSetupCommandBuffer(vulkan* Vulkan, flush_command_buffer Flush)
   -> void
 {
-  if(Vulkan->SetupCommand == VK_NULL_HANDLE)
+  if(Vulkan->SetupCommandBuffer == VK_NULL_HANDLE)
     return;
 
   auto const& Device = Vulkan->Device;
@@ -1308,12 +1308,12 @@ auto
 
   if(Flush == flush_command_buffer::Yes)
   {
-    VulkanVerify(Device.vkEndCommandBuffer(Vulkan->SetupCommand));
+    VulkanVerify(Device.vkEndCommandBuffer(Vulkan->SetupCommandBuffer));
 
     auto SubmitInfo = InitStruct<VkSubmitInfo>();
     {
       SubmitInfo.commandBufferCount = 1;
-      SubmitInfo.pCommandBuffers = &Vulkan->SetupCommand;
+      SubmitInfo.pCommandBuffers = &Vulkan->SetupCommandBuffer;
     }
     VkFence NullFence = {};
     VulkanVerify(Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, NullFence));
@@ -1321,8 +1321,8 @@ auto
     VulkanVerify(Device.vkQueueWaitIdle(Vulkan->Queue));
   }
 
-  Device.vkFreeCommandBuffers(DeviceHandle, Vulkan->CommandPool, 1, &Vulkan->SetupCommand);
-  Vulkan->SetupCommand = VK_NULL_HANDLE;
+  Device.vkFreeCommandBuffers(DeviceHandle, Vulkan->CommandPool, 1, &Vulkan->SetupCommandBuffer);
+  Vulkan->SetupCommandBuffer = VK_NULL_HANDLE;
 }
 
 auto

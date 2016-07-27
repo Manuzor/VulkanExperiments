@@ -1112,13 +1112,13 @@ VulkanCreateCommandBuffers(vulkan* Vulkan, VkCommandPool CommandPool, uint32 Num
     AllocateInfo.commandBufferCount = Num;
   }
 
-  SetNum(&Vulkan->DrawCommands, Num);
-  SetNum(&Vulkan->PrePresentCommands, Num);
-  SetNum(&Vulkan->PostPresentCommands, Num);
+  SetNum(&Vulkan->DrawCommandBuffers, Num);
+  SetNum(&Vulkan->PrePresentCommandBuffers, Num);
+  SetNum(&Vulkan->PostPresentCommandBuffers, Num);
 
-  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->DrawCommands.Ptr));
-  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->PrePresentCommands.Ptr));
-  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->PostPresentCommands.Ptr));
+  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->DrawCommandBuffers.Ptr));
+  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->PrePresentCommandBuffers.Ptr));
+  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->PostPresentCommandBuffers.Ptr));
 }
 
 static void VulkanDestroyCommandBuffers(vulkan* Vulkan, VkCommandPool CommandPool)
@@ -1126,13 +1126,13 @@ static void VulkanDestroyCommandBuffers(vulkan* Vulkan, VkCommandPool CommandPoo
   auto const& Device = Vulkan->Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
-  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->PostPresentCommands.Num), Vulkan->PostPresentCommands.Ptr);
-  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->PrePresentCommands.Num), Vulkan->PrePresentCommands.Ptr);
-  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->DrawCommands.Num), Vulkan->DrawCommands.Ptr);
+  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->PostPresentCommandBuffers.Num), Vulkan->PostPresentCommandBuffers.Ptr);
+  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->PrePresentCommandBuffers.Num), Vulkan->PrePresentCommandBuffers.Ptr);
+  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->DrawCommandBuffers.Num), Vulkan->DrawCommandBuffers.Ptr);
 
-  Clear(&Vulkan->DrawCommands);
-  Clear(&Vulkan->PrePresentCommands);
-  Clear(&Vulkan->PostPresentCommands);
+  Clear(&Vulkan->DrawCommandBuffers);
+  Clear(&Vulkan->PrePresentCommandBuffers);
+  Clear(&Vulkan->PostPresentCommandBuffers);
 }
 
 // TODO
@@ -1441,7 +1441,7 @@ VulkanDraw(vulkan* Vulkan)
   {
     auto SubmitInfo = InitStruct<VkSubmitInfo>();
     SubmitInfo.commandBufferCount = 1;
-    SubmitInfo.pCommandBuffers = &Vulkan->PostPresentCommands[Vulkan->CurrentSwapchainImage.Index];
+    SubmitInfo.pCommandBuffers = &Vulkan->PostPresentCommandBuffers[Vulkan->CurrentSwapchainImage.Index];
     VulkanVerify(Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, NullFence));
   }
 
@@ -1459,7 +1459,7 @@ VulkanDraw(vulkan* Vulkan)
     SubmitInfo.signalSemaphoreCount = 1;
     SubmitInfo.pSignalSemaphores = &Vulkan->RenderCompleteSemaphore;
     SubmitInfo.commandBufferCount = 1;
-    SubmitInfo.pCommandBuffers = &Vulkan->DrawCommands[Vulkan->CurrentSwapchainImage.Index];
+    SubmitInfo.pCommandBuffers = &Vulkan->DrawCommandBuffers[Vulkan->CurrentSwapchainImage.Index];
     VulkanVerify(Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, NullFence));
   }
 
@@ -1470,7 +1470,7 @@ VulkanDraw(vulkan* Vulkan)
   {
     auto SubmitInfo = InitStruct<VkSubmitInfo>();
     SubmitInfo.commandBufferCount = 1;
-    SubmitInfo.pCommandBuffers = &Vulkan->PrePresentCommands[Vulkan->CurrentSwapchainImage.Index];
+    SubmitInfo.pCommandBuffers = &Vulkan->PrePresentCommandBuffers[Vulkan->CurrentSwapchainImage.Index];
     VulkanVerify(Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, NullFence));
   }
 
@@ -1894,16 +1894,16 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     //
     {
       VulkanBuildDrawCommands(*Vulkan,
-                              Slice(&Vulkan->DrawCommands),
+                              Slice(&Vulkan->DrawCommandBuffers),
                               Slice(&Vulkan->Framebuffers),
                               color::CornflowerBlue,
                               Vulkan->DepthStencilValue,
                               0);
       VulkanBuildPrePresentCommands(Vulkan->Device,
-                                    Slice(&Vulkan->PrePresentCommands),
+                                    Slice(&Vulkan->PrePresentCommandBuffers),
                                     Slice(&Vulkan->Swapchain.Images));
       VulkanBuildPostPresentCommands(Vulkan->Device,
-                                     Slice(&Vulkan->PostPresentCommands),
+                                     Slice(&Vulkan->PostPresentCommandBuffers),
                                      Slice(&Vulkan->Swapchain.Images));
     }
 

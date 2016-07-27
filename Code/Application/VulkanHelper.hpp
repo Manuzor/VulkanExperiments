@@ -155,11 +155,11 @@ struct vulkan : public vulkan_instance_functions
   // Command Buffers
   //
   // TODO: Rename {Commands} => {CommandBuffers}
-  VkCommandBuffer SetupCommand;
+  VkCommandBuffer SetupCommandBuffer;
   // TODO Combine arrays into one and assign slices instead.
-  dynamic_array<VkCommandBuffer> DrawCommands;
-  dynamic_array<VkCommandBuffer> PrePresentCommands;
-  dynamic_array<VkCommandBuffer> PostPresentCommands;
+  dynamic_array<VkCommandBuffer> DrawCommandBuffers;
+  dynamic_array<VkCommandBuffer> PrePresentCommandBuffers;
+  dynamic_array<VkCommandBuffer> PostPresentCommandBuffers;
 
   //
   // Semaphores
