@@ -648,14 +648,14 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       DescriptorSetLayoutCreateInfo.pBindings = LayoutBindings.Ptr;
     }
 
-    VulkanVerify(Device.vkCreateDescriptorSetLayout(DeviceHandle, &DescriptorSetLayoutCreateInfo, nullptr, &Vulkan->DescriptorSetLayout));
+    VulkanVerify(Device.vkCreateDescriptorSetLayout(DeviceHandle, &DescriptorSetLayoutCreateInfo, nullptr, &Vulkan->SceneObjectGraphicsState.DescriptorSetLayout));
 
     auto PipelineLayoutCreateInfo = InitStruct<VkPipelineLayoutCreateInfo>();
     {
       PipelineLayoutCreateInfo.setLayoutCount = 1;
-      PipelineLayoutCreateInfo.pSetLayouts = &Vulkan->DescriptorSetLayout;
+      PipelineLayoutCreateInfo.pSetLayouts = &Vulkan->SceneObjectGraphicsState.DescriptorSetLayout;
     }
-    VulkanVerify(Device.vkCreatePipelineLayout(DeviceHandle, &PipelineLayoutCreateInfo, nullptr, &Vulkan->PipelineLayout));
+    VulkanVerify(Device.vkCreatePipelineLayout(DeviceHandle, &PipelineLayoutCreateInfo, nullptr, &Vulkan->SceneObjectGraphicsState.PipelineLayout));
   }
 
   //
@@ -904,14 +904,14 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       GraphicsPipelineCreateInfo.pDepthStencilState = &DepthStencilState;
       GraphicsPipelineCreateInfo.pColorBlendState = &ColorBlendState;
       GraphicsPipelineCreateInfo.pDynamicState = &DynamicState;
-      GraphicsPipelineCreateInfo.layout = Vulkan->PipelineLayout;
+      GraphicsPipelineCreateInfo.layout = Vulkan->SceneObjectGraphicsState.PipelineLayout;
       GraphicsPipelineCreateInfo.renderPass = Vulkan->RenderPass;
     }
 
     VulkanVerify(Device.vkCreateGraphicsPipelines(DeviceHandle, Vulkan->PipelineCache,
                                                   1, &GraphicsPipelineCreateInfo,
                                                   nullptr,
-                                                  &Vulkan->Pipeline));
+                                                  &Vulkan->SceneObjectGraphicsState.Pipeline));
   }
 
   //
@@ -949,75 +949,37 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
   }
 
   //
-  // Prepare Descriptor Set
+  // Allocate the UBO for Globals
   //
   {
-    LogBeginScope("Preparing descriptor set.");
-    Defer [](){ LogEndScope("Finished preparing descriptor set."); };
-
-    auto DescriptorSetAllocateInfo = InitStruct<VkDescriptorSetAllocateInfo>();
+    auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
-      DescriptorSetAllocateInfo.descriptorPool = Vulkan->DescriptorPool;
-      DescriptorSetAllocateInfo.descriptorSetCount = 1;
-      DescriptorSetAllocateInfo.pSetLayouts = &Vulkan->DescriptorSetLayout;
-    }
-    VulkanVerify(Device.vkAllocateDescriptorSets(DeviceHandle,
-                                                 &DescriptorSetAllocateInfo,
-                                                 &Vulkan->DescriptorSet));
-
-    //
-    // GlobalUBO
-    //
-    {
-      auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
-      {
-        BufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-        BufferCreateInfo.size = SizeOf<mat4x4>();
-      }
-
-      VulkanVerify(Device.vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr,
-                                         &Vulkan->GlobalsUBO.Buffer));
-
-      VkMemoryRequirements Temp_MemoryRequirements;
-      Device.vkGetBufferMemoryRequirements(DeviceHandle, Vulkan->GlobalsUBO.Buffer,
-                                           &Temp_MemoryRequirements);
-
-      auto Temp_MemoryAllocationInfo = InitStruct<VkMemoryAllocateInfo>();
-      {
-        Temp_MemoryAllocationInfo.allocationSize = Temp_MemoryRequirements.size;
-        Temp_MemoryAllocationInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Device.Gpu->MemoryProperties,
-                                                                                   Temp_MemoryRequirements.memoryTypeBits,
-                                                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-        Assert(Temp_MemoryAllocationInfo.memoryTypeIndex != IntMaxValue<uint32>());
-      }
-
-      VulkanVerify(Device.vkAllocateMemory(DeviceHandle, &Temp_MemoryAllocationInfo, nullptr, &Vulkan->GlobalsUBO.Memory));
-
-      VulkanVerify(Device.vkBindBufferMemory(DeviceHandle, Vulkan->GlobalsUBO.Buffer, Vulkan->GlobalsUBO.Memory, 0));
+      BufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+      BufferCreateInfo.size = SizeOf<mat4x4>();
     }
 
-    //
-    // Associate the buffer with the descriptor set.
-    //
-    auto DescriptorBufferInfo = InitStruct<VkDescriptorBufferInfo>();
+    VulkanVerify(Device.vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr,
+                                       &Vulkan->SceneObjectGraphicsState.GlobalsUBO.Buffer));
+
+    VkMemoryRequirements MemoryRequirements;
+    Device.vkGetBufferMemoryRequirements(DeviceHandle, Vulkan->SceneObjectGraphicsState.GlobalsUBO.Buffer,
+                                         &MemoryRequirements);
+
+    auto Temp_MemoryAllocationInfo = InitStruct<VkMemoryAllocateInfo>();
     {
-      DescriptorBufferInfo.buffer = Vulkan->GlobalsUBO.Buffer;
-      DescriptorBufferInfo.offset = 0;
-      DescriptorBufferInfo.range = VK_WHOLE_SIZE;
+      Temp_MemoryAllocationInfo.allocationSize = MemoryRequirements.size;
+      Temp_MemoryAllocationInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Device.Gpu->MemoryProperties,
+                                                                                 MemoryRequirements.memoryTypeBits,
+                                                                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+      Assert(Temp_MemoryAllocationInfo.memoryTypeIndex != IntMaxValue<uint32>());
     }
 
-    auto GlobalUBOUpdateInfo = InitStruct<VkWriteDescriptorSet>();
-    {
-      GlobalUBOUpdateInfo.dstSet = Vulkan->DescriptorSet;
-      GlobalUBOUpdateInfo.dstBinding = 0;
-      GlobalUBOUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      GlobalUBOUpdateInfo.descriptorCount = 1;
-      GlobalUBOUpdateInfo.pBufferInfo = &DescriptorBufferInfo;
-    }
+    VulkanVerify(Device.vkAllocateMemory(DeviceHandle, &Temp_MemoryAllocationInfo, nullptr, &Vulkan->SceneObjectGraphicsState.GlobalsUBO.Memory));
 
-    Device.vkUpdateDescriptorSets(DeviceHandle,
-                                  1, &GlobalUBOUpdateInfo,
-                                  0, nullptr);
+    VulkanVerify(Device.vkBindBufferMemory(DeviceHandle,
+                                           Vulkan->SceneObjectGraphicsState.GlobalsUBO.Buffer,
+                                           Vulkan->SceneObjectGraphicsState.GlobalsUBO.Memory,
+                                           0));
   }
 
   //
@@ -1060,6 +1022,9 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
 static void
 VulkanCleanupRenderPass(vulkan* Vulkan)
 {
+  // TODO: Cleanup
+
+  #if 0
   auto const& Device = Vulkan->Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
@@ -1071,17 +1036,17 @@ VulkanCleanupRenderPass(vulkan* Vulkan)
   Clear(&Vulkan->Framebuffers);
 
   // UBOs
-  Device.vkFreeMemory(DeviceHandle, Vulkan->GlobalsUBO.Memory, nullptr);
-  Device.vkDestroyBuffer(DeviceHandle, Vulkan->GlobalsUBO.Buffer, nullptr);
+  Device.vkFreeMemory(DeviceHandle, Vulkan->SceneObjectGraphicsState.GlobalsUBO.Memory, nullptr);
+  Device.vkDestroyBuffer(DeviceHandle, Vulkan->SceneObjectGraphicsState.GlobalsUBO.Buffer, nullptr);
 
   // Descriptor Sets
-  Device.vkFreeDescriptorSets(DeviceHandle, Vulkan->DescriptorPool, 1, &Vulkan->DescriptorSet);
+  Device.vkFreeDescriptorSets(DeviceHandle, Vulkan->DescriptorPool, 1, &Vulkan->SceneObjectGraphicsState.DescriptorSet);
 
   // Descriptor Pool
   Device.vkDestroyDescriptorPool(DeviceHandle, Vulkan->DescriptorPool, nullptr);
 
   // Pipeline
-  Device.vkDestroyPipeline(DeviceHandle, Vulkan->Pipeline, nullptr);
+  Device.vkDestroyPipeline(DeviceHandle, Vulkan->SceneObjectGraphicsState.Pipeline, nullptr);
 
   // Pipeline Cache
   Device.vkDestroyPipelineCache(DeviceHandle, Vulkan->PipelineCache, nullptr);
@@ -1090,10 +1055,11 @@ VulkanCleanupRenderPass(vulkan* Vulkan)
   Device.vkDestroyRenderPass(DeviceHandle, Vulkan->RenderPass, nullptr);
 
   // Pipeline Layout
-  Device.vkDestroyPipelineLayout(DeviceHandle, Vulkan->PipelineLayout, nullptr);
+  Device.vkDestroyPipelineLayout(DeviceHandle, Vulkan->SceneObjectGraphicsState.PipelineLayout, nullptr);
 
   // Descriptor Set Layout
-  Device.vkDestroyDescriptorSetLayout(DeviceHandle, Vulkan->DescriptorSetLayout, nullptr);
+  Device.vkDestroyDescriptorSetLayout(DeviceHandle, Vulkan->SceneObjectGraphicsState.DescriptorSetLayout, nullptr);
+  #endif
 }
 
 static void
@@ -1284,19 +1250,17 @@ VulkanBuildDrawCommands(vulkan const&          Vulkan,
         Device.vkCmdSetScissor(DrawCommandBuffer, 0, 1, &Scissor);
       }
 
-      // Bind descriptor set
-      Device.vkCmdBindDescriptorSets(DrawCommandBuffer,
-                                     VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                     Vulkan.PipelineLayout,
-                                     0, // Descriptor set offset
-                                     1, &Vulkan.DescriptorSet,
-                                     0, nullptr); // Dynamic offsets
-
       // Draw scene objects
       VkDeviceSize NoOffset = {};
 
       for(auto& SceneObject : Slice(&Vulkan.SceneObjects))
       {
+        Device.vkCmdBindDescriptorSets(DrawCommandBuffer,
+                                       VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                       Vulkan.SceneObjectGraphicsState.PipelineLayout,
+                                       0, // Descriptor set offset
+                                       1, &SceneObject.DescriptorSet,
+                                       0, nullptr); // Dynamic offsets
         Device.vkCmdBindPipeline(DrawCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, SceneObject.Pipeline);
         Device.vkCmdBindVertexBuffers(DrawCommandBuffer, SceneObject.Vertices.BindID, 1, &SceneObject.Vertices.Buffer, &NoOffset);
         Device.vkCmdBindIndexBuffer(DrawCommandBuffer, SceneObject.Indices.Buffer, NoOffset, VK_INDEX_TYPE_UINT32);
@@ -1856,37 +1820,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
       VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->Vertices, &Kitten->Indices);
 
-      // TODO: This should be done per object in the render loop, but somehow
-      // the command buffer recording is stopped by the call to
-      // vkUpdateDescriptorSets. For now this is hardcoded to only use the
-      // kitten's data.
-      if(Vulkan->SceneObjects.Num)
-      {
-        //
-        // Update the texture and sampler in use by the shader.
-        //
-        auto TextureDescriptor = InitStruct<VkDescriptorImageInfo>();
-        {
-          TextureDescriptor.sampler = Kitten->Texture.SamplerHandle;
-          TextureDescriptor.imageView = Kitten->Texture.ImageViewHandle;
-          TextureDescriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        }
-
-        auto TextureAndSamplerUpdateInfo = InitStruct<VkWriteDescriptorSet>();
-        {
-          TextureAndSamplerUpdateInfo.dstSet = Vulkan->DescriptorSet;
-          TextureAndSamplerUpdateInfo.dstBinding = 1;
-          TextureAndSamplerUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-          TextureAndSamplerUpdateInfo.descriptorCount = 1;
-          TextureAndSamplerUpdateInfo.pImageInfo = &TextureDescriptor;
-        }
-
-        Vulkan->Device.vkUpdateDescriptorSets(Vulkan->Device.DeviceHandle,
-                                              1, &TextureAndSamplerUpdateInfo,
-                                              0, nullptr);
-      }
-
-      Kitten->Pipeline = Vulkan->Pipeline;
+      VulkanPrepareSceneObjectForRendering(Vulkan, Kitten);
     }
 
     //
@@ -1970,7 +1904,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       {
         void* RawData;
         VulkanVerify(Vulkan->Device.vkMapMemory(Vulkan->Device.DeviceHandle,
-                                                Vulkan->GlobalsUBO.Memory,
+                                                Vulkan->SceneObjectGraphicsState.GlobalsUBO.Memory,
                                                 0, // offset
                                                 VK_WHOLE_SIZE,
                                                 0, // flags
@@ -1979,7 +1913,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         auto const Target = Reinterpret<mat4x4*>(RawData);
         MemCopy(1, Target, &ViewProjectionMatrix);
 
-        Vulkan->Device.vkUnmapMemory(Vulkan->Device.DeviceHandle, Vulkan->GlobalsUBO.Memory);
+        Vulkan->Device.vkUnmapMemory(Vulkan->Device.DeviceHandle, Vulkan->SceneObjectGraphicsState.GlobalsUBO.Memory);
       }
 
       //

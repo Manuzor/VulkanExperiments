@@ -16,6 +16,8 @@ auto
   Init(&Vulkan->DrawCommandBuffers, Allocator);
   Init(&Vulkan->PrePresentCommandBuffers, Allocator);
   Init(&Vulkan->PostPresentCommandBuffers, Allocator);
+  Init(&Vulkan->SceneObjectGraphicsState.VertexInputBindingDescs, Allocator);
+  Init(&Vulkan->SceneObjectGraphicsState.VertexInputAttributeDescs, Allocator);
   Vulkan->Gpu.Vulkan = Vulkan;
   Vulkan->Device.Gpu = &Vulkan->Gpu;
 }
@@ -24,6 +26,8 @@ auto
 ::Finalize(vulkan* Vulkan)
   -> void
 {
+  Finalize(&Vulkan->SceneObjectGraphicsState.VertexInputAttributeDescs);
+  Finalize(&Vulkan->SceneObjectGraphicsState.VertexInputBindingDescs);
   Finalize(&Vulkan->PostPresentCommandBuffers);
   Finalize(&Vulkan->PrePresentCommandBuffers);
   Finalize(&Vulkan->DrawCommandBuffers);
@@ -1714,6 +1718,7 @@ auto
   *TheChosenOne = {};
   TheChosenOne->IsAllocated = true;
   Init(&TheChosenOne->Texture, Allocator);
+
   return TheChosenOne;
 }
 
@@ -1743,7 +1748,9 @@ auto
   Device->vkDestroyImage(DeviceHandle,     SceneObject->Texture.ImageHandle, nullptr);
   Device->vkFreeMemory(DeviceHandle,       SceneObject->Texture.MemoryHandle, nullptr);
 
-  SceneObject->IsAllocated = false;
+  // Note: This sets IsAllocated to false.
+  *SceneObject = {};
+  Assert(SceneObject->IsAllocated == false);
 }
 
 auto
@@ -2060,6 +2067,92 @@ auto
 
     VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Indices->Buffer, Indices->Memory, 0));
   }
+}
+
+auto
+::VulkanPrepareSceneObjectForRendering(vulkan const* Vulkan,
+                                       vulkan_scene_object* SceneObject)
+  -> void
+{
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  temp_allocator TempAllocator;
+  allocator_interface* Allocator = *TempAllocator;
+
+
+  //
+  // Ensure the pipeline is set.
+  //
+  SceneObject->Pipeline = Vulkan->SceneObjectGraphicsState.Pipeline;
+
+
+  //
+  // Allocate DescriptorSet
+  //
+  {
+    auto DescriptorSetAllocateInfo = InitStruct<VkDescriptorSetAllocateInfo>();
+    {
+      DescriptorSetAllocateInfo.descriptorPool = Vulkan->DescriptorPool;
+      DescriptorSetAllocateInfo.descriptorSetCount = 1;
+      DescriptorSetAllocateInfo.pSetLayouts = &Vulkan->SceneObjectGraphicsState.DescriptorSetLayout;
+    }
+    VulkanVerify(Device.vkAllocateDescriptorSets(DeviceHandle,
+                                                 &DescriptorSetAllocateInfo,
+                                                 &SceneObject->DescriptorSet));
+  }
+
+  scoped_array<VkWriteDescriptorSet> DescriptorSetWrites{ Allocator };
+
+
+  //
+  // Update the texture and sampler in use by the shader.
+  //
+  auto TextureDescriptor = InitStruct<VkDescriptorImageInfo>();
+  {
+    TextureDescriptor.sampler = SceneObject->Texture.SamplerHandle;
+    TextureDescriptor.imageView = SceneObject->Texture.ImageViewHandle;
+    TextureDescriptor.imageLayout = SceneObject->Texture.ImageLayout;
+  }
+
+  auto& TextureAndSamplerUpdateInfo = Expand(&DescriptorSetWrites);
+  TextureAndSamplerUpdateInfo = InitStruct<VkWriteDescriptorSet>();
+  {
+    TextureAndSamplerUpdateInfo.dstSet = SceneObject->DescriptorSet;
+    TextureAndSamplerUpdateInfo.dstBinding = 1;
+    TextureAndSamplerUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    TextureAndSamplerUpdateInfo.descriptorCount = 1;
+    TextureAndSamplerUpdateInfo.pImageInfo = &TextureDescriptor;
+  }
+
+
+  //
+  // Associate the Globals UBO with the DescriptorSet
+  //
+  auto DescriptorBufferInfo = InitStruct<VkDescriptorBufferInfo>();
+  {
+    DescriptorBufferInfo.buffer = Vulkan->SceneObjectGraphicsState.GlobalsUBO.Buffer;
+    DescriptorBufferInfo.offset = 0;
+    DescriptorBufferInfo.range = VK_WHOLE_SIZE;
+  }
+
+  auto& GlobalUBOUpdateInfo = Expand(&DescriptorSetWrites);
+  GlobalUBOUpdateInfo = InitStruct<VkWriteDescriptorSet>();
+  {
+    GlobalUBOUpdateInfo.dstSet = SceneObject->DescriptorSet;
+    GlobalUBOUpdateInfo.dstBinding = 0;
+    GlobalUBOUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    GlobalUBOUpdateInfo.descriptorCount = 1;
+    GlobalUBOUpdateInfo.pBufferInfo = &DescriptorBufferInfo;
+  }
+
+  //
+  // Push descriptor set updates.
+  //
+  Device.vkUpdateDescriptorSets(
+    DeviceHandle,
+    Convert<uint32>(DescriptorSetWrites.Num), DescriptorSetWrites.Ptr,
+    0, nullptr);
 }
 
 auto

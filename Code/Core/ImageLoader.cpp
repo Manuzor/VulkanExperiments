@@ -13,13 +13,13 @@ auto
 ::LoadImageFromFile(image_loader_interface* Loader, image* Image, slice<char const> FileName)
   -> bool
 {
-  temp_allocator TempAllocatorGuard;
-  allocator_interface* TempAllocator = *TempAllocatorGuard;
+  temp_allocator TempAllocator;
+  allocator_interface* Allocator = *TempAllocator;
 
   // Copy FileName here since neither the C-API nor windows accept strings
-  // that are sized (i.e. not zero-termianted.)
-  auto SzFileName = SliceAllocate<char>(TempAllocator, FileName.Num + 1);
-  Defer [=](){ SliceDeallocate(TempAllocator, SzFileName); };
+  // that are sized (i.e. not zero-termianted).
+  auto SzFileName = SliceAllocate<char>(Allocator, FileName.Num + 1);
+  Defer [=](){ SliceDeallocate(Allocator, SzFileName); };
 
   SliceCopy(SzFileName, FileName);
   SzFileName[SzFileName.Num] = '\0';
@@ -31,14 +31,14 @@ auto
   Defer [=](){ std::fclose(File); };
 
   const auto BufferMemorySize = MiB(1);
-  auto BufferMemory = TempAllocator->Allocate(BufferMemorySize, 1);
+  auto BufferMemory = Allocator->Allocate(BufferMemorySize, 1);
   if(BufferMemory == nullptr)
     return false;
 
-  Defer [=](){ TempAllocator->Deallocate(BufferMemory); };
+  Defer [=](){ Allocator->Deallocate(BufferMemory); };
   auto Buffer = Slice(BufferMemorySize, Cast<char*>(BufferMemory));
 
-  scoped_array<char> Content(TempAllocator);
+  scoped_array<char> Content(Allocator);
   while(!std::feof(File))
   {
     const auto NumBytesRead = std::fread(Buffer.Ptr, 1, Buffer.Num, File);

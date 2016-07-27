@@ -85,6 +85,17 @@ struct vertex
   vec2 TexCoord;
 };
 
+struct vulkan_scene_object_gfx_state
+{
+  VkPipeline Pipeline;
+  VkPipelineLayout PipelineLayout;
+  VkDescriptorSetLayout DescriptorSetLayout;
+  vulkan_uniform_buffer GlobalsUBO;
+
+  dynamic_array<VkVertexInputBindingDescription> VertexInputBindingDescs;
+  dynamic_array<VkVertexInputAttributeDescription> VertexInputAttributeDescs;
+};
+
 struct vulkan_scene_object
 {
   bool IsAllocated;
@@ -92,7 +103,9 @@ struct vulkan_scene_object
   vulkan_texture2d Texture;
   vertex_buffer Vertices;
   index_buffer Indices;
+
   VkPipeline Pipeline;
+  VkDescriptorSet DescriptorSet;
 };
 
 struct vulkan_queue_node
@@ -146,20 +159,29 @@ struct vulkan : public vulkan_instance_functions
   vulkan_swapchain Swapchain;
   vulkan_depth Depth;
 
+  VkDescriptorPool DescriptorPool;
   VkCommandPool CommandPool;
 
   VkQueue Queue;
+
+  vulkan_swapchain_image CurrentSwapchainImage;
+
+  VkPipelineCache PipelineCache;
+
+  VkRenderPass RenderPass;
+
+  dynamic_array<VkFramebuffer> Framebuffers;
 
 
   //
   // Command Buffers
   //
-  // TODO: Rename {Commands} => {CommandBuffers}
   VkCommandBuffer SetupCommandBuffer;
   // TODO Combine arrays into one and assign slices instead.
   dynamic_array<VkCommandBuffer> DrawCommandBuffers;
   dynamic_array<VkCommandBuffer> PrePresentCommandBuffers;
   dynamic_array<VkCommandBuffer> PostPresentCommandBuffers;
+
 
   //
   // Semaphores
@@ -169,25 +191,18 @@ struct vulkan : public vulkan_instance_functions
 
 
   //
-  // Misc
+  // Scene Objects
   //
-  VkPipelineLayout PipelineLayout;
-  VkDescriptorSetLayout DescriptorSetLayout;
-  VkPipelineCache PipelineCache;
-
-  VkRenderPass RenderPass;
-  VkDescriptorPool DescriptorPool;
-  VkDescriptorSet DescriptorSet;
-  VkPipeline Pipeline;
-
-  dynamic_array<VkFramebuffer> Framebuffers;
-  vulkan_swapchain_image CurrentSwapchainImage;
-
-  vulkan_uniform_buffer GlobalsUBO;
-
-  float DepthStencilValue = 1.0f;
+  vulkan_scene_object_gfx_state SceneObjectGraphicsState;
 
   dynamic_array<vulkan_scene_object> SceneObjects;
+
+
+  //
+  // Misc
+  //
+
+  float DepthStencilValue = 1.0f;
 };
 
 
@@ -210,6 +225,8 @@ VulkanLoadDLL(vulkan* Vulkan);
 void
 VulkanLoadInstanceFunctions(vulkan* Vulkan);
 
+// TODO: Return a handle rather than a pointer, otherwise when creating about
+//       17 or more scene objects, things will break.
 vulkan_scene_object*
 VulkanCreateSceneObject(vulkan* Vulkan, allocator_interface* Allocator);
 
@@ -233,6 +250,10 @@ VulkanSetQuadGeometry(vulkan*        Vulkan,
                       extent2 const& Extents,
                       vertex_buffer* Vertices,
                       index_buffer*  Indices);
+
+void
+VulkanPrepareSceneObjectForRendering(vulkan const* Vulkan,
+                                     vulkan_scene_object* SceneObject);
 
 
 //
