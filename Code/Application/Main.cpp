@@ -1787,7 +1787,9 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
                                             &TextureUploadCommandBuffer);
       };
 
-      auto Kitten = VulkanCreateSceneObject(Vulkan, Allocator);
+      auto KittenHandle = VulkanCreateSceneObject(Vulkan, Allocator);
+      auto Kitten = VulkanBeginAccess(Vulkan, KittenHandle);
+      Defer [Vulkan, Kitten](){ VulkanEndAccess(Vulkan, Kitten); };
 
       //
       // Load image.

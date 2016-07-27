@@ -10,6 +10,10 @@
 
 #include <Windows.h>
 
+// Helper macro to define an opaque handle only accessible via other
+// functions.
+#define DefineOpaqueHandle(Name) using Name = struct Name ## _OPAQUE*
+
 #include "VulkanHelper.inl"
 
 struct vulkan;
@@ -99,6 +103,7 @@ struct vulkan_scene_object_gfx_state
 struct vulkan_scene_object
 {
   bool IsAllocated;
+  size_t NumExternalReferences;
 
   vulkan_texture2d Texture;
   vertex_buffer Vertices;
@@ -196,6 +201,7 @@ struct vulkan : public vulkan_instance_functions
   vulkan_scene_object_gfx_state SceneObjectGraphicsState;
 
   dynamic_array<vulkan_scene_object> SceneObjects;
+  size_t NumExternalSceneObjectPtrs;
 
 
   //
@@ -225,14 +231,20 @@ VulkanLoadDLL(vulkan* Vulkan);
 void
 VulkanLoadInstanceFunctions(vulkan* Vulkan);
 
-// TODO: Return a handle rather than a pointer, otherwise when creating about
-//       17 or more scene objects, things will break.
-vulkan_scene_object*
+DefineOpaqueHandle(vulkan_scene_object_handle);
+
+vulkan_scene_object_handle
 VulkanCreateSceneObject(vulkan* Vulkan, allocator_interface* Allocator);
 
 void
-VulkanDestroyAndDeallocateSceneObject(vulkan*              Vulkan,
-                                      vulkan_scene_object* SceneObject);
+VulkanDestroyAndDeallocateSceneObject(vulkan*                    Vulkan,
+                                      vulkan_scene_object_handle SceneObject);
+
+vulkan_scene_object*
+VulkanBeginAccess(vulkan* Vulkan, vulkan_scene_object_handle SceneObjectHandle);
+
+void
+VulkanEndAccess(vulkan* Vulkan, vulkan_scene_object* SceneObject);
 
 enum class vulkan_force_linear_tiling : bool { No = false, Yes = true };
 
@@ -252,7 +264,7 @@ VulkanSetQuadGeometry(vulkan*        Vulkan,
                       index_buffer*  Indices);
 
 void
-VulkanPrepareSceneObjectForRendering(vulkan const* Vulkan,
+VulkanPrepareSceneObjectForRendering(vulkan const*        Vulkan,
                                      vulkan_scene_object* SceneObject);
 
 

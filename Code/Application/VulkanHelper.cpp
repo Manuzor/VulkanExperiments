@@ -1695,15 +1695,20 @@ auto
 
 auto
 ::VulkanCreateSceneObject(vulkan* Vulkan, allocator_interface* Allocator)
-  -> vulkan_scene_object*
+  -> vulkan_scene_object_handle
 {
   vulkan_scene_object* TheChosenOne = nullptr;
+  vulkan_scene_object_handle Handle = nullptr;
 
   // Try to find a scene object that is not in use anymore.
-  for(auto& SceneObject : Slice(&Vulkan->SceneObjects))
+  auto const NumSceneObjects = Vulkan->SceneObjects.Num;
+  for(size_t Index = 0; Index < NumSceneObjects; ++Index)
   {
+    auto& SceneObject = Vulkan->SceneObjects[Index];
+
     if(!SceneObject.IsAllocated)
     {
+      Handle = Reinterpret<vulkan_scene_object_handle>(Index + 1);
       TheChosenOne = &SceneObject;
       break;
     }
@@ -1712,23 +1717,55 @@ auto
   // If no free scene object was found, create a new one.
   if(TheChosenOne == nullptr)
   {
+    if(Vulkan->NumExternalSceneObjectPtrs > 0)
+    {
+      LogError("Attempt to create a new scene object while there externally "
+               "exists a raw pointer to an existing scene object. Aborted this "
+               "operation because external pointers would be corrupted by it.");
+      return nullptr;
+    }
+
+    Handle = Reinterpret<vulkan_scene_object_handle>(Vulkan->SceneObjects.Num + 1);
     TheChosenOne = &Expand(&Vulkan->SceneObjects);
+    *TheChosenOne = {};
   }
 
-  *TheChosenOne = {};
+  // Note: There's no need for `*TheChosenOne = {}` because
+  // `VulkanDestroyAndDeallocateSceneObject` already does that.
   TheChosenOne->IsAllocated = true;
   Init(&TheChosenOne->Texture, Allocator);
 
-  return TheChosenOne;
+  return Handle;
+}
+
+static size_t
+TranslateHandleToIndex(vulkan_scene_object_handle Handle)
+{
+  return Reinterpret<size_t>(Handle) - 1;
 }
 
 auto
-::VulkanDestroyAndDeallocateSceneObject(vulkan* Vulkan, vulkan_scene_object* SceneObject)
+::VulkanDestroyAndDeallocateSceneObject(vulkan* Vulkan, vulkan_scene_object_handle SceneObjectHandle)
   -> void
 {
+  if(SceneObjectHandle == nullptr)
+  {
+    LogWarning("Ignoring a null handle in VulkanDestroyAndDeallocateSceneObject.");
+    return;
+  }
+
+  auto SceneObjectIndex = TranslateHandleToIndex(SceneObjectHandle);
+  auto SceneObject = &Vulkan->SceneObjects[SceneObjectIndex];
+
   if(SceneObject->IsAllocated)
   {
-    LogWarning("Ignored: Trying to destroy a scene object that is already destroyed.");
+    LogError("Trying to destroy a scene object that is already destroyed. (Ignored)");
+    return;
+  }
+
+  if(SceneObject->NumExternalReferences > 0)
+  {
+    LogError("Cannot destroy a scene object that is still externally referenced.");
     return;
   }
 
@@ -1748,9 +1785,36 @@ auto
   Device->vkDestroyImage(DeviceHandle,     SceneObject->Texture.ImageHandle, nullptr);
   Device->vkFreeMemory(DeviceHandle,       SceneObject->Texture.MemoryHandle, nullptr);
 
+  // TODO: Free DescriptorSet and friends
+
   // Note: This sets IsAllocated to false.
   *SceneObject = {};
   Assert(SceneObject->IsAllocated == false);
+}
+
+auto
+::VulkanBeginAccess(vulkan* Vulkan, vulkan_scene_object_handle SceneObjectHandle)
+  -> vulkan_scene_object*
+{
+  if(SceneObjectHandle == nullptr)
+    return nullptr;
+
+  auto SceneObjectIndex = TranslateHandleToIndex(SceneObjectHandle);
+  auto SceneObject = &Vulkan->SceneObjects[SceneObjectIndex];
+  ++SceneObject->NumExternalReferences;
+  ++Vulkan->NumExternalSceneObjectPtrs;
+  return SceneObject;
+}
+
+auto
+::VulkanEndAccess(vulkan* Vulkan, vulkan_scene_object* SceneObject)
+  -> void
+{
+  Assert(SceneObject->NumExternalReferences > 0);
+  --SceneObject->NumExternalReferences;
+
+  Assert(Vulkan->NumExternalSceneObjectPtrs > 0);
+  --Vulkan->NumExternalSceneObjectPtrs;
 }
 
 auto
