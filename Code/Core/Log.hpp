@@ -72,11 +72,11 @@ CORE_API
 void
 LogMessageDispatch(log_level LogLevel, log_data* Log, slice<char const> Message, ...);
 
-#define LogBeginScope(...) LogMessageDispatch(log_level::ScopeBegin, __VA_ARGS__);
-#define LogEndScope(...)   LogMessageDispatch(log_level::ScopeEnd,   __VA_ARGS__);
-#define LogInfo(...)       LogMessageDispatch(log_level::Info,       __VA_ARGS__);
-#define LogWarning(...)    LogMessageDispatch(log_level::Warning,    __VA_ARGS__);
-#define LogError(...)      LogMessageDispatch(log_level::Error,      __VA_ARGS__);
+#define LogBeginScope(...) LogMessageDispatch(log_level::ScopeBegin, __VA_ARGS__)
+#define LogEndScope(...)   LogMessageDispatch(log_level::ScopeEnd,   __VA_ARGS__)
+#define LogInfo(...)       LogMessageDispatch(log_level::Info,       __VA_ARGS__)
+#define LogWarning(...)    LogMessageDispatch(log_level::Warning,    __VA_ARGS__)
+#define LogError(...)      LogMessageDispatch(log_level::Error,      __VA_ARGS__)
 
 //
 // Default Log Sinks
