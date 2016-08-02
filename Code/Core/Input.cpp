@@ -264,7 +264,7 @@ auto
     {
       if(Slot->Type == input_type::Action)
       {
-        Slot->Value = 0.0f;
+        UpdateInputSlotValue(Context, Id, 0.0f);
       }
 
       continue;

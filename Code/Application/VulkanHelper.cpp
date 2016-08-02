@@ -2037,10 +2037,10 @@ auto
   auto const Device = &Vulkan->Device;
   auto const DeviceHandle = Device->DeviceHandle;
 
-  vertex const TopLeft    { Vec3(0.0f, -1.0f,  1.0f) * 1.0f, Vec2(0.0f, 0.0f) };
-  vertex const TopRight   { Vec3(0.0f,  1.0f,  1.0f) * 1.0f, Vec2(1.0f, 0.0f) };
-  vertex const BottomLeft { Vec3(0.0f, -1.0f, -1.0f) * 1.0f, Vec2(0.0f, 1.0f) };
-  vertex const BottomRight{ Vec3(0.0f,  1.0f, -1.0f) * 1.0f, Vec2(1.0f, 1.0f) };
+  vertex const TopLeft    { Vec3( 0.0f,  0.0f,  0.0f) * 1.0f, Vec2(0.0f, 0.0f) };
+  vertex const TopRight   { Vec3( 0.0f,  1.0f,  0.0f) * 1.0f, Vec2(1.0f, 0.0f) };
+  vertex const BottomLeft { Vec3( 0.0f,  1.0f,  1.0f) * 1.0f, Vec2(0.0f, 1.0f) };
+  vertex const BottomRight{ Vec3( 0.0f,  1.0f,  1.0f) * 1.0f, Vec2(1.0f, 1.0f) };
 
   vertex const GeometryDataArray[] =
   {
@@ -2052,8 +2052,9 @@ auto
 
   uint32 IndexDataArray[] =
   {
-    0, 2, 3,
-    3, 1, 0,
+    0, 2, 1
+    // 0, 2, 3,
+    // 3, 1, 0,
   };
   auto IndexData = Slice(IndexDataArray);
   Indices->NumIndices = Cast<uint32>(IndexData.Num);
@@ -2092,8 +2093,6 @@ auto
     }
 
     VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Vertices->Buffer, Vertices->Memory, 0));
-
-    Vertices->BindID = 0;
   }
 
   // Index Buffer Setup
@@ -2130,6 +2129,121 @@ auto
     }
 
     VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Indices->Buffer, Indices->Memory, 0));
+  }
+}
+
+auto
+::VulkanSetDebugGridGeometry(vulkan*        Vulkan,
+                             extent2 const& Extents,
+                             vertex_buffer* VertexBuffer,
+                             index_buffer*  IndexBuffer)
+  -> void
+{
+  temp_allocator TempAllocator;
+  allocator_interface* Allocator = *TempAllocator;
+
+  auto const Device = &Vulkan->Device;
+  auto const DeviceHandle = Device->DeviceHandle;
+
+  scoped_array<vulkan_debug_grid_vertex> Vertices{ Allocator };
+
+  for(int Index = -10; Index <= 10; ++Index)
+  {
+    // X Axis
+    Expand(&Vertices) = { Vec3(-10, Convert<float>(Index), 0), color::Red };
+    Expand(&Vertices) = { Vec3( 10, Convert<float>(Index), 0), color::Red };
+
+    // Y Axis
+    Expand(&Vertices) = { Vec3(Convert<float>(Index), -10, 0), color::Lime };
+    Expand(&Vertices) = { Vec3(Convert<float>(Index),  10, 0), color::Lime };
+
+    // Z Axis
+    Expand(&Vertices) = { Vec3(Convert<float>(Index), -10,  0), color::Blue };
+    Expand(&Vertices) = { Vec3(Convert<float>(Index), -10, 10), color::Blue };
+  }
+
+  VertexBuffer->NumVertices = Cast<uint32>(Vertices.Num);
+
+  scoped_array<uint32> Indices{ Allocator };
+  SetNum(&Indices, Vertices.Num);
+
+  for(uint32 Index = 0; Index < Indices.Num; ++Index)
+  {
+    Indices[Index] = Index;
+  }
+
+  IndexBuffer->NumIndices = Cast<uint32>(Indices.Num);
+
+  // Vertex Buffer Setup
+  {
+    auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
+    {
+      BufferCreateInfo.size = SliceByteSize(Slice(&Vertices));
+      BufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    }
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &VertexBuffer->Buffer));
+
+    VkMemoryRequirements MemoryRequirements;
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, VertexBuffer->Buffer, &MemoryRequirements);
+
+    auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
+    {
+      MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
+      MemoryAllocateInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Gpu.MemoryProperties,
+                                                                          MemoryRequirements.memoryTypeBits,
+                                                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+      Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
+    }
+
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &VertexBuffer->Memory));
+
+    // Copy data from host to the device.
+    {
+      void* RawData;
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, VertexBuffer->Memory, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+
+      MemCopy(Vertices.Num, Reinterpret<vulkan_debug_grid_vertex*>(RawData), Vertices.Ptr);
+
+      Device->vkUnmapMemory(DeviceHandle, VertexBuffer->Memory);
+    }
+
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, VertexBuffer->Buffer, VertexBuffer->Memory, 0));
+  }
+
+  // Index Buffer Setup
+  {
+    auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
+    {
+      BufferCreateInfo.size = SliceByteSize(Slice(&Indices));
+      BufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    }
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &IndexBuffer->Buffer));
+
+    VkMemoryRequirements MemoryRequirements;
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, IndexBuffer->Buffer, &MemoryRequirements);
+
+    auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
+    {
+      MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
+      MemoryAllocateInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Gpu.MemoryProperties,
+                                                                          MemoryRequirements.memoryTypeBits,
+                                                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+      Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
+    }
+
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &IndexBuffer->Memory));
+
+    // Copy data from host to the device.
+    {
+      void* RawData;
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, IndexBuffer->Memory, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+
+      MemCopy(Indices.Num, Reinterpret<uint32*>(RawData), Indices.Ptr);
+
+      Device->vkUnmapMemory(DeviceHandle, IndexBuffer->Memory);
+    }
+
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, IndexBuffer->Buffer, IndexBuffer->Memory, 0));
   }
 }
 
@@ -2205,7 +2319,7 @@ auto
   {
     GlobalUBOUpdateInfo.dstSet = SceneObject->DescriptorSet;
     GlobalUBOUpdateInfo.dstBinding = 0;
-    GlobalUBOUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    GlobalUBOUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     GlobalUBOUpdateInfo.descriptorCount = 1;
     GlobalUBOUpdateInfo.pBufferInfo = &DescriptorBufferInfo;
   }

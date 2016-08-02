@@ -197,49 +197,68 @@ ReadFileContentIntoArray(dynamic_array<uint8>* Array, char const* FileName)
   }
 }
 
+enum class vulkan_enable_validation : bool { No = false, Yes = true };
+
 static bool
-VulkanCreateInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
+VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
 {
   Assert(Vulkan->DLL);
   Assert(Vulkan->vkCreateInstance);
   Assert(Vulkan->vkEnumerateInstanceLayerProperties);
   Assert(Vulkan->vkEnumerateInstanceExtensionProperties);
 
+  temp_allocator TempAllocator;
+  allocator_interface* Allocator = *TempAllocator;
+
   //
   // Instance Layers
   //
-  scoped_array<char const*> LayerNames{ TempAllocator };
+  scoped_array<char const*> LayerNames{ Allocator };
   {
+    scoped_array<char const*> DesiredLayerNames{ Allocator };
+
+    if(EnableValidation == vulkan_enable_validation::Yes)
+    {
+      Expand(&DesiredLayerNames) = "VK_LAYER_LUNARG_standard_validation";
+    }
+
     uint32 LayerCount;
     VulkanVerify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
 
-    scoped_array<VkLayerProperties> LayerProperties = { TempAllocator };
+    scoped_array<VkLayerProperties> LayerProperties = { Allocator };
     ExpandBy(&LayerProperties, LayerCount);
     VulkanVerify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, LayerProperties.Ptr));
 
     LogBeginScope("Explicitly enabled instance layers:");
     Defer [](){ LogEndScope("=========="); };
+    {
+      // Check for its existance.
+
+    }
     for(auto& Property : Slice(&LayerProperties))
     {
       auto LayerName = SliceFromString(Property.layerName);
-      if(LayerName == SliceFromString("VK_LAYER_LUNARG_standard_validation"))
+      bool WasAdded = false;
+
+      for(auto DesiredLayerName : Slice(&DesiredLayerNames))
       {
-        Expand(&LayerNames) = "VK_LAYER_LUNARG_standard_validation";
-      }
-      else
-      {
-        LogInfo("[ ] %s", LayerName.Ptr);
-        continue;
+        if(LayerName == SliceFromString(DesiredLayerName))
+        {
+          Expand(&LayerNames) = DesiredLayerName;
+          WasAdded = true;
+          break;
+        }
       }
 
-      LogInfo("[x] %s", LayerName.Ptr);
+      if(WasAdded) LogInfo("[x] %s", LayerName.Ptr);
+      else         LogInfo("[ ] %s", LayerName.Ptr);
     }
   }
 
   //
   // Instance Extensions
   //
-  scoped_array<char const*> ExtensionNames{ TempAllocator };
+  scoped_array<char const*> ExtensionNames{ Allocator };
   {
     // Required extensions:
     bool SurfaceExtensionFound = false;
@@ -248,7 +267,7 @@ VulkanCreateInstance(vulkan* Vulkan, allocator_interface* TempAllocator)
     uint32 ExtensionCount;
     VulkanVerify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
-    scoped_array<VkExtensionProperties> ExtensionProperties = { TempAllocator };
+    scoped_array<VkExtensionProperties> ExtensionProperties = { Allocator };
     ExpandBy(&ExtensionProperties, ExtensionCount);
     VulkanVerify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, ExtensionProperties.Ptr));
 
@@ -637,7 +656,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     {
       auto& Layout = Expand(&LayoutBindings);
       Layout.binding = 0;
-      Layout.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      Layout.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // TODO: Make it UNIFORM again?
       Layout.descriptorCount = 1;
       Layout.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
     }
@@ -757,7 +776,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       VertexShaderStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
       VertexShaderStage.pName = "main";
 
-      char const* FileName = "Build/Shader-Simple.vert.spv";
+      char const* FileName = "Build/Shader-DebugGrid.vert.spv";
 
       LogBeginScope("Loading vertex shader from file: %s", FileName);
       Defer [](){ LogEndScope(""); };
@@ -782,7 +801,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       FragmentShaderStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
       FragmentShaderStage.pName = "main";
 
-      char const* FileName = "Build/Shader-Simple.frag.spv";
+      char const* FileName = "Build/Shader-DebugGrid.frag.spv";
 
       LogBeginScope("Loading fragment shader from file: %s", FileName);
       Defer [](){ LogEndScope(""); };
@@ -791,8 +810,8 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       ReadFileContentIntoArray(&ShaderCode, FileName);
 
       auto ShaderModuleCreateInfo = InitStruct<VkShaderModuleCreateInfo>();
-      ShaderModuleCreateInfo.codeSize = Cast<uint32>(ShaderCode.Num); // In bytes, regardless of the fact that typeof(*pCode) == uint.
-      ShaderModuleCreateInfo.pCode = Reinterpret<uint32*>(ShaderCode.Ptr); // Is a const(uint)*, for some reason...
+      ShaderModuleCreateInfo.codeSize = Cast<uint32>(ShaderCode.Num); // In bytes, regardless of the fact that decltype(*pCode) == uint32.
+      ShaderModuleCreateInfo.pCode = Reinterpret<uint32*>(ShaderCode.Ptr); // Is a uint32 const*, for some reason...
 
       VulkanVerify(Device.vkCreateShaderModule(DeviceHandle, &ShaderModuleCreateInfo, nullptr, &FragmentShaderStage.module));
     }
@@ -801,6 +820,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     fixed_block<1, VkVertexInputBindingDescription> VertexInputBindingDescs;
     fixed_block<2, VkVertexInputAttributeDescription> VertexInputAttributeDescs;
 
+    #if 0
     {
       auto& Desc = VertexInputBindingDescs[0];
       Desc.binding = 0;
@@ -808,12 +828,13 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       Desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     }
 
+
     {
       auto& Desc = VertexInputAttributeDescs[0];
       Desc.binding = 0;
       Desc.location = 0;
       Desc.format = VK_FORMAT_R32G32B32_SFLOAT;
-      Desc.offset = 0;
+      Desc.offset = offsetof(vertex, Position);
     }
 
     {
@@ -821,8 +842,34 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       Desc.binding = 0;
       Desc.location = 1;
       Desc.format = VK_FORMAT_R32G32_SFLOAT;
-      Desc.offset = Cast<uint32>(SizeOf<decltype(vertex::Position)>());
+      Desc.offset = offsetof(vertex, TexCoord);
     }
+    #else
+
+    {
+      auto& Desc = VertexInputBindingDescs[0];
+      Desc.binding = 0;
+      Desc.stride = Cast<uint32>(SizeOf<vulkan_debug_grid_vertex>());
+      Desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    }
+
+
+    {
+      auto& Desc = VertexInputAttributeDescs[0];
+      Desc.binding = 0;
+      Desc.location = 0;
+      Desc.format = VK_FORMAT_R32G32B32_SFLOAT;
+      Desc.offset = offsetof(vulkan_debug_grid_vertex, Position);
+    }
+
+    {
+      auto& Desc = VertexInputAttributeDescs[1];
+      Desc.binding = 0;
+      Desc.location = 1;
+      Desc.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+      Desc.offset = offsetof(vulkan_debug_grid_vertex, Color);
+    }
+    #endif
 
     auto VertexInputState = InitStruct<VkPipelineVertexInputStateCreateInfo>();
     {
@@ -834,7 +881,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
 
     auto InputAssemblyState = InitStruct<VkPipelineInputAssemblyStateCreateInfo>();
     {
-      InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+      InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
     }
 
     auto ViewportState = InitStruct<VkPipelineViewportStateCreateInfo>();
@@ -846,7 +893,8 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     auto RasterizationState = InitStruct<VkPipelineRasterizationStateCreateInfo>();
     {
       RasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
-      RasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
+      // RasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
+      RasterizationState.cullMode = VK_CULL_MODE_NONE;
       RasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
       RasterizationState.depthClampEnable = VK_FALSE;
       RasterizationState.rasterizerDiscardEnable = VK_FALSE;
@@ -931,7 +979,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
 
     {
       auto& Size = Expand(&PoolSizes);
-      Size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      Size.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       Size.descriptorCount = 1;
     }
 
@@ -954,8 +1002,8 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
   {
     auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
-      BufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-      BufferCreateInfo.size = SizeOf<mat4x4>();
+      BufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+      BufferCreateInfo.size = SizeOf<decltype(Vulkan->SceneObjectGraphicsState.GlobalsUBOData)>();
     }
 
     VulkanVerify(Device.vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr,
@@ -1262,7 +1310,7 @@ VulkanBuildDrawCommands(vulkan const&          Vulkan,
                                        1, &SceneObject.DescriptorSet,
                                        0, nullptr); // Dynamic offsets
         Device.vkCmdBindPipeline(DrawCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, SceneObject.Pipeline);
-        Device.vkCmdBindVertexBuffers(DrawCommandBuffer, SceneObject.Vertices.BindID, 1, &SceneObject.Vertices.Buffer, &NoOffset);
+        Device.vkCmdBindVertexBuffers(DrawCommandBuffer, 0, 1, &SceneObject.Vertices.Buffer, &NoOffset);
         Device.vkCmdBindIndexBuffer(DrawCommandBuffer, SceneObject.Indices.Buffer, NoOffset, VK_INDEX_TYPE_UINT32);
         Device.vkCmdDrawIndexed(DrawCommandBuffer, SceneObject.Indices.NumIndices, 1, 0, 0, 0);
       }
@@ -1512,6 +1560,7 @@ struct
     input_id const RelPitch    = InputId("RelPitch");
     input_id const AbsYaw      = InputId("AbsYaw");
     input_id const AbsPitch    = InputId("AbsPitch");
+    input_id const Reset       = InputId("Reset");
   } Camera;
 } MyInputSlots;
 
@@ -1548,7 +1597,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       return CurrentExitCode;
 
     ++CurrentExitCode;
-    if(!VulkanCreateInstance(Vulkan, Allocator))
+    if(!VulkanCreateInstance(Vulkan, vulkan_enable_validation::Yes))
       return CurrentExitCode;
     Defer [=](){ VulkanCleanup(Vulkan); };
 
@@ -1692,9 +1741,9 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       // Let's pretend the system is user 0 for now.
       SystemInput.UserIndex = 0;
 
-      Win32RegisterAllMouseSlots(&SystemInput);
-      Win32RegisterAllXInputSlots(&SystemInput);
-      Win32RegisterAllKeyboardSlots(&SystemInput);
+      Win32RegisterAllMouseSlots(&SystemInput, GlobalLog);
+      Win32RegisterAllXInputSlots(&SystemInput, GlobalLog);
+      Win32RegisterAllKeyboardSlots(&SystemInput, GlobalLog);
 
       //
       // Input Mappings
@@ -1729,15 +1778,32 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
       RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.RelYaw);
       AddInputSlotMapping(&SystemInput, x_input::XRightStick, MyInputSlots.Camera.RelYaw);
+      AddInputSlotMapping(&SystemInput, keyboard::Left,  MyInputSlots.Camera.RelYaw, 1);
+      AddInputSlotMapping(&SystemInput, keyboard::Right, MyInputSlots.Camera.RelYaw, -1);
 
       RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.RelPitch);
-      AddInputSlotMapping(&SystemInput, x_input::YRightStick, MyInputSlots.Camera.RelPitch);
+      AddInputSlotMapping(&SystemInput, x_input::YRightStick, MyInputSlots.Camera.RelPitch, -1);
+      AddInputSlotMapping(&SystemInput, keyboard::Up,   MyInputSlots.Camera.RelPitch, -1);
+      AddInputSlotMapping(&SystemInput, keyboard::Down, MyInputSlots.Camera.RelPitch, 1);
+
+      float const CameraMouseSensitivity = 0.05f;
 
       RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.AbsYaw);
-      AddInputSlotMapping(&SystemInput, mouse::YDelta, MyInputSlots.Camera.AbsYaw);
+      AddInputSlotMapping(&SystemInput, mouse::XDelta, MyInputSlots.Camera.AbsYaw);
+      {
+        auto SlotProperties = GetOrCreate(&SystemInput.ValueProperties, MyInputSlots.Camera.AbsYaw);
+        SlotProperties->Sensitivity = CameraMouseSensitivity;
+      }
 
       RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.AbsPitch);
-      AddInputSlotMapping(&SystemInput, mouse::XDelta, MyInputSlots.Camera.AbsPitch);
+      AddInputSlotMapping(&SystemInput, mouse::YDelta, MyInputSlots.Camera.AbsPitch);
+      {
+        auto SlotProperties = GetOrCreate(&SystemInput.ValueProperties, MyInputSlots.Camera.AbsPitch);
+        SlotProperties->Sensitivity = CameraMouseSensitivity;
+      }
+
+      RegisterInputSlot(&SystemInput, input_type::Button, MyInputSlots.Camera.Reset);
+      AddInputSlotMapping(&SystemInput, keyboard::R, MyInputSlots.Camera.Reset);
 
       Window->Input = &SystemInput;
     }
@@ -1752,10 +1818,9 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       Cam.Width = 1280;
       Cam.Height = 720;
       Cam.NearPlane = 0.1f;
-      Cam.FarPlane = 1000.0f;
-      Cam.Transform = Transform(Vec3(2, 0, 0),
-                                IdentityQuaternion,
-                                UnitScaleVector3);
+      Cam.FarPlane = 100.0f;
+      Cam.Transform = IdentityTransform;
+      Cam.Transform.Translation = Vec3(-5, 0, 3);
 
       Cam.MovementSpeed = 7;
       Cam.RotationSpeed = 3;
@@ -1794,7 +1859,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       //
       // Load image.
       //
-      bool const LoadFromFile = false;
+      bool const LoadFromFile = true;
       if(LoadFromFile)
       {
         auto FileName = SliceFromString("Data/Kitten_DXT1_Mipmaps.dds");
@@ -1802,11 +1867,11 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         auto ImageLoader = ImageLoaderFactory.CreateImageLoader(Allocator);
         if(LoadImageFromFile(ImageLoader, &Kitten->Texture.Image, FileName))
         {
-          LogInfo("Loaded image file: %*s", Convert<int>(FileName.Num), FileName);
+          LogInfo("Loaded image file: %*s", Convert<int>(FileName.Num), FileName.Ptr);
         }
         else
         {
-          LogWarning("Failed to load image file: %*s", Convert<int>(FileName.Num), FileName);
+          LogWarning("Failed to load image file: %*s", Convert<int>(FileName.Num), FileName.Ptr);
         }
         ImageLoaderFactory.DestroyImageLoader(Allocator, ImageLoader);
       }
@@ -1820,7 +1885,8 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
                           &Kitten->Texture,
                           vulkan_force_linear_tiling::Yes); // TODO: Should be ::No
 
-      VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->Vertices, &Kitten->Indices);
+      // VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->Vertices, &Kitten->Indices);
+      VulkanSetDebugGridGeometry(Vulkan, {}, &Kitten->Vertices, &Kitten->Indices);
 
       VulkanPrepareSceneObjectForRendering(Vulkan, Kitten);
     }
@@ -1832,7 +1898,8 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       VulkanBuildDrawCommands(*Vulkan,
                               Slice(&Vulkan->DrawCommandBuffers),
                               Slice(&Vulkan->Framebuffers),
-                              color::CornflowerBlue,
+                              // color::CornflowerBlue,
+                              color::Gray,
                               Vulkan->DepthStencilValue,
                               0);
       VulkanBuildPrePresentCommands(Vulkan->Device,
@@ -1867,13 +1934,19 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       //
       // Check for Quit requests
       //
+      if(ButtonIsDown(SystemInput[keyboard::Alt]) &&
+         ButtonIsDown(SystemInput[keyboard::F4]))
+      {
+        quick_exit(0);
+      }
+
       if(ButtonIsDown(SystemInput[MyInputSlots.Quit]))
       {
         ::GlobalRunning = false;
         break;
       }
 
-      Vulkan->DepthStencilValue = Clamp(Vulkan->DepthStencilValue + AxisValue(SystemInput[MyInputSlots.Depth]), 0.8f, 1.0f);
+      //Vulkan->DepthStencilValue = Clamp(Vulkan->DepthStencilValue + AxisValue(SystemInput[MyInputSlots.Depth]), 0.8f, 1.0f);
 
       //
       // Update camera
@@ -1895,10 +1968,16 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         Cam.Transform.Rotation = Quaternion(UpVector3,    Radians(Cam.InputYaw)) *
                                  Quaternion(RightVector3, Radians(Cam.InputPitch));
         SafeNormalize(&Cam.Transform.Rotation);
+
+        if(ButtonIsDown(SystemInput[MyInputSlots.Camera.Reset]))
+        {
+          Cam.Transform = IdentityTransform;
+          Cam.InputYaw = 0;
+          Cam.InputPitch = 0;
+        }
       }
 
-      // auto const ViewProjectionMatrix = CameraViewProjectionMatrix(Cam, Cam.Transform);
-      auto const ViewProjectionMatrix = IdentityMatrix4x4;
+      auto const ViewProjectionMatrix = CameraViewProjectionMatrix(Cam, Cam.Transform);
 
       //
       // Upload shader globals
@@ -1912,8 +1991,8 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
                                                 0, // flags
                                                 &RawData));
 
-        auto const Target = Reinterpret<mat4x4*>(RawData);
-        MemCopy(1, Target, &ViewProjectionMatrix);
+        auto const Target = Reinterpret<decltype(vulkan_scene_object_gfx_state::GlobalsUBOData)*>(RawData);
+        Target->ViewProjectionMatrix = ViewProjectionMatrix;
 
         Vulkan->Device.vkUnmapMemory(Vulkan->Device.DeviceHandle, Vulkan->SceneObjectGraphicsState.GlobalsUBO.Memory);
       }

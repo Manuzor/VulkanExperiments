@@ -784,7 +784,8 @@ struct slice
   /// Test whether this slice is valid or not.
   ///
   /// A slice is considered valid if it does not point to null and contains at
-  /// least one element.
+  /// least one element. If `Num` is 0 or `Ptr` is `nullptr`, the slice is
+  /// considered invalid (`false`).
   operator bool() const { return Num && Ptr; }
 
   /// Index operator to access elements of the slice.
@@ -839,7 +840,7 @@ template<typename T>
 typename slice<T>::element_type*
 Last(slice<T> const& SomeSlice)
 {
-  return MemAddOffset(First(SomeSlice), Max(1, SomeSlice.Num) - 1);
+  return MemAddOffset(First(SomeSlice), Max(size_t(1), SomeSlice.Num) - 1);
 }
 
 template<typename T>
@@ -870,7 +871,7 @@ slice<TargetType>
 SliceReinterpret(slice<SourceType> SomeSlice)
 {
   return Slice(Reinterpret<TargetType*>(First(SomeSlice)),
-              Reinterpret<TargetType*>(OnePastLast(SomeSlice)));
+               Reinterpret<TargetType*>(OnePastLast(SomeSlice)));
 }
 
 template<typename SourceType>
@@ -1292,6 +1293,9 @@ Cos(angle Angle);
 float
 Tan(angle Angle);
 
+inline float
+Cot(angle Angle) { return 1 / Tan(Angle); }
+
 angle
 ASin(float A);
 
@@ -1488,15 +1492,22 @@ struct impl_find_file_extension
   static slice<CharType>
   Do(slice<CharType> FileName, path_options Options)
   {
-    for(size_t Index = FileName.Num; Index > 0; --Index)
+    while(FileName.Num)
     {
-      if(FileName[Index] == '.')
-        return Slice(FileName, Index, FileName.Num);
+      --FileName.Num;
+      ++FileName.Ptr;
 
-      if(FileName[Index] == Options.Separator)
+      char const Character = *First(FileName);
+
+      // Found the path separator before the extension marker?
+      if(Character == Options.Separator)
         break;
+
+      if(Character == '.')
+        return FileName;
     }
 
+    // Return an empty slice that still points to the correct memory.
     return { 0, OnePastLast(FileName) };
   }
 };

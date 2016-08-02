@@ -22,7 +22,7 @@ auto
   Defer [=](){ SliceDeallocate(Allocator, SzFileName); };
 
   SliceCopy(SzFileName, FileName);
-  SzFileName[SzFileName.Num] = '\0';
+  SzFileName[SzFileName.Num - 1] = '\0';
 
   FILE* File = std::fopen(SzFileName.Ptr, "rb");
   if(File == nullptr)

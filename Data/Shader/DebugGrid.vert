@@ -28,6 +28,6 @@ layout(location = 0) out vec4 OutColor;
 
 void main()
 {
-  OutColor = Color;
   gl_Position = ViewProjectionMatrix * vec4(Position, 1.0f);
+  OutColor = Color;
 }

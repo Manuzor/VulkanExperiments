@@ -89,3 +89,12 @@ StdoutLogSink(log_sink_args Args);
 CORE_API
 void
 VisualStudioLogSink(log_sink_args Args);
+
+//
+// Misc
+//
+
+#include <Windows.h>
+
+void Win32LogErrorCode(log_data* Log, DWORD ErrorCode);
+void Win32LogErrorCode(DWORD ErrorCode);

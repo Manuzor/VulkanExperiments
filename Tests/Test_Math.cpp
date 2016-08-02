@@ -151,12 +151,12 @@ TEST_CASE("Math: Matrix Multiplication", "[Math]")
      9, 10, 11, 12,
     13, 14, 15, 16);
 
-  SECTION("Identity * Arbitrary")
+  SECTION("Arbitrary * Identity")
   {
     REQUIRE( Mat * IdentityMatrix4x4 == Mat );
   }
 
-  SECTION("Arbitrary * Arbitrary")
+  SECTION("Arbitrary1 * Arbitrary2")
   {
     auto Mat2 = Mat4x4(
       16, 15, 14, 13,

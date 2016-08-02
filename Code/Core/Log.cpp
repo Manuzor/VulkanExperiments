@@ -320,3 +320,46 @@ auto
 
   OutputDebugStringA("\n");
 }
+
+
+auto
+::Win32LogErrorCode(log_data* Log, DWORD ErrorCode)
+  -> void
+{
+  if(ErrorCode == 0 || Log == nullptr)
+  {
+    return;
+  }
+
+  LPSTR Message = {};
+  // NOTE(Manu): Free the message when leaving this function.
+  Defer [Message](){ if(Message) LocalFree(Message); };
+
+  DWORD const FormatMessageFlags = FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                                   FORMAT_MESSAGE_FROM_SYSTEM |
+                                   FORMAT_MESSAGE_IGNORE_INSERTS;
+  DWORD const LanguageIdentifier = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
+  DWORD const MessageSize = FormatMessageA(
+        FormatMessageFlags,           // _In_     DWORD   dwFlags
+        nullptr,                      // _In_opt_ LPCVOID lpSource
+        ErrorCode,                    // _In_     DWORD   dwMessageId
+        LanguageIdentifier,           // _In_     DWORD   dwLanguageId
+        Reinterpret<LPSTR>(&Message), // _Out_    LPTSTR  lpBuffer
+        0,                            // _In_     DWORD   nSize
+        nullptr);                     // _In_opt_ va_list *Argument
+  if(MessageSize == 0)
+  {
+    LogError(Log, "Failed to format the win32 error.");
+  }
+  else
+  {
+    LogError(Log, "[Win32] %*s", Convert<int>(MessageSize), Message);
+  }
+}
+
+auto
+::Win32LogErrorCode(DWORD ErrorCode)
+  -> void
+{
+  Win32LogErrorCode(GlobalLog, ErrorCode);
+}

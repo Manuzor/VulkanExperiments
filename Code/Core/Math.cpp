@@ -37,6 +37,13 @@ auto
 }
 
 auto
+::operator *(mat4x4 const& A, vec4 const& B)
+  -> vec4
+{
+  return TransformDirection(A, B);
+}
+
+auto
 ::operator *(quaternion const& A, quaternion const& B)
   -> quaternion
 {
@@ -60,26 +67,26 @@ auto
 }
 
 auto
-::Length(vec2 const& Vec)
+::Length(vec2 const& Vector)
   -> float
 {
-  auto Result = Sqrt(LengthSquared(Vec));
+  auto Result = Sqrt(LengthSquared(Vector));
   return Result;
 }
 
 auto
-::Length(vec3 const& Vec)
+::Length(vec3 const& Vector)
   -> float
 {
-  auto Result = Sqrt(LengthSquared(Vec));
+  auto Result = Sqrt(LengthSquared(Vector));
   return Result;
 }
 
 auto
-::Length(vec4 const& Vec)
+::Length(vec4 const& Vector)
   -> float
 {
-  auto Result = Sqrt(LengthSquared(Vec));
+  auto Result = Sqrt(LengthSquared(Vector));
   return Result;
 }
 
@@ -93,90 +100,90 @@ Length(quaternion const& Quat)
 
 
 auto
-::Normalized(vec2 const& Vec)
+::Normalized(vec2 const& Vector)
   -> vec2
 {
-  auto Result = Vec / Length(Vec);
+  auto Result = Vector / Length(Vector);
   return Result;
 }
 
 auto
-::Normalized(vec3 const& Vec)
+::Normalized(vec3 const& Vector)
   -> vec3
 {
-  auto Result = Vec / Length(Vec);
+  auto Result = Vector / Length(Vector);
   return Result;
 }
 
 auto
-::Normalized(vec4 const& Vec)
+::Normalized(vec4 const& Vector)
   -> vec4
 {
-  auto Result = Vec / Length(Vec);
+  auto Result = Vector / Length(Vector);
   return Result;
 }
 
 auto
-::Normalize(vec2* Vec)
+::Normalize(vec2* Vector)
   -> void
 {
-  *Vec = Normalized(*Vec);
+  *Vector = Normalized(*Vector);
 }
 
 auto
-::Normalize(vec3* Vec)
+::Normalize(vec3* Vector)
   -> void
 {
-  *Vec = Normalized(*Vec);
+  *Vector = Normalized(*Vector);
 }
 
 auto
-::Normalize(vec4* Vec)
+::Normalize(vec4* Vector)
   -> void
 {
-  *Vec = Normalized(*Vec);
+  *Vector = Normalized(*Vector);
 }
 
 auto
-::SafeNormalized(vec2 const& Vec, float Epsilon)
+::SafeNormalized(vec2 const& Vector, float Epsilon)
   -> vec2
 {
-  return IsNearlyZero(Vec, Epsilon) ? ZeroVector2 : Normalized(Vec);
+  return IsNearlyZero(Vector, Epsilon) ? ZeroVector2 : Normalized(Vector);
 }
 
 auto
-::SafeNormalized(vec3 const& Vec, float Epsilon)
+::SafeNormalized(vec3 const& Vector, float Epsilon)
   -> vec3
 {
-  return IsNearlyZero(Vec, Epsilon) ? ZeroVector3 : Normalized(Vec);
+  return IsNearlyZero(Vector, Epsilon) ? ZeroVector3 : Normalized(Vector);
 }
 
 auto
-::SafeNormalized(vec4 const& Vec, float Epsilon)
+::SafeNormalized(vec4 const& Vector, float Epsilon)
   -> vec4
 {
-  return IsNearlyZero(Vec, Epsilon) ? ZeroVector4 : Normalized(Vec);
+  return IsNearlyZero(Vector, Epsilon) ? ZeroVector4 : Normalized(Vector);
 }
 
 auto
-::SafeNormalize(vec2* Vec, float Epsilon)
+::SafeNormalize(vec2* Vector, float Epsilon)
   -> void
 {
-  *Vec = SafeNormalized(*Vec, Epsilon);
+  *Vector = SafeNormalized(*Vector, Epsilon);
 }
 
 auto
-::SafeNormalize(vec3* Vec, float Epsilon)
+::SafeNormalize(vec3* Vector, float Epsilon)
   -> void
 {
-  *Vec = SafeNormalized(*Vec, Epsilon);
+  *Vector = SafeNormalized(*Vector, Epsilon);
 }
 
 auto
-::SafeNormalize(vec4* Vec, float Epsilon)
+::SafeNormalize(vec4* Vector, float Epsilon)
   -> void
 {
-  *Vec = SafeNormalized(*Vec, Epsilon);
+  *Vector = SafeNormalized(*Vector, Epsilon);
 }
 
 auto
@@ -307,61 +314,61 @@ auto
 }
 
 auto
-::TransformDirection(mat4x4 const& Mat, vec4 const& Vec)
+::TransformDirection(mat4x4 const& Mat, vec4 const& Vector)
   -> vec4
 {
   vec4 Result;
 
-  Result.Data[0] = Mat[0][0] * Vec.Data[0] + Mat[1][0] * Vec.Data[1] + Mat[2][0] * Vec.Data[2] + Mat[3][0] * Vec.Data[3];
-  Result.Data[1] = Mat[0][1] * Vec.Data[0] + Mat[1][1] * Vec.Data[1] + Mat[2][1] * Vec.Data[2] + Mat[3][1] * Vec.Data[3];
-  Result.Data[2] = Mat[0][2] * Vec.Data[0] + Mat[1][2] * Vec.Data[1] + Mat[2][2] * Vec.Data[2] + Mat[3][2] * Vec.Data[3];
-  Result.Data[3] = Mat[0][3] * Vec.Data[0] + Mat[1][3] * Vec.Data[1] + Mat[2][3] * Vec.Data[2] + Mat[3][3] * Vec.Data[3];
+  Result.Data[0] = Mat[0][0] * Vector.Data[0] + Mat[1][0] * Vector.Data[1] + Mat[2][0] * Vector.Data[2] + Mat[3][0] * Vector.Data[3];
+  Result.Data[1] = Mat[0][1] * Vector.Data[0] + Mat[1][1] * Vector.Data[1] + Mat[2][1] * Vector.Data[2] + Mat[3][1] * Vector.Data[3];
+  Result.Data[2] = Mat[0][2] * Vector.Data[0] + Mat[1][2] * Vector.Data[1] + Mat[2][2] * Vector.Data[2] + Mat[3][2] * Vector.Data[3];
+  Result.Data[3] = Mat[0][3] * Vector.Data[0] + Mat[1][3] * Vector.Data[1] + Mat[2][3] * Vector.Data[2] + Mat[3][3] * Vector.Data[3];
 
   return Result;
 }
 
 auto
-::TransformDirection(mat4x4 const& Mat, vec3 const& Vec)
+::TransformDirection(mat4x4 const& Mat, vec3 const& Vector)
   -> vec3
 {
-  return Vec3FromXYZ(TransformDirection(Mat, Vec4(Vec, 0)));
+  return Vec3FromXYZ(TransformDirection(Mat, Vec4(Vector, 0)));
 }
 
 auto
-::TransformPosition(mat4x4 const& Mat, vec3 const& Vec)
+::TransformPosition(mat4x4 const& Mat, vec3 const& Vector)
   -> vec3
 {
-  return Vec3FromXYZ(TransformDirection(Mat, Vec4(Vec, 1)));
+  return Vec3FromXYZ(TransformDirection(Mat, Vec4(Vector, 1)));
 }
 
 auto
-::InverseTransformDirection(mat4x4 const& Mat, vec4 const& Vec)
+::InverseTransformDirection(mat4x4 const& Mat, vec4 const& Vector)
   -> vec4
 {
   vec4 Result;
 
   auto Inverted = SafeInverted(Mat);
 
-  Result.Data[0] = Inverted[0][0] * Vec.Data[0] + Inverted[1][0] * Vec.Data[1] + Inverted[2][0] * Vec.Data[2] + Inverted[3][0] * Vec.Data[3];
-  Result.Data[1] = Inverted[0][1] * Vec.Data[0] + Inverted[1][1] * Vec.Data[1] + Inverted[2][1] * Vec.Data[2] + Inverted[3][1] * Vec.Data[3];
-  Result.Data[2] = Inverted[0][2] * Vec.Data[0] + Inverted[1][2] * Vec.Data[1] + Inverted[2][2] * Vec.Data[2] + Inverted[3][2] * Vec.Data[3];
-  Result.Data[3] = Inverted[0][3] * Vec.Data[0] + Inverted[1][3] * Vec.Data[1] + Inverted[2][3] * Vec.Data[2] + Inverted[3][3] * Vec.Data[3];
+  Result.Data[0] = Inverted[0][0] * Vector.Data[0] + Inverted[1][0] * Vector.Data[1] + Inverted[2][0] * Vector.Data[2] + Inverted[3][0] * Vector.Data[3];
+  Result.Data[1] = Inverted[0][1] * Vector.Data[0] + Inverted[1][1] * Vector.Data[1] + Inverted[2][1] * Vector.Data[2] + Inverted[3][1] * Vector.Data[3];
+  Result.Data[2] = Inverted[0][2] * Vector.Data[0] + Inverted[1][2] * Vector.Data[1] + Inverted[2][2] * Vector.Data[2] + Inverted[3][2] * Vector.Data[3];
+  Result.Data[3] = Inverted[0][3] * Vector.Data[0] + Inverted[1][3] * Vector.Data[1] + Inverted[2][3] * Vector.Data[2] + Inverted[3][3] * Vector.Data[3];
 
   return Result;
 }
 
 auto
-::InverseTransformDirection(mat4x4 const& Mat, vec3 const& Vec)
+::InverseTransformDirection(mat4x4 const& Mat, vec3 const& Vector)
   -> vec3
 {
-  return Vec3FromXYZ(InverseTransformDirection(Mat, Vec4(Vec, 0)));
+  return Vec3FromXYZ(InverseTransformDirection(Mat, Vec4(Vector, 0)));
 }
 
 auto
-::InverseTransformPosition(mat4x4 const& Mat, vec3 const& Vec)
+::InverseTransformPosition(mat4x4 const& Mat, vec3 const& Vector)
   -> vec3
 {
-  return Vec3FromXYZ(InverseTransformDirection(Mat, Vec4(Vec, 1)));
+  return Vec3FromXYZ(InverseTransformDirection(Mat, Vec4(Vector, 1)));
 }
 
 auto
@@ -403,31 +410,31 @@ auto
 }
 
 auto
-::TransformDirection(transform const& Transform, vec3 const& Vec)
+::TransformDirection(transform const& Transform, vec3 const& Vector)
   -> vec3
 {
-  return Transform.Rotation * ComponentwiseMultiply(Transform.Scale, Vec);
+  return Transform.Rotation * ComponentwiseMultiply(Transform.Scale, Vector);
 }
 
 auto
-::TransformPosition(transform const& Transform, vec3 const& Vec)
+::TransformPosition(transform const& Transform, vec3 const& Vector)
   -> vec3
 {
-  return Transform.Rotation * ComponentwiseMultiply(Transform.Scale, Vec) + Transform.Translation;
+  return Transform.Rotation * ComponentwiseMultiply(Transform.Scale, Vector) + Transform.Translation;
 }
 
 auto
-::InverseTransformDirection(transform const& Transform, vec3 const& Vec)
+::InverseTransformDirection(transform const& Transform, vec3 const& Vector)
   -> vec3
 {
-  return InverseTransformDirection(Transform.Rotation, Vec) * Reciprocal(Transform.Scale, 0);
+  return InverseTransformDirection(Transform.Rotation, Vector) * Reciprocal(Transform.Scale, 0);
 }
 
 auto
-::InverseTransformPosition(transform const& Transform, vec3 const& Vec)
+::InverseTransformPosition(transform const& Transform, vec3 const& Vector)
   -> vec3
 {
-  return InverseTransformDirection(Transform.Rotation, Vec - Transform.Translation) * Reciprocal(Transform.Scale, 0);
+  return InverseTransformDirection(Transform.Rotation, Vector - Transform.Translation) * Reciprocal(Transform.Scale, 0);
 }
 
 auto
@@ -455,30 +462,75 @@ auto
 }
 
 auto
+::Mat4x4PerspectiveProjection(angle VerticalFOV, float AspectRatio, float NearPlane, float FarPlane)
+  -> mat4x4
+{
+  // From the D3DX Docs:
+  // https://msdn.microsoft.com/en-us/library/windows/desktop/bb205350(v=vs.85).aspx
+
+  float const ScaleY = Cot(0.5f * VerticalFOV);
+  float const ScaleX = ScaleY / AspectRatio;
+
+  #define LEFT_HANDED 1
+  #if LEFT_HANDED
+    float const A = FarPlane / (FarPlane - NearPlane);
+    float const B = -NearPlane * FarPlane / (FarPlane - NearPlane);
+    float const One = 1;
+  #else
+    float const A = FarPlane / (NearPlane - FarPlane);
+    float const B = NearPlane * FarPlane / (NearPlane - FarPlane);
+    float const One = -1;
+  #endif
+  #undef LEFT_HANDED
+
+  return {
+    ScaleX, 0,      0, 0,
+    0,      ScaleY, 0, 0,
+    0,      0,      A, One,
+    0,      0,      B, 0,
+  };
+}
+
+#if 0
+auto
 ::Mat4x4Perspective(angle HalfFOVY, float Width, float Height, float NearPlane, float FarPlane)
   -> mat4x4
 {
-  auto A = 1.0f / Tan(HalfFOVY);
-  auto B = Width / Tan(HalfFOVY) / Height;
-  auto C = ((NearPlane == FarPlane) ? 1.0f : FarPlane / (FarPlane - NearPlane));
-  auto D = -NearPlane * ((NearPlane == FarPlane) ? 1.0f : FarPlane / (FarPlane - NearPlane));
+  float const
+
+  #if 1
+    // Marvin's Original
+    float const A = 1.0f / Tan(HalfFOVY);
+    float const B = Width / Tan(HalfFOVY) / Height;
+    float const C = ((NearPlane == FarPlane) ? 1.0f : FarPlane / (FarPlane - NearPlane));
+    float const One = 1;
+    float const D = -NearPlane * ((NearPlane == FarPlane) ? 1.0f : FarPlane / (FarPlane - NearPlane));
+  #else
+    // From MSDN: D3DXMatrixPerspectiveRH function
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/bb205355(v=vs.85).aspx
+    float const A = ;
+    float const B = ;
+    float const C = ;
+    float const D = ;
+  #endif
 
   return {
     A, 0, 0, 0,
     0, B, 0, 0,
-    0, 0, C, 1,
+    0, 0, C, One,
     0, 0, D, 0,
   };
 }
+#endif
 
 auto
-::Mat4x4Orthogonal(float Width, float Height, float ZScale, float ZOffset)
+::Mat4x4OrthogonalProjection(float Width, float Height, float ZScale, float ZOffset)
   -> mat4x4
 {
-  auto A = Width  ? (1.0f / Width) : 1.0f;
-  auto B = Height ? (1.0f / Height) : 1.0f;
-  auto C = ZScale;
-  auto D = ZOffset * ZScale;
+  float const A = Width  ? (1.0f / Width) : 1.0f;
+  float const B = Height ? (1.0f / Height) : 1.0f;
+  float const C = ZScale;
+  float const D = ZOffset * ZScale;
 
   return {
     A, 0, 0, 0,
@@ -823,14 +875,14 @@ auto
 }
 
 auto
-DirectionAndLength(vec2 const& Vec, vec2* OutDirection, float* OutLength, float Epsilon)
+DirectionAndLength(vec2 const& Vector, vec2* OutDirection, float* OutLength, float Epsilon)
   -> void
 {
-  *OutLength = Length(Vec);
+  *OutLength = Length(Vector);
 
   if(*OutLength > Epsilon)
   {
-    *OutDirection = Vec / *OutLength;
+    *OutDirection = Vector / *OutLength;
   }
   else
   {
@@ -839,14 +891,14 @@ DirectionAndLength(vec2 const& Vec, vec2* OutDirection, float* OutLength, float 
 }
 
 auto
-DirectionAndLength(vec3 const& Vec, vec3* OutDirection, float* OutLength, float Epsilon)
+DirectionAndLength(vec3 const& Vector, vec3* OutDirection, float* OutLength, float Epsilon)
   -> void
 {
-  *OutLength = Length(Vec);
+  *OutLength = Length(Vector);
 
   if(*OutLength > Epsilon)
   {
-    *OutDirection = Vec / *OutLength;
+    *OutDirection = Vector / *OutLength;
   }
   else
   {
@@ -855,14 +907,14 @@ DirectionAndLength(vec3 const& Vec, vec3* OutDirection, float* OutLength, float 
 }
 
 auto
-DirectionAndLength(vec4 const& Vec, vec4* OutDirection, float* OutLength, float Epsilon)
+DirectionAndLength(vec4 const& Vector, vec4* OutDirection, float* OutLength, float Epsilon)
   -> void
 {
-  *OutLength = Length(Vec);
+  *OutLength = Length(Vector);
 
   if(*OutLength > Epsilon)
   {
-    *OutDirection = Vec / *OutLength;
+    *OutDirection = Vector / *OutLength;
   }
   else
   {

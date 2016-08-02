@@ -84,6 +84,10 @@
     <DisplayString>{{ X={X,g}, Y={Y,g}, Z={Z,g}, W={W,g} }}</DisplayString>
   </Type>
 
+  <Type Name="quaternion">
+    <DisplayString>{{ X={X,g}, Y={Y,g}, Z={Z,g}, W={W,g} }}</DisplayString>
+  </Type>
+
   <Type Name="mat4x4">
     <DisplayString>{Data[0],16}</DisplayString>
     <Expand>

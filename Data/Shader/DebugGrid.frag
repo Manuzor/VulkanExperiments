@@ -7,7 +7,7 @@
 //
 // Uniforms
 //
-layout(binding = 1) uniform sampler2D Sampler; // Shhh, it'll be over soon.
+layout(binding = 1) uniform sampler2D Sampler; // TODO: Remove
 
 
 //

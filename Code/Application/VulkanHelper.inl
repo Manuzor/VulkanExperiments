@@ -305,464 +305,468 @@ struct vulkan_device_functions
   PFN_vkCmdDebugMarkerInsertEXT vkCmdDebugMarkerInsertEXT;
 };
 
-template<>
-struct impl_init_struct<VkApplicationInfo>
-{
-  static constexpr VkApplicationInfo
-  Create() { return { VK_STRUCTURE_TYPE_APPLICATION_INFO }; }
-};
+//
+// InitStruct specializations
+//
 
-template<>
-struct impl_init_struct<VkInstanceCreateInfo>
-{
-  static constexpr VkInstanceCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkDeviceQueueCreateInfo>
-{
-  static constexpr VkDeviceQueueCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkDeviceCreateInfo>
-{
-  static constexpr VkDeviceCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkSubmitInfo>
-{
-  static constexpr VkSubmitInfo
-  Create() { return { VK_STRUCTURE_TYPE_SUBMIT_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkMemoryAllocateInfo>
-{
-  static constexpr VkMemoryAllocateInfo
-  Create() { return { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkMappedMemoryRange>
-{
-  static constexpr VkMappedMemoryRange
-  Create() { return { VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE }; }
-};
-
-template<>
-struct impl_init_struct<VkBindSparseInfo>
-{
-  static constexpr VkBindSparseInfo
-  Create() { return { VK_STRUCTURE_TYPE_BIND_SPARSE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkFenceCreateInfo>
-{
-  static constexpr VkFenceCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkSemaphoreCreateInfo>
-{
-  static constexpr VkSemaphoreCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkEventCreateInfo>
-{
-  static constexpr VkEventCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_EVENT_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkQueryPoolCreateInfo>
-{
-  static constexpr VkQueryPoolCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkBufferCreateInfo>
-{
-  static constexpr VkBufferCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkBufferViewCreateInfo>
-{
-  static constexpr VkBufferViewCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkImageCreateInfo>
-{
-  static constexpr VkImageCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkImageViewCreateInfo>
-{
-  static constexpr VkImageViewCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkShaderModuleCreateInfo>
-{
-  static constexpr VkShaderModuleCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineCacheCreateInfo>
-{
-  static constexpr VkPipelineCacheCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineShaderStageCreateInfo>
-{
-  static constexpr VkPipelineShaderStageCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineVertexInputStateCreateInfo>
-{
-  static constexpr VkPipelineVertexInputStateCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineInputAssemblyStateCreateInfo>
-{
-  static constexpr VkPipelineInputAssemblyStateCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineTessellationStateCreateInfo>
-{
-  static constexpr VkPipelineTessellationStateCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineViewportStateCreateInfo>
-{
-  static constexpr VkPipelineViewportStateCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineRasterizationStateCreateInfo>
-{
-  static constexpr VkPipelineRasterizationStateCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineMultisampleStateCreateInfo>
-{
-  static constexpr VkPipelineMultisampleStateCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineDepthStencilStateCreateInfo>
-{
-  static constexpr VkPipelineDepthStencilStateCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineColorBlendStateCreateInfo>
-{
-  static constexpr VkPipelineColorBlendStateCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineDynamicStateCreateInfo>
-{
-  static constexpr VkPipelineDynamicStateCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkGraphicsPipelineCreateInfo>
-{
-  static constexpr VkGraphicsPipelineCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkComputePipelineCreateInfo>
-{
-  static constexpr VkComputePipelineCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineLayoutCreateInfo>
-{
-  static constexpr VkPipelineLayoutCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkSamplerCreateInfo>
-{
-  static constexpr VkSamplerCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkDescriptorSetLayoutCreateInfo>
-{
-  static constexpr VkDescriptorSetLayoutCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkDescriptorPoolCreateInfo>
-{
-  static constexpr VkDescriptorPoolCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkDescriptorSetAllocateInfo>
-{
-  static constexpr VkDescriptorSetAllocateInfo
-  Create() { return { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkWriteDescriptorSet>
-{
-  static constexpr VkWriteDescriptorSet
-  Create() { return { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET }; }
-};
-
-template<>
-struct impl_init_struct<VkCopyDescriptorSet>
-{
-  static constexpr VkCopyDescriptorSet
-  Create() { return { VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET }; }
-};
-
-template<>
-struct impl_init_struct<VkFramebufferCreateInfo>
-{
-  static constexpr VkFramebufferCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkRenderPassCreateInfo>
-{
-  static constexpr VkRenderPassCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkCommandPoolCreateInfo>
-{
-  static constexpr VkCommandPoolCreateInfo
-  Create() { return { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkCommandBufferAllocateInfo>
-{
-  static constexpr VkCommandBufferAllocateInfo
-  Create() { return { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkCommandBufferInheritanceInfo>
-{
-  static constexpr VkCommandBufferInheritanceInfo
-  Create() { return { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkCommandBufferBeginInfo>
-{
-  static constexpr VkCommandBufferBeginInfo
-  Create() { return { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkRenderPassBeginInfo>
-{
-  static constexpr VkRenderPassBeginInfo
-  Create() { return { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO }; }
-};
-
-template<>
-struct impl_init_struct<VkBufferMemoryBarrier>
-{
-  static constexpr VkBufferMemoryBarrier
-  Create() { return { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER }; }
-};
-
-template<>
-struct impl_init_struct<VkImageMemoryBarrier>
-{
-  static VkImageMemoryBarrier
-  Create()
+  template<>
+  struct impl_init_struct<VkApplicationInfo>
   {
-    VkImageMemoryBarrier Result{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    Result.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    Result.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    return Result;
-  }
-};
+    static constexpr VkApplicationInfo
+    Create() { return { VK_STRUCTURE_TYPE_APPLICATION_INFO }; }
+  };
 
-template<>
-struct impl_init_struct<VkMemoryBarrier>
-{
-  static constexpr VkMemoryBarrier
-  Create() { return { VK_STRUCTURE_TYPE_MEMORY_BARRIER }; }
-};
-
-// VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO?
-// VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO?
-template<>
-struct impl_init_struct<VkSwapchainCreateInfoKHR>
-{
-  static constexpr VkSwapchainCreateInfoKHR
-  Create() { return { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR }; }
-};
-
-template<>
-struct impl_init_struct<VkPresentInfoKHR>
-{
-  static constexpr VkPresentInfoKHR
-  Create() { return { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR }; }
-};
-
-template<>
-struct impl_init_struct<VkDisplayModeCreateInfoKHR>
-{
-  static constexpr VkDisplayModeCreateInfoKHR
-  Create() { return { VK_STRUCTURE_TYPE_DISPLAY_MODE_CREATE_INFO_KHR }; }
-};
-
-template<>
-struct impl_init_struct<VkDisplaySurfaceCreateInfoKHR>
-{
-  static constexpr VkDisplaySurfaceCreateInfoKHR
-  Create() { return { VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR }; }
-};
-
-template<>
-struct impl_init_struct<VkDisplayPresentInfoKHR>
-{
-  static constexpr VkDisplayPresentInfoKHR
-  Create() { return { VK_STRUCTURE_TYPE_DISPLAY_PRESENT_INFO_KHR }; }
-};
-
-// template<>
-// struct impl_init_struct<VkXlibSurfaceCreateInfoKHR>
-// {
-//   static constexpr VkXlibSurfaceCreateInfoKHR
-//   Create() { return { VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR }; }
-// };
-
-// template<>
-// struct impl_init_struct<VkXcbSurfaceCreateInfoKHR>
-// {
-//   static constexpr VkXcbSurfaceCreateInfoKHR
-//   Create() { return { VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR }; }
-// };
-
-// template<>
-// struct impl_init_struct<VkWaylandSurfaceCreateInfoKHR>
-// {
-//   static constexpr VkWaylandSurfaceCreateInfoKHR
-//   Create() { return { VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR }; }
-// };
-
-// template<>
-// struct impl_init_struct<VkMirSurfaceCreateInfoKHR>
-// {
-//   static constexpr VkMirSurfaceCreateInfoKHR
-//   Create() { return { VK_STRUCTURE_TYPE_MIR_SURFACE_CREATE_INFO_KHR }; }
-// };
-
-// template<>
-// struct impl_init_struct<VkAndroidSurfaceCreateInfoKHR>
-// {
-//   static constexpr VkAndroidSurfaceCreateInfoKHR
-//   Create() { return { VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR }; }
-// };
-
-template<>
-struct impl_init_struct<VkWin32SurfaceCreateInfoKHR>
-{
-  static constexpr VkWin32SurfaceCreateInfoKHR
-  Create() { return { VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR }; }
-};
-
-template<>
-struct impl_init_struct<VkDebugReportCallbackCreateInfoEXT>
-{
-  static constexpr VkDebugReportCallbackCreateInfoEXT
-  Create() { return { VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT }; }
-};
-
-template<>
-struct impl_init_struct<VkPipelineRasterizationStateRasterizationOrderAMD>
-{
-  static constexpr VkPipelineRasterizationStateRasterizationOrderAMD
-  Create() { return { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_RASTERIZATION_ORDER_AMD }; }
-};
-
-template<>
-struct impl_init_struct<VkDebugMarkerObjectNameInfoEXT>
-{
-  static constexpr VkDebugMarkerObjectNameInfoEXT
-  Create() { return { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT }; }
-};
-
-template<>
-struct impl_init_struct<VkDebugMarkerObjectTagInfoEXT>
-{
-  static constexpr VkDebugMarkerObjectTagInfoEXT
-  Create() { return { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_TAG_INFO_EXT }; }
-};
-
-template<>
-struct impl_init_struct<VkDebugMarkerMarkerInfoEXT>
-{
-  static constexpr VkDebugMarkerMarkerInfoEXT
-  Create() { return { VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT }; }
-};
-
-template<>
-struct impl_init_struct<VkComponentMapping>
-{
-  static constexpr VkComponentMapping
-  Create()
+  template<>
+  struct impl_init_struct<VkInstanceCreateInfo>
   {
-    return { VK_COMPONENT_SWIZZLE_R,
-             VK_COMPONENT_SWIZZLE_G,
-             VK_COMPONENT_SWIZZLE_B,
-             VK_COMPONENT_SWIZZLE_A };
-  }
-};
+    static constexpr VkInstanceCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDeviceQueueCreateInfo>
+  {
+    static constexpr VkDeviceQueueCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDeviceCreateInfo>
+  {
+    static constexpr VkDeviceCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkSubmitInfo>
+  {
+    static constexpr VkSubmitInfo
+    Create() { return { VK_STRUCTURE_TYPE_SUBMIT_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkMemoryAllocateInfo>
+  {
+    static constexpr VkMemoryAllocateInfo
+    Create() { return { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkMappedMemoryRange>
+  {
+    static constexpr VkMappedMemoryRange
+    Create() { return { VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkBindSparseInfo>
+  {
+    static constexpr VkBindSparseInfo
+    Create() { return { VK_STRUCTURE_TYPE_BIND_SPARSE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkFenceCreateInfo>
+  {
+    static constexpr VkFenceCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkSemaphoreCreateInfo>
+  {
+    static constexpr VkSemaphoreCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkEventCreateInfo>
+  {
+    static constexpr VkEventCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_EVENT_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkQueryPoolCreateInfo>
+  {
+    static constexpr VkQueryPoolCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkBufferCreateInfo>
+  {
+    static constexpr VkBufferCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkBufferViewCreateInfo>
+  {
+    static constexpr VkBufferViewCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkImageCreateInfo>
+  {
+    static constexpr VkImageCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkImageViewCreateInfo>
+  {
+    static constexpr VkImageViewCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkShaderModuleCreateInfo>
+  {
+    static constexpr VkShaderModuleCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineCacheCreateInfo>
+  {
+    static constexpr VkPipelineCacheCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineShaderStageCreateInfo>
+  {
+    static constexpr VkPipelineShaderStageCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineVertexInputStateCreateInfo>
+  {
+    static constexpr VkPipelineVertexInputStateCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineInputAssemblyStateCreateInfo>
+  {
+    static constexpr VkPipelineInputAssemblyStateCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineTessellationStateCreateInfo>
+  {
+    static constexpr VkPipelineTessellationStateCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineViewportStateCreateInfo>
+  {
+    static constexpr VkPipelineViewportStateCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineRasterizationStateCreateInfo>
+  {
+    static constexpr VkPipelineRasterizationStateCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineMultisampleStateCreateInfo>
+  {
+    static constexpr VkPipelineMultisampleStateCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineDepthStencilStateCreateInfo>
+  {
+    static constexpr VkPipelineDepthStencilStateCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineColorBlendStateCreateInfo>
+  {
+    static constexpr VkPipelineColorBlendStateCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineDynamicStateCreateInfo>
+  {
+    static constexpr VkPipelineDynamicStateCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkGraphicsPipelineCreateInfo>
+  {
+    static constexpr VkGraphicsPipelineCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkComputePipelineCreateInfo>
+  {
+    static constexpr VkComputePipelineCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineLayoutCreateInfo>
+  {
+    static constexpr VkPipelineLayoutCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkSamplerCreateInfo>
+  {
+    static constexpr VkSamplerCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDescriptorSetLayoutCreateInfo>
+  {
+    static constexpr VkDescriptorSetLayoutCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDescriptorPoolCreateInfo>
+  {
+    static constexpr VkDescriptorPoolCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDescriptorSetAllocateInfo>
+  {
+    static constexpr VkDescriptorSetAllocateInfo
+    Create() { return { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkWriteDescriptorSet>
+  {
+    static constexpr VkWriteDescriptorSet
+    Create() { return { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkCopyDescriptorSet>
+  {
+    static constexpr VkCopyDescriptorSet
+    Create() { return { VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkFramebufferCreateInfo>
+  {
+    static constexpr VkFramebufferCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkRenderPassCreateInfo>
+  {
+    static constexpr VkRenderPassCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkCommandPoolCreateInfo>
+  {
+    static constexpr VkCommandPoolCreateInfo
+    Create() { return { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkCommandBufferAllocateInfo>
+  {
+    static constexpr VkCommandBufferAllocateInfo
+    Create() { return { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkCommandBufferInheritanceInfo>
+  {
+    static constexpr VkCommandBufferInheritanceInfo
+    Create() { return { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkCommandBufferBeginInfo>
+  {
+    static constexpr VkCommandBufferBeginInfo
+    Create() { return { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkRenderPassBeginInfo>
+  {
+    static constexpr VkRenderPassBeginInfo
+    Create() { return { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkBufferMemoryBarrier>
+  {
+    static constexpr VkBufferMemoryBarrier
+    Create() { return { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkImageMemoryBarrier>
+  {
+    static VkImageMemoryBarrier
+    Create()
+    {
+      VkImageMemoryBarrier Result{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+      Result.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      Result.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      return Result;
+    }
+  };
+
+  template<>
+  struct impl_init_struct<VkMemoryBarrier>
+  {
+    static constexpr VkMemoryBarrier
+    Create() { return { VK_STRUCTURE_TYPE_MEMORY_BARRIER }; }
+  };
+
+  // VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO?
+  // VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO?
+  template<>
+  struct impl_init_struct<VkSwapchainCreateInfoKHR>
+  {
+    static constexpr VkSwapchainCreateInfoKHR
+    Create() { return { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPresentInfoKHR>
+  {
+    static constexpr VkPresentInfoKHR
+    Create() { return { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDisplayModeCreateInfoKHR>
+  {
+    static constexpr VkDisplayModeCreateInfoKHR
+    Create() { return { VK_STRUCTURE_TYPE_DISPLAY_MODE_CREATE_INFO_KHR }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDisplaySurfaceCreateInfoKHR>
+  {
+    static constexpr VkDisplaySurfaceCreateInfoKHR
+    Create() { return { VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDisplayPresentInfoKHR>
+  {
+    static constexpr VkDisplayPresentInfoKHR
+    Create() { return { VK_STRUCTURE_TYPE_DISPLAY_PRESENT_INFO_KHR }; }
+  };
+
+  // template<>
+  // struct impl_init_struct<VkXlibSurfaceCreateInfoKHR>
+  // {
+  //   static constexpr VkXlibSurfaceCreateInfoKHR
+  //   Create() { return { VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR }; }
+  // };
+
+  // template<>
+  // struct impl_init_struct<VkXcbSurfaceCreateInfoKHR>
+  // {
+  //   static constexpr VkXcbSurfaceCreateInfoKHR
+  //   Create() { return { VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR }; }
+  // };
+
+  // template<>
+  // struct impl_init_struct<VkWaylandSurfaceCreateInfoKHR>
+  // {
+  //   static constexpr VkWaylandSurfaceCreateInfoKHR
+  //   Create() { return { VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR }; }
+  // };
+
+  // template<>
+  // struct impl_init_struct<VkMirSurfaceCreateInfoKHR>
+  // {
+  //   static constexpr VkMirSurfaceCreateInfoKHR
+  //   Create() { return { VK_STRUCTURE_TYPE_MIR_SURFACE_CREATE_INFO_KHR }; }
+  // };
+
+  // template<>
+  // struct impl_init_struct<VkAndroidSurfaceCreateInfoKHR>
+  // {
+  //   static constexpr VkAndroidSurfaceCreateInfoKHR
+  //   Create() { return { VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR }; }
+  // };
+
+  template<>
+  struct impl_init_struct<VkWin32SurfaceCreateInfoKHR>
+  {
+    static constexpr VkWin32SurfaceCreateInfoKHR
+    Create() { return { VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDebugReportCallbackCreateInfoEXT>
+  {
+    static constexpr VkDebugReportCallbackCreateInfoEXT
+    Create() { return { VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkPipelineRasterizationStateRasterizationOrderAMD>
+  {
+    static constexpr VkPipelineRasterizationStateRasterizationOrderAMD
+    Create() { return { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_RASTERIZATION_ORDER_AMD }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDebugMarkerObjectNameInfoEXT>
+  {
+    static constexpr VkDebugMarkerObjectNameInfoEXT
+    Create() { return { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDebugMarkerObjectTagInfoEXT>
+  {
+    static constexpr VkDebugMarkerObjectTagInfoEXT
+    Create() { return { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_TAG_INFO_EXT }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkDebugMarkerMarkerInfoEXT>
+  {
+    static constexpr VkDebugMarkerMarkerInfoEXT
+    Create() { return { VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT }; }
+  };
+
+  template<>
+  struct impl_init_struct<VkComponentMapping>
+  {
+    static constexpr VkComponentMapping
+    Create()
+    {
+      return { VK_COMPONENT_SWIZZLE_R,
+               VK_COMPONENT_SWIZZLE_G,
+               VK_COMPONENT_SWIZZLE_B,
+               VK_COMPONENT_SWIZZLE_A };
+    }
+  };

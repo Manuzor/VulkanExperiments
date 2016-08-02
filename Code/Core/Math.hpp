@@ -10,50 +10,62 @@
 //
 
 template<typename Type>
-union vec2_
+struct vec2_
 {
-  struct{ Type X; Type Y; };
-  Type Data[2];
+  union
+  {
+    struct{ Type X; Type Y; };
+    Type Data[2];
+  };
 };
 
 template<typename Type>
-union vec3_
+struct vec3_
 {
-  struct{ Type X; Type Y; Type Z; };
-  Type Data[3];
+  union
+  {
+    struct{ Type X; Type Y; Type Z; };
+    Type Data[3];
+  };
 };
 
 template<typename Type>
-union vec4_
+struct vec4_
 {
-  struct{ Type X; Type Y; Type Z; Type W; };
-  Type Data[4];
+  union
+  {
+    struct{ Type X; Type Y; Type Z; Type W; };
+    Type Data[4];
+  };
 };
 
 /// Column-Major
 template<typename Type>
-union mat4x4_
+struct mat4x4_
 {
   using Type_4   = Type[4];
   using Type_4x4 = Type_4[4];
 
-  struct
+  union
   {
-    Type M00, M01, M02, M03;
-    Type M10, M11, M12, M13;
-    Type M20, M21, M22, M23;
-    Type M30, M31, M32, M33;
-  };
+    struct
+    {
+      Type M00, M01, M02, M03;
+      Type M10, M11, M12, M13;
+      Type M20, M21, M22, M23;
+      Type M30, M31, M32, M33;
+    };
 
-  struct
-  {
-    vec4_<Type> Col0;
-    vec4_<Type> Col1;
-    vec4_<Type> Col2;
-    vec4_<Type> Col3;
-  };
+    struct
+    {
+      vec4_<Type> Col0;
+      vec4_<Type> Col1;
+      vec4_<Type> Col2;
+      vec4_<Type> Col3;
+    };
 
-  Type_4x4 Data;
+    Type_4x4 Data;
+  };
 
   inline
   Type_4&
@@ -71,23 +83,22 @@ union mat4x4_
 };
 
 template<typename Type>
-union quaternion_
+struct quaternion_
 {
-  struct
+  union
   {
-    Type X;
-    Type Y;
-    Type Z;
-    Type W;
-  };
+    struct
+    {
+      Type X;
+      Type Y;
+      Type Z;
+      Type W;
+    };
 
-  struct
-  {
-    vec3_<Type> Direction;
-    angle Angle;
-  };
+    vec4_<Type> Vector;
 
-  Type Data[4];
+    Type Data[4];
+  };
 };
 
 template<typename Type>
@@ -99,52 +110,61 @@ struct transform_
 };
 
 template<typename Type>
-union extent2_
+struct extent2_
 {
-  struct
+  union
   {
-    Type Width;
-    Type Height;
+    struct
+    {
+      Type Width;
+      Type Height;
+    };
+
+    vec2_<Type> Vector;
+
+    Type Data[2];
   };
-
-  vec2_<Type> Vec;
-
-  Type Data[2];
 };
 
 template<typename Type>
-union extent3_
+struct extent3_
 {
-  struct
+  union
   {
-    Type Width;
-    Type Height;
-    Type Depth;
+    struct
+    {
+      Type Width;
+      Type Height;
+      Type Depth;
+    };
+
+    vec3_<Type> Vector;
+
+    Type Data[3];
   };
-
-  vec3_<Type> Vec;
-
-  Type Data[3];
 };
 
 template<typename Type>
-union rect_
+struct rect_
 {
-  struct
+  union
   {
-    Type X;
-    Type Y;
-    Type Width;
-    Type Height;
-  };
+    struct
+    {
+      Type X;
+      Type Y;
+      Type Width;
+      Type Height;
+    };
 
-  struct
-  {
-    vec2_<Type> Offset;
-    extent2_<Type> Extent;
-  };
+    struct
+    {
+      vec2_<Type> Offset;
+      extent2_<Type> Extent;
+    };
 
-  Type Data[4];
+    Type Data[4];
+  };
 };
 
 
@@ -186,7 +206,7 @@ vec3 constexpr Vec3(float X, float Y, float Z) { return { X, Y, Z }; }
 vec3 constexpr Vec3(float X, vec2 const& YZ) { return Vec3(X, YZ.X, YZ.Y); }
 vec3 constexpr Vec3(vec2 const& XY, float Z) { return Vec3(XY.X, XY.Y, Z); }
 
-vec3 constexpr Vec3FromXYZ(vec4 const& Vec) { return Vec3(Vec.X, Vec.Y, Vec.Z); }
+vec3 constexpr Vec3FromXYZ(vec4 const& Vector) { return Vec3(Vector.X, Vector.Y, Vector.Z); }
 
 
 vec4 constexpr Vec4(float XYZW) { return { XYZW, XYZW, XYZW, XYZW }; }
@@ -275,11 +295,13 @@ Mat4x4(vec3 const& XAxis, vec3 const& YAxis, vec3 const& ZAxis, vec3 const& Posi
            Position.X, Position.Y, Position.Z, 1 };
 }
 
+/// \param VerticalFOV The vertical field of view, i.e. the operning angle of the view.
+/// \param AspectRatio The view width divided by the view height.
 mat4x4 CORE_API
-Mat4x4Perspective(angle HalfFOVY, float Width, float Height, float NearPlane, float FarPlane);
+Mat4x4PerspectiveProjection(angle VerticalFOV, float AspectRatio, float NearPlane, float FarPlane);
 
 mat4x4 CORE_API
-Mat4x4Orthogonal(float Width, float Height, float ZScale, float ZOffset);
+Mat4x4OrthogonalProjection(float Width, float Height, float ZScale, float ZOffset);
 
 mat4x4 CORE_API
 Mat4x4LookAt(vec3 const& Target, vec3 const& Position, vec3 const& Up = UpVector3);
@@ -342,18 +364,23 @@ Quaternion(mat4x4 const& Mat);
 //
 // Constants: quaternion
 //
-
 constexpr quaternion IdentityQuaternion = Quaternion(0, 0, 0, 1);
+
 
 //
 // Construction Functions: transform
 //
-
 transform constexpr
 Transform(vec3 const& Translation, quaternion const& Rotation, vec3 const& Scale)
 {
   return { Translation, Rotation, Scale };
 }
+
+
+//
+// Constants: transform
+//
+constexpr transform IdentityTransform = Transform(ZeroVector3, IdentityQuaternion, UnitScaleVector3);
 
 //
 // Algorithms: Equality
@@ -361,7 +388,7 @@ Transform(vec3 const& Translation, quaternion const& Rotation, vec3 const& Scale
 bool constexpr operator ==(vec2 const& A, vec2 const& B) { return A.X == B.X && A.Y == B.Y; }
 bool constexpr operator ==(vec3 const& A, vec3 const& B) { return A.X == B.X && A.Y == B.Y && A.Z == B.Z; }
 bool constexpr operator ==(vec4 const& A, vec4 const& B) { return A.X == B.X && A.Y == B.Y && A.Z == B.Z && A.W == B.W; }
-bool constexpr operator ==(quaternion const& A, quaternion const& B) { return A.Direction == B.Direction && A.Angle == B.Angle; }
+bool constexpr operator ==(quaternion const& A, quaternion const& B) { return A.Vector == B.Vector; }
 bool constexpr operator ==(mat4x4 const& A, mat4x4 const& B) { return A.Col0 == B.Col0 && A.Col1 == B.Col1 && A.Col2 == B.Col2 && A.Col3 == B.Col3; }
 
 bool constexpr operator !=(vec2 const& A, vec2 const& B) { return !(A == B); }
@@ -373,12 +400,12 @@ bool constexpr operator !=(mat4x4 const& A, mat4x4 const& B) { return !(A == B);
 bool constexpr AreNearlyEqual(vec2 const& A, vec2 const& B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.X, B.X, Epsilon) && AreNearlyEqual(A.Y, B.Y, Epsilon); }
 bool constexpr AreNearlyEqual(vec3 const& A, vec3 const& B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.X, B.X, Epsilon) && AreNearlyEqual(A.Y, B.Y, Epsilon) && AreNearlyEqual(A.Z, B.Z, Epsilon); }
 bool constexpr AreNearlyEqual(vec4 const& A, vec4 const& B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.X, B.X, Epsilon) && AreNearlyEqual(A.Y, B.Y, Epsilon) && AreNearlyEqual(A.Z, B.Z, Epsilon) && AreNearlyEqual(A.W, B.W, Epsilon); }
-bool constexpr AreNearlyEqual(quaternion const& A, quaternion const& B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.Direction, B.Direction, Epsilon) && AreNearlyEqual(A.Angle, B.Angle, Radians(Epsilon)); }
+bool constexpr AreNearlyEqual(quaternion const& A, quaternion const& B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.Vector, B.Vector, Epsilon); }
 bool constexpr AreNearlyEqual(mat4x4 const& A, mat4x4 const& B, float Epsilon = 1e-4f) { return AreNearlyEqual(A.Col0, B.Col0, Epsilon) && AreNearlyEqual(A.Col1, B.Col1, Epsilon) && AreNearlyEqual(A.Col2, B.Col2, Epsilon) && AreNearlyEqual(A.Col3, B.Col3, Epsilon); }
 
-bool constexpr IsNearlyZero(vec2 const& Vec, float Epsilon = 1e-4f) { return AreNearlyEqual(Vec, ZeroVector2, Epsilon); }
-bool constexpr IsNearlyZero(vec3 const& Vec, float Epsilon = 1e-4f) { return AreNearlyEqual(Vec, ZeroVector3, Epsilon); }
-bool constexpr IsNearlyZero(vec4 const& Vec, float Epsilon = 1e-4f) { return AreNearlyEqual(Vec, ZeroVector4, Epsilon); }
+bool constexpr IsNearlyZero(vec2 const& Vector, float Epsilon = 1e-4f) { return AreNearlyEqual(Vector, ZeroVector2, Epsilon); }
+bool constexpr IsNearlyZero(vec3 const& Vector, float Epsilon = 1e-4f) { return AreNearlyEqual(Vector, ZeroVector3, Epsilon); }
+bool constexpr IsNearlyZero(vec4 const& Vector, float Epsilon = 1e-4f) { return AreNearlyEqual(Vector, ZeroVector4, Epsilon); }
 bool constexpr IsNearlyZero(mat4x4 const& Mat, float Epsilon = 1e-4f) { return AreNearlyEqual(Mat, ZeroMatrix4x4, Epsilon); }
 
 
@@ -443,6 +470,8 @@ mat4x4 CORE_API MatrixMultiply(mat4x4 const& A, mat4x4 const& B);
 
 mat4x4 CORE_API operator *(mat4x4 const& A, mat4x4 const& B);
 void inline operator *=(mat4x4& A, mat4x4 const& B) { A = A * B; }
+
+vec4 CORE_API operator *(mat4x4 const& A, vec4 const& B);
 
 quaternion CORE_API operator *(quaternion const& A, quaternion const& B);
 void inline operator *=(quaternion& A, quaternion const& B) { A = A * B; }
@@ -527,27 +556,27 @@ void inline operator ^=(vec3& A, vec3 const& B) { A = A ^ B; }
 // Algorithms: Reciprocal
 //
 vec2 constexpr
-Reciprocal(vec2 const& Vec, float ZeroCase = 3.4e38f)
+Reciprocal(vec2 const& Vector, float ZeroCase = 3.4e38f)
 {
-  return Vec2(Vec.X ? 1 / Vec.X : ZeroCase,
-              Vec.Y ? 1 / Vec.Y : ZeroCase);
+  return Vec2(Vector.X ? 1 / Vector.X : ZeroCase,
+              Vector.Y ? 1 / Vector.Y : ZeroCase);
 }
 
 vec3 constexpr
-Reciprocal(vec3 const& Vec, float ZeroCase = 3.4e38f)
+Reciprocal(vec3 const& Vector, float ZeroCase = 3.4e38f)
 {
-  return Vec3(Vec.X ? 1 / Vec.X : ZeroCase,
-              Vec.Y ? 1 / Vec.Y : ZeroCase,
-              Vec.Z ? 1 / Vec.Z : ZeroCase);
+  return Vec3(Vector.X ? 1 / Vector.X : ZeroCase,
+              Vector.Y ? 1 / Vector.Y : ZeroCase,
+              Vector.Z ? 1 / Vector.Z : ZeroCase);
 }
 
 vec4 constexpr
-Reciprocal(vec4 const& Vec, float ZeroCase = 3.4e38f)
+Reciprocal(vec4 const& Vector, float ZeroCase = 3.4e38f)
 {
-  return Vec4(Vec.X ? 1 / Vec.X : ZeroCase,
-              Vec.Y ? 1 / Vec.Y : ZeroCase,
-              Vec.Z ? 1 / Vec.Z : ZeroCase,
-              Vec.W ? 1 / Vec.W : ZeroCase);
+  return Vec4(Vector.X ? 1 / Vector.X : ZeroCase,
+              Vector.Y ? 1 / Vector.Y : ZeroCase,
+              Vector.Z ? 1 / Vector.Z : ZeroCase,
+              Vector.W ? 1 / Vector.W : ZeroCase);
 }
 
 //
@@ -563,22 +592,22 @@ vec3 CORE_API
 operator *(quaternion const& Quat, vec3 const& Direction);
 
 vec4 CORE_API
-TransformDirection(mat4x4 const& Mat, vec4 const& Vec);
+TransformDirection(mat4x4 const& Mat, vec4 const& Vector);
 
 vec3 CORE_API
-TransformDirection(mat4x4 const& Mat, vec3 const& Vec);
+TransformDirection(mat4x4 const& Mat, vec3 const& Vector);
 
 vec3 CORE_API
-TransformPosition(mat4x4 const& Mat, vec3 const& Vec);
+TransformPosition(mat4x4 const& Mat, vec3 const& Vector);
 
 vec4 CORE_API
-InverseTransformDirection(mat4x4 const& Mat, vec4 const& Vec);
+InverseTransformDirection(mat4x4 const& Mat, vec4 const& Vector);
 
 vec3 CORE_API
-InverseTransformDirection(mat4x4 const& Mat, vec3 const& Vec);
+InverseTransformDirection(mat4x4 const& Mat, vec3 const& Vector);
 
 vec3 CORE_API
-InverseTransformPosition(mat4x4 const& Mat, vec3 const& Vec);
+InverseTransformPosition(mat4x4 const& Mat, vec3 const& Vector);
 
 vec3 CORE_API
 TransformDirection(quaternion const& Quat, vec3 const& Direction);
@@ -593,16 +622,16 @@ vec4 CORE_API
 InverseTransformDirection(quaternion const& Quat, vec4 const& Direction);
 
 vec3 CORE_API
-TransformDirection(transform const& Transform, vec3 const& Vec);
+TransformDirection(transform const& Transform, vec3 const& Vector);
 
 vec3 CORE_API
-TransformPosition(transform const& Transform, vec3 const& Vec);
+TransformPosition(transform const& Transform, vec3 const& Vector);
 
 vec3 CORE_API
-InverseTransformDirection(transform const& Transform, vec3 const& Vec);
+InverseTransformDirection(transform const& Transform, vec3 const& Vector);
 
 vec3 CORE_API
-InverseTransformPosition(transform const& Transform, vec3 const& Vec);
+InverseTransformPosition(transform const& Transform, vec3 const& Vector);
 
 //
 // Algorithms: Matrix Transposition and Inversion
@@ -666,29 +695,29 @@ vec3 CORE_API UpVector(transform const& Transform);
 // Misc
 //
 
-/// Utility function to convert the given Vec into a unit direction vector
+/// Utility function to convert the given Vector into a unit direction vector
 /// (OutDirection) and its original length (OutLength).
 ///
-/// If the length of Vec is smaller than the given Epsilon, OutDirection will
+/// If the length of Vector is smaller than the given Epsilon, OutDirection will
 /// be set to ZeroVector2.
 void CORE_API
-DirectionAndLength(vec2 const& Vec, vec2* OutDirection, float* OutLength, float Epsilon = 1e-4f);
+DirectionAndLength(vec2 const& Vector, vec2* OutDirection, float* OutLength, float Epsilon = 1e-4f);
 
-/// Utility function to convert the given Vec into a unit direction vector
+/// Utility function to convert the given Vector into a unit direction vector
 /// (OutDirection) and its original length (OutLength).
 ///
-/// If the length of Vec is smaller than the given Epsilon, OutDirection will
+/// If the length of Vector is smaller than the given Epsilon, OutDirection will
 /// be set to ZeroVector3.
 void CORE_API
-DirectionAndLength(vec3 const& Vec, vec3* OutDirection, float* OutLength, float Epsilon = 1e-4f);
+DirectionAndLength(vec3 const& Vector, vec3* OutDirection, float* OutLength, float Epsilon = 1e-4f);
 
-/// Utility function to convert the given Vec into a unit direction vector
+/// Utility function to convert the given Vector into a unit direction vector
 /// (OutDirection) and its original length (OutLength).
 ///
-/// If the length of Vec is smaller than the given Epsilon, OutDirection will
+/// If the length of Vector is smaller than the given Epsilon, OutDirection will
 /// be set to ZeroVector4.
 void CORE_API
-DirectionAndLength(vec4 const& Vec, vec4* OutDirection, float* OutLength, float Epsilon = 1e-4f);
+DirectionAndLength(vec4 const& Vector, vec4* OutDirection, float* OutLength, float Epsilon = 1e-4f);
 
 
 //

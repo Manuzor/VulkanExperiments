@@ -3,6 +3,8 @@
   {
     'Simple.vert',
     'Simple.frag',
+    'DebugGrid.vert',
+    'DebugGrid.frag',
   }
 
   .DataShaderTargets = {}

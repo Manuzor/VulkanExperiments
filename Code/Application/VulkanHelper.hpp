@@ -3,6 +3,7 @@
 
 #include <Core/DynamicArray.hpp>
 #include <Core/Math.hpp>
+#include <Core/Color.hpp>
 #include <Core/Image.hpp>
 
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -71,7 +72,6 @@ struct vertex_buffer
   VkBuffer Buffer;
   VkDeviceMemory Memory;
 
-  uint32 BindID;
   uint32 NumVertices;
 };
 
@@ -89,12 +89,22 @@ struct vertex
   vec2 TexCoord;
 };
 
+struct vulkan_debug_grid_vertex
+{
+  vec3 Position;
+  color_linear Color;
+};
+
 struct vulkan_scene_object_gfx_state
 {
   VkPipeline Pipeline;
   VkPipelineLayout PipelineLayout;
   VkDescriptorSetLayout DescriptorSetLayout;
   vulkan_uniform_buffer GlobalsUBO;
+  struct
+  {
+    mat4x4 ViewProjectionMatrix;
+  } GlobalsUBOData;
 
   dynamic_array<VkVertexInputBindingDescription> VertexInputBindingDescs;
   dynamic_array<VkVertexInputAttributeDescription> VertexInputAttributeDescs;
@@ -262,6 +272,12 @@ VulkanSetQuadGeometry(vulkan*        Vulkan,
                       extent2 const& Extents,
                       vertex_buffer* Vertices,
                       index_buffer*  Indices);
+
+void
+VulkanSetDebugGridGeometry(vulkan*        Vulkan,
+                           extent2 const& Extents,
+                           vertex_buffer* Vertices,
+                           index_buffer*  Indices);
 
 void
 VulkanPrepareSceneObjectForRendering(vulkan const*        Vulkan,

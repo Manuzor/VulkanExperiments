@@ -223,7 +223,7 @@ auto
     if(InputDataSize == 0)
       return true;
 
-    if(InputDataSize <= sizeof(RAWINPUT))
+    if(InputDataSize > sizeof(RAWINPUT))
     {
       LogError(Log, "We are querying only for raw mouse input data, for which sizeof(RAWINPUT) should be enough.");
       Assert(false);
@@ -234,7 +234,7 @@ auto
     if(BytesWritten != InputDataSize)
     {
       LogError(Log, "Failed to get raw input data.");
-      // TODO: Win32LogErrorCode(Log, GetLastError());
+      Win32LogErrorCode(GetLastError());
       return true;
     }
 
@@ -565,7 +565,7 @@ auto
   // Register Mouse Raw Input
   //
   {
-    RAWINPUTDEVICE Device;
+    RAWINPUTDEVICE Device = {};
     Device.usUsagePage = 0x01;
     Device.usUsage = 0x02;
 
@@ -576,6 +576,7 @@ auto
     else
     {
       LogError(Log, "Failed to initialize raw input for mouse.");
+      Win32LogErrorCode(Log, GetLastError());
     }
   }
 }

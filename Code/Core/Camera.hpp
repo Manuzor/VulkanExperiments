@@ -24,11 +24,11 @@ struct free_horizon_camera : public common_camera_data
   float InputPitch;
 };
 
-mat4x4 CORE_API
+CORE_API mat4x4
 CameraProjectionMatrix(common_camera_data const& Cam);
 
-mat4x4 CORE_API
+CORE_API mat4x4
 CameraViewMatrix(common_camera_data const& Cam, transform const& WorldTransform);
 
-mat4x4 CORE_API
+CORE_API mat4x4
 CameraViewProjectionMatrix(common_camera_data const& Cam, transform const& WorldTransform);
