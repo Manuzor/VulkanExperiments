@@ -7,6 +7,9 @@
 // For placement-new.
 #include <new>
 
+// For std::numeric_limits
+#include <limits>
+
 
 // ===================================
 // === Source: Backbone/Common.hpp ===
@@ -249,20 +252,79 @@ IntMinValue()
                           : T(0);
 }
 
-template<typename t_type>
-struct impl_rm_ref
+template<typename CharType> struct impl_is_digit_helper { static constexpr bool Do(CharType Char) { return Char >= '0' && Char <= '9'; } };
+template<typename CharType> struct impl_is_digit;
+template<> struct impl_is_digit<char> : public impl_is_digit_helper<char> {};
+
+template<typename CharType>
+constexpr bool
+IsDigit(CharType Char)
 {
-  using Result = t_type;
+  return impl_is_digit<rm_ref_const<CharType>>::Do(Char);
+}
+
+template<typename CharType>
+struct impl_is_whitespace_helper
+{
+  static constexpr bool
+  Do(CharType Char)
+  {
+    return Char == ' '  ||
+           Char == '\n' ||
+           Char == '\r' ||
+           Char == '\t' ||
+           Char == '\b';
+  }
 };
 
-template<typename t_type>
-struct impl_rm_ref<t_type&>
-{
-  using Result = t_type;
-};
+template<typename CharType> struct impl_is_whitespace;
+template<> struct impl_is_whitespace<char> : public impl_is_whitespace_helper<char> {};
 
-template<typename t_type>
-using rm_ref = typename impl_rm_ref<t_type>::Result;
+template<typename CharType>
+constexpr bool
+IsWhitespace(CharType Char)
+{
+  return impl_is_whitespace<rm_ref_const<CharType>>::Do(Char);
+}
+
+template<typename T> struct impl_nan;
+// TODO: Cross-platform.
+template<> struct impl_nan<float>  { static constexpr float  Value = std::numeric_limits<float>::quiet_NaN(); };
+template<> struct impl_nan<double> { static constexpr double Value = std::numeric_limits<double>::quiet_NaN(); };
+
+/// Returns a quiet Not-A-Number value of the given type.
+template<typename T>
+constexpr T
+NaN()
+{
+  return impl_nan<T>::Value;
+}
+
+template<typename T> struct impl_is_nan;
+template<> struct impl_is_nan<float>  { static constexpr bool Do(float  Value) { return Value != Value; } };
+template<> struct impl_is_nan<double> { static constexpr bool Do(double Value) { return Value != Value; } };
+
+template<typename T>
+constexpr bool
+IsNaN(T Value)
+{
+  return impl_is_nan<T>::Do(Value);
+}
+
+template<typename T> struct impl_rm_ref     { using Type = T; };
+template<typename T> struct impl_rm_ref<T&> { using Type = T; };
+
+template<typename T>
+using rm_ref = typename impl_rm_ref<T>::Type;
+
+template<typename T> struct impl_rm_const          { using Type = T; };
+template<typename T> struct impl_rm_const<T const> { using Type = T; };
+
+template<typename T>
+using rm_const = typename impl_rm_const<T>::Type;
+
+template<typename T>
+using rm_ref_const = rm_const<rm_ref<T>>;
 
 template<class t_type>
 constexpr typename rm_ref<t_type>&&
@@ -335,11 +397,14 @@ struct impl_convert
   }
 };
 
-template<typename ToType, typename FromType>
+template<typename ToType, typename FromType, typename... ExtraTypes>
 ToType
-Convert(FromType const& Value)
+Convert(FromType const& From, ExtraTypes&&... Extra)
 {
-  return impl_convert<ToType, FromType>::Do(Value);
+  using UnqualifiedToType   = rm_ref_const<ToType>;
+  using UnqualifiedFromType = rm_ref_const<FromType>;
+  using Impl = impl_convert<UnqualifiedToType, UnqualifiedFromType>;
+  return Impl::Do(From, Forward<ExtraTypes>(Extra)...);
 }
 
 /// Asserts on overflows and underflows when converting signed or unsigned
@@ -437,6 +502,26 @@ Sqrt(T Value) { return (ReturnType)Sqrt((double)Value); }
 
 float
 InvSqrt(float Value);
+
+
+template<typename NumberType> struct impl_negate;
+template<> struct impl_negate<float>  { static constexpr float  Do(float  Value) { return -Value; } };
+template<> struct impl_negate<double> { static constexpr double Do(double Value) { return -Value; } };
+template<> struct impl_negate<int8>   { static constexpr int8   Do(int8  Value)  { return -Value; } };
+template<> struct impl_negate<int16>  { static constexpr int16  Do(int16 Value)  { return -Value; } };
+template<> struct impl_negate<int32>  { static constexpr int32  Do(int32 Value)  { return -Value; } };
+template<> struct impl_negate<int64>  { static constexpr int64  Do(int64 Value)  { return -Value; } };
+template<> struct impl_negate<uint8>  { static constexpr uint8  Do(uint8  Value) { return  Value; } };
+template<> struct impl_negate<uint16> { static constexpr uint16 Do(uint16 Value) { return  Value; } };
+template<> struct impl_negate<uint32> { static constexpr uint32 Do(uint32 Value) { return  Value; } };
+template<> struct impl_negate<uint64> { static constexpr uint64 Do(uint64 Value) { return  Value; } };
+
+template<typename NumberType>
+NumberType
+Negate(NumberType Value)
+{
+  return impl_negate<NumberType>::Do(Value);
+}
 
 // Project a value from [LowerBound, UpperBound] to [0, 1]
 // Example:
@@ -536,19 +621,28 @@ struct impl_defer
 /// Defers execution of code until the end of the current scope.
 ///
 /// Usage:
-/// int i = 0;
-/// Defer [&](){ i++; printf("Foo %d\n", i); };
-/// Defer [&](){ i++; printf("Bar %d\n", i); };
-/// Defer [=](){      printf("Baz %d\n", i); };
+///   int i = 0;
+///   Defer [&](){ i++; printf("Foo %d\n", i); };
+///   Defer [&](){ i++; printf("Bar %d\n", i); };
+///   Defer [=](){      printf("Baz %d\n", i); };
 ///
 /// Output:
-/// Baz 0
-/// Bar 1
-/// Foo 2
+///   Baz 0
+///   Bar 1
+///   Foo 2
 ///
 /// \param CaptureSpec The lambda capture specification.
 //#define Defer(Lambda) impl_defer<decltype(Lambda)> PRE_Concat2(_Defer, __LINE__){ Lambda }
 #define Defer auto PRE_Concat2(_Defer, __LINE__) = impl_defer() =
+
+
+/// Helper macro to define an opaque handle type.
+///
+/// Usage:
+///   DefineOpaqueHandle(Foo);
+///   /*...*/
+///   Foo CreateFoo(); // Returns a Foo.
+#define DefineOpaqueHandle(Name) using Name = struct Name ## _OPAQUE*
 
 // ===================================
 // === Source: Backbone/Memory.hpp ===
@@ -1100,7 +1194,7 @@ SliceDestruct(slice<T> Target)
 
 template<typename T, typename NeedleType>
 size_t
-SliceCountUntil(slice<T const> Haystack, const NeedleType& Needle)
+SliceCountUntil(slice<T const> Haystack, NeedleType const& Needle)
 {
   size_t Index = 0;
 
@@ -1117,7 +1211,7 @@ SliceCountUntil(slice<T const> Haystack, const NeedleType& Needle)
 /// Counts up until \c Predicate(ElementOfHaystack, Needle) returns \c true.
 template<typename T, typename NeedleType, typename PredicateType>
 size_t
-SliceCountUntil(slice<T const> Haystack, const NeedleType& Needle, PredicateType Predicate)
+SliceCountUntil(slice<T const> Haystack, NeedleType const& Needle, PredicateType Predicate)
 {
   size_t Index = 0;
 
@@ -1129,6 +1223,63 @@ SliceCountUntil(slice<T const> Haystack, const NeedleType& Needle, PredicateType
   }
 
   return INVALID_INDEX;
+}
+
+template<typename T, typename U>
+bool
+SliceStartsWith(slice<T const> Slice, slice<U const> Sequence)
+{
+  size_t const Amount = Min(Slice.Num, Sequence.Num);
+
+  for(size_t Index = 0; Index < Amount; ++Index)
+  {
+    if(Slice[Index] != Sequence[Index])
+      return false;
+  }
+
+  return true;
+}
+
+template<typename T, typename NeedleType>
+slice<T>
+SliceFind(slice<T> Haystack, NeedleType const& Needle)
+{
+  while(Haystack.Num)
+  {
+    if(Haystack[0] == Needle)
+      return Haystack;
+    Haystack = SliceTrimFront(Haystack, 1);
+  }
+
+  return Haystack;
+}
+
+template<typename T, typename NeedleType, typename PredicateType>
+slice<T>
+SliceFind(slice<T> Haystack, NeedleType const& Needle, PredicateType Predicate)
+{
+  while(Haystack.Num)
+  {
+    if(Predicate(Haystack[0], Needle))
+      return Haystack;
+    Haystack = SliceTrimFront(Haystack, 1);
+  }
+
+  return Haystack;
+}
+
+template<typename T, typename NeedleType>
+slice<T>
+SliceFind(slice<T> Haystack, slice<NeedleType> const& NeedleSequence)
+{
+  while(Haystack.Num)
+  {
+    if(SliceStartsWith(Haystack, NeedleSequence))
+      return Haystack;
+    Haystack = SliceTrimFront(Haystack, 1);
+  }
+
+  return Haystack;
 }
 
 
@@ -1421,6 +1572,116 @@ Slice(fixed_block<N, t_element>& Block, t_start_index InclusiveStartIndex, t_end
 {
   return Slice(Slice(Block), InclusiveStartIndex, ExclusiveEndIndex);
 }
+
+// =============================================
+// === Source: Backbone/StringConversion.hpp ===
+// =============================================
+
+//
+// Conversion: String -> Floating Point
+//
+
+double
+ImplConvertStringToDouble(slice<char const>* Source, bool* Success, double Fallback);
+
+template<typename FloatType>
+struct impl_convert_string_to_floating_point_helper
+{
+  template<typename CharType>
+  static inline FloatType
+  Do(slice<CharType> String, bool* Success = nullptr, FloatType Fallback = NaN<FloatType>())
+  {
+    auto Result = ImplConvertStringToDouble(Coerce<slice<char const>*>(&String), Success, Cast<double>(Fallback));
+    return Cast<FloatType>(Result);
+  }
+
+  template<typename CharType>
+  static inline FloatType
+  Do(slice<CharType>* String, bool* Success = nullptr, FloatType Fallback = NaN<FloatType>())
+  {
+    auto Result = ImplConvertStringToDouble(Coerce<slice<char const>*>(String), Success, Cast<double>(Fallback));
+    return Cast<FloatType>(Result);
+  }
+};
+
+template<> struct impl_convert<double, slice<char>>        : public impl_convert_string_to_floating_point_helper<double> {};
+template<> struct impl_convert<double, slice<char>*>       : public impl_convert_string_to_floating_point_helper<double> {};
+template<> struct impl_convert<double, slice<char const>>  : public impl_convert_string_to_floating_point_helper<double> {};
+template<> struct impl_convert<double, slice<char const>*> : public impl_convert_string_to_floating_point_helper<double> {};
+template<> struct impl_convert<float,  slice<char>>        : public impl_convert_string_to_floating_point_helper<float>  {};
+template<> struct impl_convert<float,  slice<char>*>       : public impl_convert_string_to_floating_point_helper<float>  {};
+template<> struct impl_convert<float,  slice<char const>>  : public impl_convert_string_to_floating_point_helper<float>  {};
+template<> struct impl_convert<float,  slice<char const>*> : public impl_convert_string_to_floating_point_helper<float>  {};
+
+//
+// Conversion: String -> Unsigned Integer
+//
+
+uint64
+ImplConvertStringToInteger(slice<char const>* Source, bool* Success, uint64 Fallback);
+
+int64
+ImplConvertStringToInteger(slice<char const>* Source, bool* Success, int64 Fallback);
+
+template<typename IntegerType>
+struct impl_convert_string_to_integer_helper
+{
+  template<bool IsSigned> struct impl_max_integer_type;
+  template<> struct impl_max_integer_type<true>  { using Type = int64;  };
+  template<> struct impl_max_integer_type<false> { using Type = uint64; };
+
+  using MaxIntegerType = typename impl_max_integer_type<IntIsSigned<IntegerType>()>::Type;;
+
+  template<typename CharType>
+  static inline IntegerType
+  Do(slice<CharType> String, bool* Success = nullptr, IntegerType Fallback = 0)
+  {
+    auto Result = ImplConvertStringToInteger(Coerce<slice<char const>*>(&String), Success, Cast<MaxIntegerType>(Fallback));
+    return Convert<IntegerType>(Result);
+  }
+
+  template<typename CharType>
+  static inline IntegerType
+  Do(slice<CharType>* String, bool* Success = nullptr, IntegerType Fallback = 0)
+  {
+    auto Result = ImplConvertStringToInteger(Coerce<slice<char const>*>(String), Success, Cast<MaxIntegerType>(Fallback));
+    return Convert<IntegerType>(Result);
+  }
+};
+
+template<> struct impl_convert<int8,   slice<char>>        : public impl_convert_string_to_integer_helper<int8>   {};
+template<> struct impl_convert<int8,   slice<char>*>       : public impl_convert_string_to_integer_helper<int8>   {};
+template<> struct impl_convert<int8,   slice<char const>>  : public impl_convert_string_to_integer_helper<int8>   {};
+template<> struct impl_convert<int8,   slice<char const>*> : public impl_convert_string_to_integer_helper<int8>   {};
+template<> struct impl_convert<int16,  slice<char>>        : public impl_convert_string_to_integer_helper<int16>  {};
+template<> struct impl_convert<int16,  slice<char>*>       : public impl_convert_string_to_integer_helper<int16>  {};
+template<> struct impl_convert<int16,  slice<char const>>  : public impl_convert_string_to_integer_helper<int16>  {};
+template<> struct impl_convert<int16,  slice<char const>*> : public impl_convert_string_to_integer_helper<int16>  {};
+template<> struct impl_convert<int32,  slice<char>>        : public impl_convert_string_to_integer_helper<int32>  {};
+template<> struct impl_convert<int32,  slice<char>*>       : public impl_convert_string_to_integer_helper<int32>  {};
+template<> struct impl_convert<int32,  slice<char const>>  : public impl_convert_string_to_integer_helper<int32>  {};
+template<> struct impl_convert<int32,  slice<char const>*> : public impl_convert_string_to_integer_helper<int32>  {};
+template<> struct impl_convert<int64,  slice<char>>        : public impl_convert_string_to_integer_helper<int64>  {};
+template<> struct impl_convert<int64,  slice<char>*>       : public impl_convert_string_to_integer_helper<int64>  {};
+template<> struct impl_convert<int64,  slice<char const>>  : public impl_convert_string_to_integer_helper<int64>  {};
+template<> struct impl_convert<int64,  slice<char const>*> : public impl_convert_string_to_integer_helper<int64>  {};
+
+template<> struct impl_convert<uint8,  slice<char>>        : public impl_convert_string_to_integer_helper<uint8>  {};
+template<> struct impl_convert<uint8,  slice<char>*>       : public impl_convert_string_to_integer_helper<uint8>  {};
+template<> struct impl_convert<uint8,  slice<char const>>  : public impl_convert_string_to_integer_helper<uint8>  {};
+template<> struct impl_convert<uint8,  slice<char const>*> : public impl_convert_string_to_integer_helper<uint8>  {};
+template<> struct impl_convert<uint16, slice<char>>        : public impl_convert_string_to_integer_helper<uint16> {};
+template<> struct impl_convert<uint16, slice<char>*>       : public impl_convert_string_to_integer_helper<uint16> {};
+template<> struct impl_convert<uint16, slice<char const>>  : public impl_convert_string_to_integer_helper<uint16> {};
+template<> struct impl_convert<uint16, slice<char const>*> : public impl_convert_string_to_integer_helper<uint16> {};
+template<> struct impl_convert<uint32, slice<char>>        : public impl_convert_string_to_integer_helper<uint32> {};
+template<> struct impl_convert<uint32, slice<char>*>       : public impl_convert_string_to_integer_helper<uint32> {};
+template<> struct impl_convert<uint32, slice<char const>>  : public impl_convert_string_to_integer_helper<uint32> {};
+template<> struct impl_convert<uint32, slice<char const>*> : public impl_convert_string_to_integer_helper<uint32> {};
+template<> struct impl_convert<uint64, slice<char>>        : public impl_convert_string_to_integer_helper<uint64> {};
+template<> struct impl_convert<uint64, slice<char>*>       : public impl_convert_string_to_integer_helper<uint64> {};
+template<> struct impl_convert<uint64, slice<char const>>  : public impl_convert_string_to_integer_helper<uint64> {};
+template<> struct impl_convert<uint64, slice<char const>*> : public impl_convert_string_to_integer_helper<uint64> {};
 
 // ====================
 // === Inline Files ===

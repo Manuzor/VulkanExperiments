@@ -11,10 +11,6 @@
 
 #include <Windows.h>
 
-// Helper macro to define an opaque handle only accessible via other
-// functions.
-#define DefineOpaqueHandle(Name) using Name = struct Name ## _OPAQUE*
-
 #include "VulkanHelper.inl"
 
 struct vulkan;

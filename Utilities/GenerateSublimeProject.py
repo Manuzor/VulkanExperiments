@@ -20,6 +20,10 @@ BuildRules = [
     "Arg": "Core",
   },
   {
+    "Name": "Cfg",
+    "Arg": "Cfg",
+  },
+  {
     "Name": "Application",
     "Arg": "Application",
   },

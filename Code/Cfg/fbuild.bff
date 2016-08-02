@@ -3,9 +3,8 @@
   // Base Infos
   //
 
-  .ProjectName = 'Core'
-  .SourcePath = '$RepoRoot$/Code/Core'
-
+  .ProjectName = 'Cfg'
+  .SourcePath = '$RepoRoot$/Code/Cfg'
 
   //
   // Rules
@@ -23,17 +22,26 @@
   ObjectList( '$ProjectName$-Lib' )
   {
     .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
-                     + ' /DCORE_DLL_EXPORT'
+                     + ' /DCFG_DLL_EXPORT'
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
   }
 
-  DLL( '$ProjectName$' )
+  DLL( '$ProjectName$-Dll' )
   {
     .Libraries + '$ProjectName$-Lib'
+               + 'Core-Lib'
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
                    + ' /DLL'
     .LinkerOutput = '$BuildPath$/$ProjectName$.dll'
+  }
+
+  Alias( '$ProjectName$' )
+  {
+    .Targets =
+    {
+      '$ProjectName$-Dll'
+    }
   }
 
   Alias( '$ProjectName$-x64-Debug' )   { .Targets = '$ProjectName$' }
