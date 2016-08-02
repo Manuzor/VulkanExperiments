@@ -53,8 +53,8 @@ Win32ProcessInputMessage(HWND WindowHandle, UINT Message, WPARAM WParam, LPARAM 
                          log_data* Log = nullptr);
 
 CORE_API
-input_id
-Win32VirtualKeyToInputId(WPARAM VKCode, LPARAM lParam);
+slice<input_id>
+Win32VirtualKeyToInputId(WPARAM VKCode, LPARAM lParam, slice<input_id> Buffer);
 
 CORE_API
 void

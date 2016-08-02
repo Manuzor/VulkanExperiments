@@ -115,15 +115,20 @@ auto
       return true;
     }
 
-    input_id KeyId = Win32VirtualKeyToInputId(VKCode, LParam);
+    fixed_block<3, input_id> KeyIdBuffer;
 
-    if(KeyId == nullptr)
+    slice<input_id> KeyIds = Win32VirtualKeyToInputId(VKCode, LParam, Slice(KeyIdBuffer));
+
+    if(KeyIds.Num == 0)
     {
       LogWarning(Log, "Unable to map virtual key code %d (Hex: 0x%x)", VKCode, VKCode);
       return true;
     }
 
-    UpdateInputSlotValue(Input, KeyId, IsDown);
+    for(auto KeyId : KeyIds)
+    {
+      UpdateInputSlotValue(Input, KeyId, IsDown);
+    }
 
     return true;
   }
@@ -259,8 +264,8 @@ auto
 }
 
 auto
-::Win32VirtualKeyToInputId(WPARAM VKCode, LPARAM lParam)
-  -> input_id
+::Win32VirtualKeyToInputId(WPARAM VKCode, LPARAM lParam, slice<input_id> Buffer)
+  -> slice<input_id>
 {
   const UINT ScanCode = Cast<UINT>((lParam & 0x00ff0000) >> 16);
   const bool IsExtended = (lParam & 0x01000000) != 0;
@@ -273,154 +278,160 @@ auto
     case VK_SHIFT:
     {
       VKCode = MapVirtualKey(ScanCode, MAPVK_VSC_TO_VK_EX);
-      return Win32VirtualKeyToInputId(VKCode, lParam);
+      Buffer[0] = keyboard::Shift;
+      auto Result = Win32VirtualKeyToInputId(VKCode, lParam, SliceTrimFront(Buffer, 1));
+      return Slice(Buffer, 0, Result.Num + 1);
     }
 
     case VK_CONTROL:
     {
       VKCode = IsExtended ? VK_RCONTROL : VK_LCONTROL;
-      return Win32VirtualKeyToInputId(VKCode, lParam);
+      Buffer[0] = keyboard::Control;
+      auto Result = Win32VirtualKeyToInputId(VKCode, lParam, SliceTrimFront(Buffer, 1));
+      return Slice(Buffer, 0, Result.Num + 1);
     }
 
     case VK_MENU:
     {
       VKCode = IsExtended ? VK_RMENU : VK_LMENU;
-      return Win32VirtualKeyToInputId(VKCode, lParam);
+      Buffer[0] = keyboard::Alt;
+      auto Result = Win32VirtualKeyToInputId(VKCode, lParam, SliceTrimFront(Buffer, 1));
+      return Slice(Buffer, 0, Result.Num + 1);
     }
 
     //
     // Common Keys
     //
-    case VK_LSHIFT: return keyboard::LeftShift;
-    case VK_RSHIFT: return keyboard::RightShift;
+    case VK_LSHIFT: Buffer[0] = keyboard::LeftShift;  return Slice(Buffer, 0, 1);
+    case VK_RSHIFT: Buffer[0] = keyboard::RightShift; return Slice(Buffer, 0, 1);
 
-    case VK_LMENU: return keyboard::LeftAlt;
-    case VK_RMENU: return keyboard::RightAlt;
+    case VK_LMENU: Buffer[0] = keyboard::LeftAlt;  return Slice(Buffer, 0, 1);
+    case VK_RMENU: Buffer[0] = keyboard::RightAlt; return Slice(Buffer, 0, 1);
 
-    case VK_LCONTROL: return keyboard::LeftControl;
-    case VK_RCONTROL: return keyboard::RightControl;
+    case VK_LCONTROL: Buffer[0] = keyboard::LeftControl;  return Slice(Buffer, 0, 1);
+    case VK_RCONTROL: Buffer[0] = keyboard::RightControl; return Slice(Buffer, 0, 1);
 
-    case VK_ESCAPE:   return keyboard::Escape;
-    case VK_SPACE:    return keyboard::Space;
-    case VK_TAB:      return keyboard::Tab;
-    case VK_LWIN:     return keyboard::LeftSystem;
-    case VK_RWIN:     return keyboard::RightSystem;
-    case VK_APPS:     return keyboard::Application;
-    case VK_BACK:     return keyboard::Backspace;
-    case VK_RETURN:   return IsExtended ? keyboard::Numpad_Enter : keyboard::Return;
+    case VK_ESCAPE:   Buffer[0] = keyboard::Escape;                                       return Slice(Buffer, 0, 1);
+    case VK_SPACE:    Buffer[0] = keyboard::Space;                                        return Slice(Buffer, 0, 1);
+    case VK_TAB:      Buffer[0] = keyboard::Tab;                                          return Slice(Buffer, 0, 1);
+    case VK_LWIN:     Buffer[0] = keyboard::LeftSystem;                                   return Slice(Buffer, 0, 1);
+    case VK_RWIN:     Buffer[0] = keyboard::RightSystem;                                  return Slice(Buffer, 0, 1);
+    case VK_APPS:     Buffer[0] = keyboard::Application;                                  return Slice(Buffer, 0, 1);
+    case VK_BACK:     Buffer[0] = keyboard::Backspace;                                    return Slice(Buffer, 0, 1);
+    case VK_RETURN:   Buffer[0] = IsExtended ? keyboard::Numpad_Enter : keyboard::Return; return Slice(Buffer, 0, 1);
 
-    case VK_INSERT: return keyboard::Insert;
-    case VK_DELETE: return keyboard::Delete;
-    case VK_HOME:   return keyboard::Home;
-    case VK_END:    return keyboard::End;
-    case VK_NEXT:   return keyboard::PageUp;
-    case VK_PRIOR:  return keyboard::PageDown;
+    case VK_INSERT: Buffer[0] = keyboard::Insert;   return Slice(Buffer, 0, 1);
+    case VK_DELETE: Buffer[0] = keyboard::Delete;   return Slice(Buffer, 0, 1);
+    case VK_HOME:   Buffer[0] = keyboard::Home;     return Slice(Buffer, 0, 1);
+    case VK_END:    Buffer[0] = keyboard::End;      return Slice(Buffer, 0, 1);
+    case VK_NEXT:   Buffer[0] = keyboard::PageUp;   return Slice(Buffer, 0, 1);
+    case VK_PRIOR:  Buffer[0] = keyboard::PageDown; return Slice(Buffer, 0, 1);
 
-    case VK_UP:    return keyboard::Up;
-    case VK_DOWN:  return keyboard::Down;
-    case VK_LEFT:  return keyboard::Left;
-    case VK_RIGHT: return keyboard::Right;
+    case VK_UP:    Buffer[0] = keyboard::Up;    return Slice(Buffer, 0, 1);
+    case VK_DOWN:  Buffer[0] = keyboard::Down;  return Slice(Buffer, 0, 1);
+    case VK_LEFT:  Buffer[0] = keyboard::Left;  return Slice(Buffer, 0, 1);
+    case VK_RIGHT: Buffer[0] = keyboard::Right; return Slice(Buffer, 0, 1);
 
     //
     // Digit Keys
     //
-    case '0': return keyboard::Digit_0;
-    case '1': return keyboard::Digit_1;
-    case '2': return keyboard::Digit_2;
-    case '3': return keyboard::Digit_3;
-    case '4': return keyboard::Digit_4;
-    case '5': return keyboard::Digit_5;
-    case '6': return keyboard::Digit_6;
-    case '7': return keyboard::Digit_7;
-    case '8': return keyboard::Digit_8;
-    case '9': return keyboard::Digit_9;
+    case '0': Buffer[0] = keyboard::Digit_0; return Slice(Buffer, 0, 1);
+    case '1': Buffer[0] = keyboard::Digit_1; return Slice(Buffer, 0, 1);
+    case '2': Buffer[0] = keyboard::Digit_2; return Slice(Buffer, 0, 1);
+    case '3': Buffer[0] = keyboard::Digit_3; return Slice(Buffer, 0, 1);
+    case '4': Buffer[0] = keyboard::Digit_4; return Slice(Buffer, 0, 1);
+    case '5': Buffer[0] = keyboard::Digit_5; return Slice(Buffer, 0, 1);
+    case '6': Buffer[0] = keyboard::Digit_6; return Slice(Buffer, 0, 1);
+    case '7': Buffer[0] = keyboard::Digit_7; return Slice(Buffer, 0, 1);
+    case '8': Buffer[0] = keyboard::Digit_8; return Slice(Buffer, 0, 1);
+    case '9': Buffer[0] = keyboard::Digit_9; return Slice(Buffer, 0, 1);
 
     //
     // Numpad
     //
-    case VK_MULTIPLY: return keyboard::Numpad_Multiply;
-    case VK_ADD:      return keyboard::Numpad_Add;
-    case VK_SUBTRACT: return keyboard::Numpad_Subtract;
-    case VK_DECIMAL:  return keyboard::Numpad_Decimal;
-    case VK_DIVIDE:   return keyboard::Numpad_Divide;
+    case VK_MULTIPLY: Buffer[0] = keyboard::Numpad_Multiply; return Slice(Buffer, 0, 1);
+    case VK_ADD:      Buffer[0] = keyboard::Numpad_Add;      return Slice(Buffer, 0, 1);
+    case VK_SUBTRACT: Buffer[0] = keyboard::Numpad_Subtract; return Slice(Buffer, 0, 1);
+    case VK_DECIMAL:  Buffer[0] = keyboard::Numpad_Decimal;  return Slice(Buffer, 0, 1);
+    case VK_DIVIDE:   Buffer[0] = keyboard::Numpad_Divide;   return Slice(Buffer, 0, 1);
 
-    case VK_NUMPAD0: return keyboard::Numpad_0;
-    case VK_NUMPAD1: return keyboard::Numpad_1;
-    case VK_NUMPAD2: return keyboard::Numpad_2;
-    case VK_NUMPAD3: return keyboard::Numpad_3;
-    case VK_NUMPAD4: return keyboard::Numpad_4;
-    case VK_NUMPAD5: return keyboard::Numpad_5;
-    case VK_NUMPAD6: return keyboard::Numpad_6;
-    case VK_NUMPAD7: return keyboard::Numpad_7;
-    case VK_NUMPAD8: return keyboard::Numpad_8;
-    case VK_NUMPAD9: return keyboard::Numpad_9;
+    case VK_NUMPAD0: Buffer[0] = keyboard::Numpad_0; return Slice(Buffer, 0, 1);
+    case VK_NUMPAD1: Buffer[0] = keyboard::Numpad_1; return Slice(Buffer, 0, 1);
+    case VK_NUMPAD2: Buffer[0] = keyboard::Numpad_2; return Slice(Buffer, 0, 1);
+    case VK_NUMPAD3: Buffer[0] = keyboard::Numpad_3; return Slice(Buffer, 0, 1);
+    case VK_NUMPAD4: Buffer[0] = keyboard::Numpad_4; return Slice(Buffer, 0, 1);
+    case VK_NUMPAD5: Buffer[0] = keyboard::Numpad_5; return Slice(Buffer, 0, 1);
+    case VK_NUMPAD6: Buffer[0] = keyboard::Numpad_6; return Slice(Buffer, 0, 1);
+    case VK_NUMPAD7: Buffer[0] = keyboard::Numpad_7; return Slice(Buffer, 0, 1);
+    case VK_NUMPAD8: Buffer[0] = keyboard::Numpad_8; return Slice(Buffer, 0, 1);
+    case VK_NUMPAD9: Buffer[0] = keyboard::Numpad_9; return Slice(Buffer, 0, 1);
 
     //
     // F-Keys
     //
-    case VK_F1:  return keyboard::F1;
-    case VK_F2:  return keyboard::F2;
-    case VK_F3:  return keyboard::F3;
-    case VK_F4:  return keyboard::F4;
-    case VK_F5:  return keyboard::F5;
-    case VK_F6:  return keyboard::F6;
-    case VK_F7:  return keyboard::F7;
-    case VK_F8:  return keyboard::F8;
-    case VK_F9:  return keyboard::F9;
-    case VK_F10: return keyboard::F10;
-    case VK_F11: return keyboard::F11;
-    case VK_F12: return keyboard::F12;
-    case VK_F13: return keyboard::F13;
-    case VK_F14: return keyboard::F14;
-    case VK_F15: return keyboard::F15;
-    case VK_F16: return keyboard::F16;
-    case VK_F17: return keyboard::F17;
-    case VK_F18: return keyboard::F18;
-    case VK_F19: return keyboard::F19;
-    case VK_F20: return keyboard::F20;
-    case VK_F21: return keyboard::F21;
-    case VK_F22: return keyboard::F22;
-    case VK_F23: return keyboard::F23;
-    case VK_F24: return keyboard::F24;
+    case VK_F1:  Buffer[0] = keyboard::F1;  return Slice(Buffer, 0, 1);
+    case VK_F2:  Buffer[0] = keyboard::F2;  return Slice(Buffer, 0, 1);
+    case VK_F3:  Buffer[0] = keyboard::F3;  return Slice(Buffer, 0, 1);
+    case VK_F4:  Buffer[0] = keyboard::F4;  return Slice(Buffer, 0, 1);
+    case VK_F5:  Buffer[0] = keyboard::F5;  return Slice(Buffer, 0, 1);
+    case VK_F6:  Buffer[0] = keyboard::F6;  return Slice(Buffer, 0, 1);
+    case VK_F7:  Buffer[0] = keyboard::F7;  return Slice(Buffer, 0, 1);
+    case VK_F8:  Buffer[0] = keyboard::F8;  return Slice(Buffer, 0, 1);
+    case VK_F9:  Buffer[0] = keyboard::F9;  return Slice(Buffer, 0, 1);
+    case VK_F10: Buffer[0] = keyboard::F10; return Slice(Buffer, 0, 1);
+    case VK_F11: Buffer[0] = keyboard::F11; return Slice(Buffer, 0, 1);
+    case VK_F12: Buffer[0] = keyboard::F12; return Slice(Buffer, 0, 1);
+    case VK_F13: Buffer[0] = keyboard::F13; return Slice(Buffer, 0, 1);
+    case VK_F14: Buffer[0] = keyboard::F14; return Slice(Buffer, 0, 1);
+    case VK_F15: Buffer[0] = keyboard::F15; return Slice(Buffer, 0, 1);
+    case VK_F16: Buffer[0] = keyboard::F16; return Slice(Buffer, 0, 1);
+    case VK_F17: Buffer[0] = keyboard::F17; return Slice(Buffer, 0, 1);
+    case VK_F18: Buffer[0] = keyboard::F18; return Slice(Buffer, 0, 1);
+    case VK_F19: Buffer[0] = keyboard::F19; return Slice(Buffer, 0, 1);
+    case VK_F20: Buffer[0] = keyboard::F20; return Slice(Buffer, 0, 1);
+    case VK_F21: Buffer[0] = keyboard::F21; return Slice(Buffer, 0, 1);
+    case VK_F22: Buffer[0] = keyboard::F22; return Slice(Buffer, 0, 1);
+    case VK_F23: Buffer[0] = keyboard::F23; return Slice(Buffer, 0, 1);
+    case VK_F24: Buffer[0] = keyboard::F24; return Slice(Buffer, 0, 1);
 
     //
     // Keys
     //
-    case 'A': return keyboard::A;
-    case 'B': return keyboard::B;
-    case 'C': return keyboard::C;
-    case 'D': return keyboard::D;
-    case 'E': return keyboard::E;
-    case 'F': return keyboard::F;
-    case 'G': return keyboard::G;
-    case 'H': return keyboard::H;
-    case 'I': return keyboard::I;
-    case 'J': return keyboard::J;
-    case 'K': return keyboard::K;
-    case 'L': return keyboard::L;
-    case 'M': return keyboard::M;
-    case 'N': return keyboard::N;
-    case 'O': return keyboard::O;
-    case 'P': return keyboard::P;
-    case 'Q': return keyboard::Q;
-    case 'R': return keyboard::R;
-    case 'S': return keyboard::S;
-    case 'T': return keyboard::T;
-    case 'U': return keyboard::U;
-    case 'V': return keyboard::V;
-    case 'W': return keyboard::W;
-    case 'X': return keyboard::X;
-    case 'Y': return keyboard::Y;
-    case 'Z': return keyboard::Z;
+    case 'A': Buffer[0] = keyboard::A; return Slice(Buffer, 0, 1);
+    case 'B': Buffer[0] = keyboard::B; return Slice(Buffer, 0, 1);
+    case 'C': Buffer[0] = keyboard::C; return Slice(Buffer, 0, 1);
+    case 'D': Buffer[0] = keyboard::D; return Slice(Buffer, 0, 1);
+    case 'E': Buffer[0] = keyboard::E; return Slice(Buffer, 0, 1);
+    case 'F': Buffer[0] = keyboard::F; return Slice(Buffer, 0, 1);
+    case 'G': Buffer[0] = keyboard::G; return Slice(Buffer, 0, 1);
+    case 'H': Buffer[0] = keyboard::H; return Slice(Buffer, 0, 1);
+    case 'I': Buffer[0] = keyboard::I; return Slice(Buffer, 0, 1);
+    case 'J': Buffer[0] = keyboard::J; return Slice(Buffer, 0, 1);
+    case 'K': Buffer[0] = keyboard::K; return Slice(Buffer, 0, 1);
+    case 'L': Buffer[0] = keyboard::L; return Slice(Buffer, 0, 1);
+    case 'M': Buffer[0] = keyboard::M; return Slice(Buffer, 0, 1);
+    case 'N': Buffer[0] = keyboard::N; return Slice(Buffer, 0, 1);
+    case 'O': Buffer[0] = keyboard::O; return Slice(Buffer, 0, 1);
+    case 'P': Buffer[0] = keyboard::P; return Slice(Buffer, 0, 1);
+    case 'Q': Buffer[0] = keyboard::Q; return Slice(Buffer, 0, 1);
+    case 'R': Buffer[0] = keyboard::R; return Slice(Buffer, 0, 1);
+    case 'S': Buffer[0] = keyboard::S; return Slice(Buffer, 0, 1);
+    case 'T': Buffer[0] = keyboard::T; return Slice(Buffer, 0, 1);
+    case 'U': Buffer[0] = keyboard::U; return Slice(Buffer, 0, 1);
+    case 'V': Buffer[0] = keyboard::V; return Slice(Buffer, 0, 1);
+    case 'W': Buffer[0] = keyboard::W; return Slice(Buffer, 0, 1);
+    case 'X': Buffer[0] = keyboard::X; return Slice(Buffer, 0, 1);
+    case 'Y': Buffer[0] = keyboard::Y; return Slice(Buffer, 0, 1);
+    case 'Z': Buffer[0] = keyboard::Z; return Slice(Buffer, 0, 1);
 
     //
     // Mouse Buttons
     //
-    case VK_LBUTTON:  return mouse::LeftButton;
-    case VK_MBUTTON:  return mouse::MiddleButton;
-    case VK_RBUTTON:  return mouse::RightButton;
-    case VK_XBUTTON1: return mouse::ExtraButton1;
-    case VK_XBUTTON2: return mouse::ExtraButton2;
+    case VK_LBUTTON:  Buffer[0] = mouse::LeftButton;   return Slice(Buffer, 0, 1);
+    case VK_MBUTTON:  Buffer[0] = mouse::MiddleButton; return Slice(Buffer, 0, 1);
+    case VK_RBUTTON:  Buffer[0] = mouse::RightButton;  return Slice(Buffer, 0, 1);
+    case VK_XBUTTON1: Buffer[0] = mouse::ExtraButton1; return Slice(Buffer, 0, 1);
+    case VK_XBUTTON2: Buffer[0] = mouse::ExtraButton2; return Slice(Buffer, 0, 1);
 
     default: return {};
   }
@@ -644,6 +655,10 @@ auto
   RegisterInputSlot(Context, input_type::Button, keyboard::RightControl);
   RegisterInputSlot(Context, input_type::Button, keyboard::RightAlt);
   RegisterInputSlot(Context, input_type::Button, keyboard::RightSystem);
+  RegisterInputSlot(Context, input_type::Button, keyboard::Shift);
+  RegisterInputSlot(Context, input_type::Button, keyboard::Control);
+  RegisterInputSlot(Context, input_type::Button, keyboard::Alt);
+  RegisterInputSlot(Context, input_type::Button, keyboard::System);
   RegisterInputSlot(Context, input_type::Button, keyboard::Application);
   RegisterInputSlot(Context, input_type::Button, keyboard::Backspace);
   RegisterInputSlot(Context, input_type::Button, keyboard::Return);

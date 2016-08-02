@@ -239,6 +239,10 @@ namespace keyboard
   CORE_API extern input_id RightControl;
   CORE_API extern input_id RightAlt;
   CORE_API extern input_id RightSystem;
+  CORE_API extern input_id Shift;   // Either left or right
+  CORE_API extern input_id Control; // Either left or right
+  CORE_API extern input_id Alt;     // Either left or right
+  CORE_API extern input_id System;  // Either left or right
   CORE_API extern input_id Application;
   CORE_API extern input_id Backspace;
   CORE_API extern input_id Return;

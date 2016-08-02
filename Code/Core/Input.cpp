@@ -360,6 +360,10 @@ namespace keyboard
   CORE_API input_id RightControl = InputId("Keyboard_RightControl");
   CORE_API input_id RightAlt     = InputId("Keyboard_RightAlt");
   CORE_API input_id RightSystem  = InputId("Keyboard_RightSystem");
+  CORE_API input_id Shift        = InputId("Keyboard_Shift");   // Either left or right
+  CORE_API input_id Control      = InputId("Keyboard_Control"); // Either left or right
+  CORE_API input_id Alt          = InputId("Keyboard_Alt");     // Either left or right
+  CORE_API input_id System       = InputId("Keyboard_System");  // Either left or right
   CORE_API input_id Application  = InputId("Keyboard_Application");
   CORE_API input_id Backspace    = InputId("Keyboard_Backspace");
   CORE_API input_id Return       = InputId("Keyboard_Return");
