@@ -47,16 +47,14 @@ struct cfg_attribute
   cfg_literal Value;
 };
 
-DefineOpaqueHandle(cfg_node_handle);
-
 struct cfg_node
 {
   cfg_document* Document;
 
-  cfg_node_handle Next;
-  cfg_node_handle Previous;
-  cfg_node_handle Parent;
-  cfg_node_handle FirstChild;
+  cfg_node* Next;
+  cfg_node* Previous;
+  cfg_node* Parent;
+  cfg_node* FirstChild;
 
   cfg_identifier Name;
 
@@ -69,16 +67,16 @@ struct cfg_document
 {
   allocator_interface* Allocator;
 
-  // This is where all nodes associated with this document live.
-  dynamic_array<cfg_node> AllNodes;
+  /// Array of node pointers.
+  ///
+  /// Will be automatically destoryed when the document gets finalized.
+  dynamic_array<cfg_node*> Nodes;
 
-  // The root node of this document. The node itself does not contain any
-  // data, it merely serves as access point to the actual document data (the
-  // children of this node).
-  cfg_node_handle Root;
-
-  // Counter to track CfgBeginNodeAccess and CfgEndNodeAccess calls.
-  int NumExternalNodePtrs;
+  /// The root node of this document.
+  ///
+  /// The node itself does not contain any data, it merely serves as access
+  /// point to the actual document data (the children of this node).
+  cfg_node* Root;
 };
 
 CFG_API void
@@ -86,9 +84,6 @@ Init(cfg_document* Document, allocator_interface* Allocator);
 
 CFG_API void
 Finalize(cfg_document* Document);
-
-CFG_API cfg_node_handle
-CfgCreateNode(cfg_document* Document);
 
 inline bool
 CfgLiteralIsValid(cfg_literal const& Literal)
@@ -100,10 +95,10 @@ CFG_API bool
 CfgIdentifierMatchesFilter(cfg_identifier Identifier, slice<char const> Filter);
 
 CFG_API cfg_node*
-CfgBeginNodeAccess(cfg_document* Document, cfg_node_handle Handle);
+CfgCreateNode(cfg_document* Document);
 
 CFG_API void
-CfgEndNodeAccess(cfg_document* Document, cfg_node* Node);
+CfgDestroyNode(cfg_document* Document, cfg_node* Node);
 
 
 //
@@ -168,29 +163,3 @@ template<> struct impl_convert<uint8,  cfg_literal> : public impl_convert_cfg_li
 template<> struct impl_convert<uint16, cfg_literal> : public impl_convert_cfg_literal_number<uint16> {};
 template<> struct impl_convert<uint32, cfg_literal> : public impl_convert_cfg_literal_number<uint32> {};
 template<> struct impl_convert<uint64, cfg_literal> : public impl_convert_cfg_literal_number<uint64> {};
-
-
-//
-// Node accessor functions
-//
-
-CFG_API cfg_node_handle
-CfgNodeNext(cfg_document* Document, cfg_node_handle NodeHandle);
-
-CFG_API cfg_node_handle
-CfgNodePrevious(cfg_document* Document, cfg_node_handle NodeHandle);
-
-CFG_API cfg_node_handle
-CfgNodeParent(cfg_document* Document, cfg_node_handle NodeHandle);
-
-CFG_API cfg_node_handle
-CfgNodeFirstChild(cfg_document* Document, cfg_node_handle NodeHandle);
-
-CFG_API cfg_identifier
-CfgNodeName(cfg_document* Document, cfg_node_handle NodeHandle);
-
-CFG_API slice<cfg_literal>
-CfgNodeValues(cfg_document* Document, cfg_node_handle NodeHandle);
-
-CFG_API slice<cfg_attribute>
-CfgNodeAttributes(cfg_document* Document, cfg_node_handle NodeHandle);

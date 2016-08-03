@@ -128,12 +128,12 @@ TEST_CASE("Cfg: Parse simple document", "[Cfg]")
 
   CfgDocumentParseFromString(&Document, "foo \"bar\""_S, &Context);
 
-  auto Node = CfgNodeFirstChild(&Document, Document.Root);
+  auto Node = Document.Root->FirstChild;
   REQUIRE( Node != nullptr );
-  REQUIRE( CfgNodeName(&Document, Node) == "foo"_S );
-  REQUIRE( CfgNodeValues(&Document, Node).Num == 1 );
-  REQUIRE( CfgNodeValues(&Document, Node)[0].Type == cfg_literal_type::String );
-  REQUIRE( CfgNodeValues(&Document, Node)[0].String == "bar"_S );
+  REQUIRE( Node->Name == "foo"_S );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
+  REQUIRE( Node->Values[0].String == "bar"_S );
 }
 
 TEST_CASE("Cfg: Parse simple document with attributes", "[Cfg]")
@@ -147,16 +147,16 @@ TEST_CASE("Cfg: Parse simple document with attributes", "[Cfg]")
 
   CfgDocumentParseFromString(&Document, "foo \"bar\" baz=\"qux\""_S, &Context);
 
-  auto Node = CfgNodeFirstChild(&Document, Document.Root);
+  auto Node = Document.Root->FirstChild;
   REQUIRE( Node != nullptr );
-  REQUIRE( CfgNodeName(&Document, Node) == "foo"_S );
-  REQUIRE( CfgNodeValues(&Document, Node).Num == 1 );
-  REQUIRE( CfgNodeValues(&Document, Node)[0].Type == cfg_literal_type::String );
-  REQUIRE( CfgNodeValues(&Document, Node)[0].String == "bar"_S );
-  REQUIRE( CfgNodeAttributes(&Document, Node).Num == 1 );
-  REQUIRE( CfgNodeAttributes(&Document, Node)[0].Name == "baz"_S );
-  REQUIRE( CfgNodeAttributes(&Document, Node)[0].Value.Type == cfg_literal_type::String );
-  REQUIRE( CfgNodeAttributes(&Document, Node)[0].Value.String == "qux"_S );
+  REQUIRE( Node->Name == "foo"_S );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
+  REQUIRE( Node->Values[0].String == "bar"_S );
+  REQUIRE( Node->Attributes.Num == 1 );
+  REQUIRE( Node->Attributes[0].Name == "baz"_S );
+  REQUIRE( Node->Attributes[0].Value.Type == cfg_literal_type::String );
+  REQUIRE( Node->Attributes[0].Value.String == "qux"_S );
 }
 
 // Below are the unported unit tests from krepel.

@@ -291,13 +291,17 @@ auto
 ::CfgDocumentParseFromSource(cfg_document* Document, cfg_source* Source, cfg_parsing_context* Context)
   -> bool
 {
-  cfg_node_handle FirstChildOfRoot;
+  if(Document->Root == nullptr)
+  {
+    LogError("The given document was not properly initialized.");
+    return false;
+  }
+
+  cfg_node* FirstChildOfRoot;
   auto Success = CfgDocumentParseInnerNodes(Document, Source, Context, &FirstChildOfRoot);
   if(Success)
   {
-    auto RootNode = CfgBeginNodeAccess(Document, Document->Root);
-    RootNode->FirstChild = FirstChildOfRoot;
-    CfgEndNodeAccess(Document, RootNode);
+    Document->Root->FirstChild = FirstChildOfRoot;
     return true;
   }
 
@@ -306,7 +310,7 @@ auto
 
 auto
 ::CfgDocumentParseInnerNodes(cfg_document* Document, cfg_source* Source, cfg_parsing_context* Context,
-                             cfg_node_handle* FirstNode)
+                             cfg_node** FirstNode)
   -> bool
 {
   if(FirstNode == nullptr)
@@ -320,21 +324,13 @@ auto
     return false;
   }
 
-  cfg_node_handle PreviousNodeHandle = *FirstNode;
-  cfg_node_handle NewNodeHandle;
-  while(CfgDocumentParseNode(Document, Source, Context, &NewNodeHandle))
+  cfg_node* PreviousNode = *FirstNode;
+  cfg_node* NewNode;
+  while(CfgDocumentParseNode(Document, Source, Context, &NewNode))
   {
-    {
-      auto PreviousNode = CfgBeginNodeAccess(Document, PreviousNodeHandle);
-      PreviousNode->Next = NewNodeHandle;
-      CfgEndNodeAccess(Document, PreviousNode);
-    }
-    {
-      auto NewNode = CfgBeginNodeAccess(Document, NewNodeHandle);
-      NewNode->Previous = PreviousNodeHandle;
-      CfgEndNodeAccess(Document, NewNode);
-    }
-    PreviousNodeHandle = NewNodeHandle;
+    PreviousNode->Next = NewNode;
+    NewNode->Previous = PreviousNode;
+    PreviousNode = NewNode;
   }
   return true;
 }
@@ -377,7 +373,7 @@ auto
 
 auto
 ::CfgDocumentParseNode(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
-                       cfg_node_handle* OutNode)
+                       cfg_node** OutNode)
   -> bool
 {
   auto Source = *OriginalSource;
@@ -387,8 +383,7 @@ auto
   if(SourceString.Num == 0)
     return false;
 
-  auto NodeHandle = CfgCreateNode(Document);
-  auto Node = CfgBeginNodeAccess(Document, NodeHandle);
+  auto Node = CfgCreateNode(Document);
 
   //
   // Parse Node Name and Namespace
@@ -453,8 +448,6 @@ auto
   // CfgSourceSkipWhiteSpaceAndComments(&Source, Context, cfg_consume_newline::Yes);
   CfgSourceSkipWhiteSpaceAndComments(&Source, Context, cfg_consume_newline::No);
 
-  CfgEndNodeAccess(Document, Node);
-
   SourceString = CfgSourceCurrentValue(Source);
   if(SourceString.Num && SourceString[0] == '{')
   {
@@ -469,21 +462,15 @@ auto
       CfgSourceLogWarning(Context, Source, "The list of child nodes is not closed properly with curly braces.");
     }
 
-    cfg_node_handle FirstChild;
-    if(CfgDocumentParseInnerNodes(Document, &ChildSource, Context, &FirstChild))
-    {
-      Node = CfgBeginNodeAccess(Document, NodeHandle);
-      Node->FirstChild = FirstChild;
-      CfgEndNodeAccess(Document, Node);
-    }
-    else
+    bool const HasInnerNodes = CfgDocumentParseInnerNodes(Document, &ChildSource, Context, &Node->FirstChild);
+    if(!HasInnerNodes)
     {
       // TODO: What to do if there are no inner nodes? Ignore it?
     }
   }
 
   if(OutNode)
-    *OutNode = NodeHandle;
+    *OutNode = Node;
 
   *OriginalSource = Source;
   return true;

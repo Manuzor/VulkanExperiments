@@ -8,8 +8,8 @@ auto
   -> void
 {
   Document->Allocator = Allocator;
-  Init(&Document->AllNodes, Allocator);
-  Reserve(&Document->AllNodes, 32);
+  Init(&Document->Nodes, Allocator);
+  Reserve(&Document->Nodes, 32);
   Document->Root = CfgCreateNode(Document);
 }
 
@@ -17,44 +17,11 @@ auto
 ::Finalize(cfg_document* Document)
   -> void
 {
-  Finalize(&Document->AllNodes);
-}
-
-static cfg_node_handle
-CreateHandleFromIndex(size_t Index)
-{
-  return Reinterpret<cfg_node_handle>(Index + 1);
-}
-
-static size_t
-GetIndexFromHandle(cfg_node_handle Handle)
-{
-  return Reinterpret<size_t>(Handle) - 1;
-}
-
-auto
-::CfgCreateNode(cfg_document* Document)
-  -> cfg_node_handle
-{
-  if(Document->NumExternalNodePtrs > 0)
+  for(auto Node : Slice(&Document->Nodes))
   {
-    LogError("Unable to create node while nodes are still accessed externally by raw pointers. "
-             "Did you forget to call `CfgEndNodeAccess()`?");
-    return nullptr;
+    CfgDestroyNode(Document, Node);
   }
-
-  // Create a new handle and fill it with proper data.
-  cfg_node_handle Handle{ CreateHandleFromIndex(Document->AllNodes.Num) };
-
-  // Create a new node by expanding the current list of nodes and initialize
-  // that node.
-  auto NewNode = &Expand(&Document->AllNodes);
-  NewNode->Document = Document;
-  Init(&NewNode->Values, Document->Allocator);
-  Init(&NewNode->Attributes, Document->Allocator);
-
-  // Return the handle to the new node.
-  return Handle;
+  Finalize(&Document->Nodes);
 }
 
 auto
@@ -69,102 +36,33 @@ auto
 }
 
 auto
-::CfgBeginNodeAccess(cfg_document* Document, cfg_node_handle Handle)
+::CfgCreateNode(cfg_document* Document)
   -> cfg_node*
 {
-  if(Handle == nullptr)
-    return nullptr;
-  ++Document->NumExternalNodePtrs;
-  return &Document->AllNodes[GetIndexFromHandle(Handle)];
+  auto Node = Allocate<cfg_node>(Document->Allocator);
+  *Node = {};
+  Node->Document = Document;
+  Init(&Node->Values, Document->Allocator);
+  Init(&Node->Attributes, Document->Allocator);
+  Expand(&Document->Nodes) = Node;
+  return Node;
 }
 
 auto
-::CfgEndNodeAccess(cfg_document* Document, cfg_node* Node)
+::CfgDestroyNode(cfg_document* Document, cfg_node* Node)
   -> void
 {
-  if(Document->NumExternalNodePtrs > 0)
-    --Document->NumExternalNodePtrs;
+  if(Node == nullptr)
+    return;
+
+  if(RemoveFirst(&Document->Nodes, Node))
+  {
+    Finalize(&Node->Values);
+    Finalize(&Node->Attributes);
+    Deallocate(Document->Allocator, Node);
+  }
   else
-    LogWarning("CfgEndNodeAccess() was called but NumExternalNodePtrs was 0.");
-}
-
-auto
-::CfgNodeNext(cfg_document* Document, cfg_node_handle NodeHandle)
-  -> cfg_node_handle
-{
-  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
-  auto const Node = &Document->AllNodes[NodeIndex];
-  return Node->Next;
-}
-
-auto
-::CfgNodePrevious(cfg_document* Document, cfg_node_handle NodeHandle)
-  -> cfg_node_handle
-{
-  if(NodeHandle == nullptr)
-    return {};
-
-  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
-  auto const Node = &Document->AllNodes[NodeIndex];
-  return Node->Previous;
-}
-
-auto
-::CfgNodeParent(cfg_document* Document, cfg_node_handle NodeHandle)
-  -> cfg_node_handle
-{
-  if(NodeHandle == nullptr)
-    return {};
-
-  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
-  auto const Node = &Document->AllNodes[NodeIndex];
-  return Node->Parent;
-}
-
-auto
-::CfgNodeFirstChild(cfg_document* Document, cfg_node_handle NodeHandle)
-  -> cfg_node_handle
-{
-  if(NodeHandle == nullptr)
-    return {};
-
-  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
-  auto const Node = &Document->AllNodes[NodeIndex];
-  return Node->FirstChild;
-}
-
-auto
-::CfgNodeName(cfg_document* Document, cfg_node_handle NodeHandle)
-  -> cfg_identifier
-{
-  if(NodeHandle == nullptr)
-    return {};
-
-  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
-  auto const Node = &Document->AllNodes[NodeIndex];
-  return Node->Name;
-}
-
-auto
-::CfgNodeValues(cfg_document* Document, cfg_node_handle NodeHandle)
-  -> slice<cfg_literal>
-{
-  if(NodeHandle == nullptr)
-    return {};
-
-  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
-  auto const Node = &Document->AllNodes[NodeIndex];
-  return Slice(&Node->Values);
-}
-
-auto
-::CfgNodeAttributes(cfg_document* Document, cfg_node_handle NodeHandle)
-  -> slice<cfg_attribute>
-{
-  if(NodeHandle == nullptr)
-    return {};
-
-  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
-  auto const Node = &Document->AllNodes[NodeIndex];
-  return Slice(&Node->Attributes);
+  {
+    LogWarning("Attempt to destroy node in this document that does not belong in it.");
+  }
 }

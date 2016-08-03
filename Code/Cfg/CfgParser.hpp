@@ -116,7 +116,7 @@ CfgDocumentParseFromSource(cfg_document* Document, cfg_source* Source, cfg_parsi
 
 CFG_API bool
 CfgDocumentParseInnerNodes(cfg_document* Document, cfg_source* Source, cfg_parsing_context* Context,
-                           cfg_node_handle* FirstNode);
+                           cfg_node** FirstNode);
 
 constexpr bool
 CfgIsValidIdentifierFirstChar(char Char)
@@ -142,7 +142,7 @@ CfgDocumentParseIdentifier(cfg_document* Document, cfg_source* OriginalSource, c
 
 CFG_API bool
 CfgDocumentParseNode(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
-                     cfg_node_handle* OutNode);
+                     cfg_node** OutNode);
 
 
 CFG_API bool
