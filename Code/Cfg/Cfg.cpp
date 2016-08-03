@@ -7,6 +7,7 @@ auto
 ::Init(cfg_document* Document, allocator_interface* Allocator)
   -> void
 {
+  Document->Allocator = Allocator;
   Init(&Document->AllNodes, Allocator);
   Reserve(&Document->AllNodes, 32);
   Document->Root = CfgCreateNode(Document);

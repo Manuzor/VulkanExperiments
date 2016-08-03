@@ -132,6 +132,9 @@ auto
   while(true)
   {
     auto String = CfgSourceCurrentValue(Source);
+    if(String.Num == 0)
+      break;
+
     if(CfgSourceIsAtLineComment(Source, Context))
     {
       auto NumToSkip = String.Num - SliceFind(String, SliceFromString("\n")).Num;
@@ -160,6 +163,10 @@ auto
 
   while(true)
   {
+    auto String = CfgSourceCurrentValue(Source);
+    if(String.Num == 0)
+      break;
+
     if(CfgSourceIsAtWhiteSpace(Source, Context))
     {
       if(ConsumeNewLine == cfg_consume_newline::No && CfgSourceIsAtNewLine(Source, Context)) break;

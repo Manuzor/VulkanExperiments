@@ -2,44 +2,44 @@
   .ProjectName = 'Tests'
   .ProjectBasePath = '$RepoRoot$/Tests'
 
-  VCXProject( 'Tests-Proj' )
+  VCXProject( '$ProjectName$-Proj' )
   {
-    .Output = '$RepoRoot$/Build/$ProjectName$.exe'
-    .OutputDirectory = '$RepoRoot$/Build'
+    .Output = '$BuildPath$/$ProjectName$.exe'
+    .OutputDirectory = '$BuildPath$'
 
     .ProjectOutput = 'Workspace/VisualStudio/$ProjectName$.vcxproj'
     .ProjectInputPaths = { '$ProjectBasePath$' }
     .LocalDebuggerCommand = '$Output$'
     .LocalDebuggerCommandArguments = '--break'
-    .LocalDebuggerWorkingDirectory = '$RepoRoot$/Build'
+    .LocalDebuggerWorkingDirectory = '$BuildPath$'
     //.IncludeSearchPath + '??'
   }
 
-  .SourcePath = 'Tests'
+  .SourcePath = '$ProjectName$'
 
-  ObjectList( 'Tests-Lib' )
+  ObjectList( '$ProjectName$-Lib' )
   {
     .CompilerInputPath = '$SourcePath$'
-    .CompilerOutputPath = '$BuildPath$/Tests'
+    .CompilerOutputPath = '$BuildPath$/$ProjectName$'
   }
 
-  Executable( 'Tests' )
+  Executable( '$ProjectName$' )
   {
-    .Libraries + 'Tests-Lib'
+    .Libraries + '$ProjectName$-Lib'
                + 'Core-Lib'
                + 'Cfg-Lib'
-    .LinkerOptions + ' /PDB:$BuildPath$/Tests.pdb'
-    .LinkerOutput = '$BuildPath$/Tests.exe'
+    .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
+    .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
   }
 
-  Test( 'Tests-Run' )
+  Test( '$ProjectName$-Run' )
   {
-    .TestExecutable = 'Tests'
+    .TestExecutable = '$ProjectName$'
     .TestOutput = '$BuildPath$/TestsOutput.txt'
     .TestWorkingDir = '$RepoRoot$'
     .TestArguments = '--break'
   }
 
-  Alias( 'Tests-x64-Debug' )   { .Targets = 'Tests' }
-  Alias( 'Tests-x64-Release' ) { .Targets = 'Tests' }
+  Alias( '$ProjectName$-x64-Debug' )   { .Targets = '$ProjectName$' }
+  Alias( '$ProjectName$-x64-Release' ) { .Targets = '$ProjectName$' }
 }

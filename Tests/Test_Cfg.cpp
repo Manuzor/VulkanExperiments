@@ -119,8 +119,13 @@ TEST_CASE("Cfg: Parse escaped", "[Cfg]")
 
 TEST_CASE("Cfg: Parse simple document", "[Cfg]")
 {
+  test_allocator Allocator{};
   cfg_parsing_context Context{ "Cfg Test 5"_S, GlobalLog };
+
   cfg_document Document{};
+  Init(&Document, &Allocator);
+  Defer [&](){ Finalize(&Document); };
+
   CfgDocumentParseFromString(&Document, "foo \"bar\""_S, &Context);
 
   auto Node = CfgNodeFirstChild(&Document, Document.Root);
@@ -133,8 +138,13 @@ TEST_CASE("Cfg: Parse simple document", "[Cfg]")
 
 TEST_CASE("Cfg: Parse simple document with attributes", "[Cfg]")
 {
+  test_allocator Allocator{};
   cfg_parsing_context Context{ "Cfg Test 6"_S, GlobalLog };
+
   cfg_document Document{};
+  Init(&Document, &Allocator);
+  Defer [&](){ Finalize(&Document); };
+
   CfgDocumentParseFromString(&Document, "foo \"bar\" baz=\"qux\""_S, &Context);
 
   auto Node = CfgNodeFirstChild(&Document, Document.Root);

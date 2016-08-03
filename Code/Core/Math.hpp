@@ -223,33 +223,33 @@ vec4 constexpr Vec4(vec3 const& XYZ, float W) { return Vec4(XYZ.X, XYZ.Y, XYZ.Z,
 // Constants: vec2
 //
 
-constexpr vec2 ZeroVector2      = Vec2(0, 0);
-constexpr vec2 UnitScaleVector2 = Vec2(1, 1);
-constexpr vec2 UnitXVector2     = Vec2(1, 0);
-constexpr vec2 UnitYVector2     = Vec2(0, 1);
+const vec2 ZeroVector2      = Vec2(0, 0);
+const vec2 UnitScaleVector2 = Vec2(1, 1);
+const vec2 UnitXVector2     = Vec2(1, 0);
+const vec2 UnitYVector2     = Vec2(0, 1);
 
 
 //
 // Constants: vec3
 //
 
-constexpr vec3 ZeroVector3      = Vec3(0, 0, 0);
-constexpr vec3 UnitScaleVector3 = Vec3(1, 1, 1);
-constexpr vec3 ForwardVector3   = Vec3(1, 0, 0);
-constexpr vec3 RightVector3     = Vec3(0, 1, 0);
-constexpr vec3 UpVector3        = Vec3(0, 0, 1);
+const vec3 ZeroVector3      = Vec3(0, 0, 0);
+const vec3 UnitScaleVector3 = Vec3(1, 1, 1);
+const vec3 ForwardVector3   = Vec3(1, 0, 0);
+const vec3 RightVector3     = Vec3(0, 1, 0);
+const vec3 UpVector3        = Vec3(0, 0, 1);
 
 
 //
 // Constants: vec4
 //
 
-constexpr vec4 ZeroVector4      = Vec4(0, 0, 0, 0);
-constexpr vec4 UnitScaleVector4 = Vec4(1, 1, 1, 1);
-constexpr vec4 ForwardVector4   = Vec4(1, 0, 0, 0);
-constexpr vec4 RightVector4     = Vec4(0, 1, 0, 0);
-constexpr vec4 UpVector4        = Vec4(0, 0, 1, 0);
-constexpr vec4 WeightVector4    = Vec4(0, 0, 0, 1);
+const vec4 ZeroVector4      = Vec4(0, 0, 0, 0);
+const vec4 UnitScaleVector4 = Vec4(1, 1, 1, 1);
+const vec4 ForwardVector4   = Vec4(1, 0, 0, 0);
+const vec4 RightVector4     = Vec4(0, 1, 0, 0);
+const vec4 UpVector4        = Vec4(0, 0, 1, 0);
+const vec4 WeightVector4    = Vec4(0, 0, 0, 1);
 
 
 //
@@ -326,15 +326,15 @@ Mat4x4(transform const& Transform);
 // Constants: mat4x4
 //
 
-constexpr mat4x4 ZeroMatrix4x4 = Mat4x4(0, 0, 0, 0,
-                                        0, 0, 0, 0,
-                                        0, 0, 0, 0,
-                                        0, 0, 0, 0);
+const mat4x4 ZeroMatrix4x4 = Mat4x4(0, 0, 0, 0,
+                                    0, 0, 0, 0,
+                                    0, 0, 0, 0,
+                                    0, 0, 0, 0);
 
-constexpr mat4x4 IdentityMatrix4x4 = Mat4x4(1, 0, 0, 0,
-                                            0, 1, 0, 0,
-                                            0, 0, 1, 0,
-                                            0, 0, 0, 1);
+const mat4x4 IdentityMatrix4x4 = Mat4x4(1, 0, 0, 0,
+                                        0, 1, 0, 0,
+                                        0, 0, 1, 0,
+                                        0, 0, 0, 1);
 
 
 //
@@ -364,7 +364,7 @@ Quaternion(mat4x4 const& Mat);
 //
 // Constants: quaternion
 //
-constexpr quaternion IdentityQuaternion = Quaternion(0, 0, 0, 1);
+const quaternion IdentityQuaternion = Quaternion(0, 0, 0, 1);
 
 
 //
@@ -380,7 +380,7 @@ Transform(vec3 const& Translation, quaternion const& Rotation, vec3 const& Scale
 //
 // Constants: transform
 //
-constexpr transform IdentityTransform = Transform(ZeroVector3, IdentityQuaternion, UnitScaleVector3);
+const transform IdentityTransform = Transform(ZeroVector3, IdentityQuaternion, UnitScaleVector3);
 
 //
 // Algorithms: Equality
