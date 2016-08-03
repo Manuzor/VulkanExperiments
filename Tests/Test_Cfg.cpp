@@ -240,216 +240,202 @@ TEST_CASE("Cfg: Parse simple document with child nodes", "[Cfg]")
   REQUIRE( Node->Values[0].String == "quux"_S );
 }
 
-// Below are the unported unit tests from krepel.
-#if 0
-
-// Parse document from file.
-unittest
+TEST_CASE("Cfg: Parse document from file", "[Cfg]")
 {
-  void TheActualTest(SDLDocument Document)
+  test_allocator Allocator{};
+
+  auto FileName = "../Tests/TestData/Full.cfg";
+
+  scoped_array<uint8> FileContent{ &Allocator };
+  if(!ReadFileContentIntoArray(&FileContent, FileName))
   {
-    // foo "bar"
-    auto Node = Document.Root->FirstChild;
-    REQUIRE( Node != nullptr );
-    REQUIRE( Node->Name == "foo" );
-    REQUIRE( Node->Values.Count == 1 );
-    REQUIRE( cast(string)Node->Values[0] == "bar" );
-    REQUIRE( Node->Attributes.IsEmpty );
-
-    // foo "bar" "baz"
-    Node = Node->Next;
-    REQUIRE( Node != nullptr );
-    REQUIRE( Node->Name == "foo" );
-    REQUIRE( Node->Values.Count == 2 );
-    REQUIRE( cast(string)Node->Values[0] == "bar" );
-    REQUIRE( cast(string)Node->Values[1] == "baz" );
-    REQUIRE( Node->Attributes.IsEmpty );
-
-    // foo "bar" baz="qux"
-    Node = Node->Next;
-    REQUIRE( Node != nullptr );
-    REQUIRE( Node->Name == "foo" );
-    REQUIRE( Node->Values.Count == 1 );
-    REQUIRE( cast(string)Node->Values[0] == "bar" );
-    REQUIRE( Node->Attributes.Count == 1 );
-    REQUIRE( Node->Attributes[0].Name == "baz" );
-    REQUIRE( cast(string)Node->Attributes[0].Value == "qux" );
-
-    // foo "bar" baz="qux" baaz="quux"
-    Node = Node->Next;
-    REQUIRE( Node != nullptr );
-    REQUIRE( Node->Name == "foo" );
-    REQUIRE( Node->Values.Count == 1 );
-    REQUIRE( cast(string)Node->Values[0] == "bar" );
-    REQUIRE( Node->Attributes.Count == 2 );
-    REQUIRE( Node->Attributes[0].Name == "baz" );
-    REQUIRE( cast(string)Node->Attributes[0].Value == "qux" );
-    REQUIRE( Node->Attributes[1].Name == "baaz" );
-    REQUIRE( cast(string)Node->Attributes[1].Value == "quux" );
-
-    // foo bar="baz"
-    Node = Node->Next;
-    REQUIRE( Node != nullptr );
-    REQUIRE( Node->Name == "foo" );
-    REQUIRE( Node->Values.IsEmpty );
-    REQUIRE( Node->Attributes.Count == 1 );
-    REQUIRE( Node->Attributes[0].Name == "bar" );
-    REQUIRE( cast(string)Node->Attributes[0].Value == "baz" );
-
-    // "foo"
-    Node = Node->Next;
-    REQUIRE( Node != nullptr );
-    REQUIRE( Node->IsAnonymous );
-    REQUIRE( Node->Name == "content" );
-    REQUIRE( Node->Values.Count == 1 );
-    REQUIRE( cast(string)Node->Values[0] == "foo" );
-    REQUIRE( Node->Attributes.IsEmpty == 1 );
-
-    // "foo" bar="baz"
-    Node = Node->Next;
-    REQUIRE( Node != nullptr );
-    REQUIRE( Node->IsAnonymous );
-    REQUIRE( Node->Name == "content" );
-    REQUIRE( Node->Values.Count == 1 );
-    REQUIRE( cast(string)Node->Values[0] == "foo" );
-    REQUIRE( Node->Attributes.Count == 1 );
-    REQUIRE( Node->Attributes[0].Name == "bar" );
-    REQUIRE( cast(string)Node->Attributes[0].Value == "baz" );
-
-    /*
-      foo {
-        baz "baz"
-      }
-    */
-    Node = Node->Next;
-    REQUIRE( Node != nullptr );
-    REQUIRE( Node->Name == "foo" );
-    REQUIRE( Node->Values.IsEmpty );
-    REQUIRE( Node->Attributes.IsEmpty );
-    {
-      auto Child = Node->FirstChild;
-      REQUIRE( Child != nullptr );
-      REQUIRE( Child.Name == "bar" );
-      REQUIRE( Child.Values.Count == 1 );
-      REQUIRE( cast(string)Child.Values[0] == "baz" );
-      REQUIRE( Child.Attributes.IsEmpty == 1 );
-    }
-
-    /+
-      foo /*
-      This is
-      what you get
-      when you support multi-line comments
-      in a whitespace sensitive language. */ bar="baz"
-    +/
-    Node = Node->Next;
-    REQUIRE( Node != nullptr );
-    REQUIRE( Node->Name == "foo" );
-    REQUIRE( Node->Values.IsEmpty );
-    REQUIRE( Node->Attributes.Num == 1 );
-    REQUIRE( Node->Attributes[0].Name == "answer" );
-    REQUIRE( cast(int)Node->Attributes[0].Value == 42 );
-
-    /+
-      foo 1 2 "bar" baz="qux" {
-        inner { 0 1 2 }
-        "anon value"
-        "anon value with nesting" {
-          another-foo "bar" 1337 -92 "baz" qux="baaz"
-        }
-      }
-    +/
-    Node = Node->Next;
-    REQUIRE( Node != nullptr );
-    REQUIRE( Node->Name == "foo" );
-    REQUIRE( Node->Values.Count == 3 );
-    REQUIRE( cast(int)Node->Values[0] == 1 );
-    REQUIRE( cast(int)Node->Values[1] == 2 );
-    REQUIRE( cast(string)Node->Values[2] == "bar" );
-    REQUIRE( Node->Attributes.Count == 1 );
-    REQUIRE( Node->Attributes[0].Name == "baz" );
-    REQUIRE( cast(string)Node->Attributes[0].Value == "qux" );
-    {
-      // inner { 0 1 2 }
-      auto Child = Node->FirstChild;
-      REQUIRE( Child != nullptr );
-      REQUIRE( Child.Name == "inner" );
-      REQUIRE( Child.Values.Count == 0 );
-      REQUIRE( Child.Attributes.Count == 0 );
-      {
-        auto ChildsChild = Child.FirstChild;
-        REQUIRE( ChildsChild != nullptr );
-        REQUIRE( ChildsChild.IsAnonymous );
-        REQUIRE( ChildsChild.Values.Count == 3 );
-        REQUIRE( cast(int)ChildsChild.Values[0] == 0 );
-        REQUIRE( cast(int)ChildsChild.Values[1] == 1 );
-        REQUIRE( cast(int)ChildsChild.Values[2] == 2 );
-        REQUIRE( ChildsChild.Attributes.IsEmpty );
-      }
-
-      // "anon value"
-      Child = Child.Next;
-      REQUIRE( Child != nullptr );
-      REQUIRE( Child.IsAnonymous );
-      REQUIRE( Child.Values.Count == 1 );
-      REQUIRE( cast(string)Child.Values[0] == "anon value" );
-      REQUIRE( Child.Attributes.IsEmpty );
-
-      /+
-        "anon value with nesting" {
-          another-foo "bar" 1337 -92 "baz" qux="baaz"
-        }
-      +/
-      Child = Child.Next;
-      REQUIRE( Child != nullptr );
-      REQUIRE( Child.IsAnonymous );
-      REQUIRE( Child.Name == "content" );
-      REQUIRE( Child.Values.Count == 1 );
-      REQUIRE( cast(string)Child.Values[0] == "anon value with nesting" );
-      REQUIRE( Child.Attributes.IsEmpty );
-      {
-        // another-foo "bar" 1337 -92 "baz" qux="baaz"
-        auto ChildsChild = Child.FirstChild;
-        REQUIRE( ChildsChild != nullptr );
-        REQUIRE( ChildsChild.Name == "another-foo" );
-        REQUIRE( ChildsChild.Values.Count == 4 );
-        REQUIRE( cast(string)ChildsChild.Values[0] == "bar" );
-        REQUIRE( cast(int)ChildsChild.Values[1] == 1337 );
-        REQUIRE( cast(int)ChildsChild.Values[2] == -92 );
-        REQUIRE( cast(string)ChildsChild.Values[3] == "baz" );
-        REQUIRE( ChildsChild.Attributes.Count == 1 );
-        REQUIRE( ChildsChild.Attributes[0].Name == "qux" );
-        REQUIRE( cast(string)ChildsChild.Attributes[0].Value == "baaz" );
-      }
-    }
-
-    REQUIRE( !Node->Next != nullptr );
+    FAIL( FileName << ": Unable to find file. Wrong working directory?" );
   }
 
-  auto TestAllocator = CreateTestAllocator!StackMemory();
+  cfg_parsing_context Context{ SliceFromString(FileName), GlobalLog };
 
-  auto FileName = "../unittest/sdlang/full.sdl"w;
-  auto File = OpenFile(TestAllocator, FileName);
-  scope(exit) CloseFile(TestAllocator, File);
+  cfg_document Document{};
+  Init(&Document, &Allocator);
+  Defer [&](){ Finalize(&Document); };
 
-  // TODO(Manu): Once we have WString => UString conversion, use the filename
-  // as context.
-  cfg_parsing_context Context{ "Full", GlobalLog };
-  auto Document = TestAllocator.New!SDLDocument(TestAllocator);
+  CfgDocumentParseFromString(&Document, SliceReinterpret<char const>(Slice(&FileContent)), &Context);
 
-  scope(exit) TestAllocator.Delete(Document);
-  auto SourceString = TestAllocator.NewArray!char(File.Size);
-  auto BytesRead = File.Read(SourceString);
-  REQUIRE( BytesRead == SourceString.Num );
-  REQUIRE( Document.ParseDocumentFromString(cast(string)SourceString, Context), SourceString );
+  //
+  // The actual test
+  //
+  // foo "bar"
+  auto Node = Document.Root->FirstChild;
+  REQUIRE( Node != nullptr );
+  REQUIRE( Node->Name == "foo"_S );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Convert<slice<char const>>(Node->Values[0]) == "bar"_S );
+  REQUIRE( Node->Attributes.Num == 0 );
 
-  TheActualTest(Document);
+  // foo "bar" "baz"
+  Node = Node->Next;
+  REQUIRE( Node != nullptr );
+  REQUIRE( Node->Name == "foo"_S );
+  REQUIRE( Node->Values.Num == 2 );
+  REQUIRE( Convert<slice<char const>>(Node->Values[0]) == "bar"_S );
+  REQUIRE( Convert<slice<char const>>(Node->Values[1]) == "baz"_S );
+  REQUIRE( Node->Attributes.Num == 0 );
 
-  // Force a reallocation of all nodes to see whether the SDLNodeRefs work as intended.
-  Document.AllNodes.Reserve(Document.AllNodes.Capacity + 1);
+  // foo "bar" baz="qux"
+  Node = Node->Next;
+  REQUIRE( Node != nullptr );
+  REQUIRE( Node->Name == "foo"_S );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Convert<slice<char const>>(Node->Values[0]) == "bar"_S );
+  REQUIRE( Node->Attributes.Num == 1 );
+  REQUIRE( Node->Attributes[0].Name == "baz"_S );
+  REQUIRE( Convert<slice<char const>>(Node->Attributes[0].Value) == "qux"_S );
 
-  TheActualTest(Document);
+  // foo "bar" baz="qux" baaz="quux"
+  Node = Node->Next;
+  REQUIRE( Node != nullptr );
+  REQUIRE( Node->Name == "foo"_S );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Convert<slice<char const>>(Node->Values[0]) == "bar"_S );
+  REQUIRE( Node->Attributes.Num == 2 );
+  REQUIRE( Node->Attributes[0].Name == "baz"_S );
+  REQUIRE( Convert<slice<char const>>(Node->Attributes[0].Value) == "qux"_S );
+  REQUIRE( Node->Attributes[1].Name == "baaz"_S );
+  REQUIRE( Convert<slice<char const>>(Node->Attributes[1].Value) == "quux"_S );
+
+  // foo bar="baz"
+  Node = Node->Next;
+  REQUIRE( Node != nullptr );
+  REQUIRE( Node->Name == "foo"_S );
+  REQUIRE( Node->Values.Num == 0 );
+  REQUIRE( Node->Attributes.Num == 1 );
+  REQUIRE( Node->Attributes[0].Name == "bar"_S );
+  REQUIRE( Convert<slice<char const>>(Node->Attributes[0].Value) == "baz"_S );
+
+  // "foo"
+  Node = Node->Next;
+  REQUIRE( Node != nullptr );
+  REQUIRE( Node->Name == ""_S );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Convert<slice<char const>>(Node->Values[0]) == "foo"_S );
+  REQUIRE( Node->Attributes.Num == 0 );
+
+  // "foo" bar="baz"
+  Node = Node->Next;
+  REQUIRE( Node != nullptr );
+  REQUIRE( Node->Name == ""_S );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Convert<slice<char const>>(Node->Values[0]) == "foo"_S );
+  REQUIRE( Node->Attributes.Num == 1 );
+  REQUIRE( Node->Attributes[0].Name == "bar"_S );
+  REQUIRE( Convert<slice<char const>>(Node->Attributes[0].Value) == "baz"_S );
+
+  /*
+    foo {
+      baz "baz"
+    }
+  */
+  Node = Node->Next;
+  REQUIRE( Node != nullptr );
+  REQUIRE( Node->Name == "foo"_S );
+  REQUIRE( Node->Values.Num == 0 );
+  REQUIRE( Node->Attributes.Num == 0 );
+  {
+    auto Child = Node->FirstChild;
+    REQUIRE( Child != nullptr );
+    REQUIRE( Child->Name == "bar"_S );
+    REQUIRE( Child->Values.Num == 1 );
+    REQUIRE( Convert<slice<char const>>(Child->Values[0]) == "baz"_S );
+    REQUIRE( Child->Attributes.Num == 0 );
+  }
+
+  // foo /*
+  // This is
+  // what you get
+  // when you support multi-line comments
+  // in a whitespace sensitive language. */ answer=42
+  Node = Node->Next;
+  REQUIRE( Node != nullptr );
+  REQUIRE( Node->Name == "foo"_S );
+  REQUIRE( Node->Values.Num == 0 );
+  REQUIRE( Node->Attributes.Num == 1 );
+  REQUIRE( Node->Attributes[0].Name == "answer"_S );
+  REQUIRE( Convert<int>(Node->Attributes[0].Value) == 42 );
+
+  /*
+    foo 1 2 "bar" baz="qux" {
+      inner { 0 1 2 }
+      "anon value"
+      "anon value with nesting" {
+        another-foo "bar" 1337 -92 "baz" qux="baaz"
+      }
+    }
+  */
+  Node = Node->Next;
+  REQUIRE( Node != nullptr );
+  REQUIRE( Node->Name == "foo"_S );
+  REQUIRE( Node->Values.Num == 3 );
+  REQUIRE( Convert<int>(Node->Values[0]) == 1 );
+  REQUIRE( Convert<int>(Node->Values[1]) == 2 );
+  REQUIRE( Convert<slice<char const>>(Node->Values[2]) == "bar"_S );
+  REQUIRE( Node->Attributes.Num == 1 );
+  REQUIRE( Node->Attributes[0].Name == "baz"_S );
+  REQUIRE( Convert<slice<char const>>(Node->Attributes[0].Value) == "qux"_S );
+  {
+    // inner { 0 1 2 }
+    auto Child = Node->FirstChild;
+    REQUIRE( Child != nullptr );
+    REQUIRE( Child->Name == "inner"_S );
+    REQUIRE( Child->Values.Num == 0 );
+    REQUIRE( Child->Attributes.Num == 0 );
+    {
+      auto ChildsChild = Child->FirstChild;
+      REQUIRE( ChildsChild != nullptr );
+      REQUIRE( ChildsChild->Values.Num == 3 );
+      REQUIRE( Convert<int>(ChildsChild->Values[0]) == 0 );
+      REQUIRE( Convert<int>(ChildsChild->Values[1]) == 1 );
+      REQUIRE( Convert<int>(ChildsChild->Values[2]) == 2 );
+      REQUIRE( ChildsChild->Attributes.Num == 0 );
+    }
+
+    // "anon value"
+    Child = Child->Next;
+    REQUIRE( Child != nullptr );
+    REQUIRE( Child->Values.Num == 1 );
+    REQUIRE( Convert<slice<char const>>(Child->Values[0]) == "anon value"_S );
+    REQUIRE( Child->Attributes.Num == 0 );
+
+    /*
+      "anon value with nesting" {
+        another-foo "bar" 1337 -92 "baz" qux="baaz"
+      }
+    */
+    Child = Child->Next;
+    REQUIRE( Child != nullptr );
+    REQUIRE( Child->Name == ""_S );
+    REQUIRE( Child->Values.Num == 1 );
+    REQUIRE( Convert<slice<char const>>(Child->Values[0]) == "anon value with nesting"_S );
+    REQUIRE( Child->Attributes.Num == 0 );
+    {
+      // another-foo "bar" 1337 -92 "baz" qux="baaz"
+      auto ChildsChild = Child->FirstChild;
+      REQUIRE( ChildsChild != nullptr );
+      REQUIRE( ChildsChild->Name == "another-foo"_S );
+      REQUIRE( ChildsChild->Values.Num == 4 );
+      REQUIRE( Convert<slice<char const>>(ChildsChild->Values[0]) == "bar"_S );
+      REQUIRE( Convert<int>(ChildsChild->Values[1]) == 1337 );
+      REQUIRE( Convert<int>(ChildsChild->Values[2]) == -92 );
+      REQUIRE( Convert<slice<char const>>(ChildsChild->Values[3]) == "baz"_S );
+      REQUIRE( ChildsChild->Attributes.Num == 1 );
+      REQUIRE( ChildsChild->Attributes[0].Name == "qux"_S );
+      REQUIRE( Convert<slice<char const>>(ChildsChild->Attributes[0].Value) == "baaz"_S );
+    }
+  }
+
+  REQUIRE( Node->Next == nullptr );
 }
+
+// Below are the unported unit tests from krepel.
+#if 0
 
 unittest
 {
@@ -463,20 +449,20 @@ unittest
     }
   )";
 
-  auto Document = TestAllocator.New!SDLDocument(TestAllocator);
+  auto Document = TestAllocator.New!cfg_document(TestAllocator);
   scope(exit) TestAllocator.Delete(Document);
 
   cfg_parsing_context ParsingContext{ "Convenience", GlobalLog };
   Document.ParseDocumentFromString(SourceString, ParsingContext);
 
-  REQUIRE( cast(string)Document.Root->Nodes["foo"][0].Values[0] == "bar" );
-  REQUIRE( cast(string)Document.Root->Nodes["foo"][0].Nodes["baz"][0].Values[0] == "qux" );
-  REQUIRE( cast(string)Document.Root->Nodes["foo"][0].Nodes["baz"][0].Nodes["baaz"][0].Values[0] == "quux" );
+  REQUIRE( cast(string)Document.Root->Nodes["foo"][0].Values[0] == "bar"_S );
+  REQUIRE( cast(string)Document.Root->Nodes["foo"][0].Nodes["baz"][0].Values[0] == "qux"_S );
+  REQUIRE( cast(string)Document.Root->Nodes["foo"][0].Nodes["baz"][0].Nodes["baaz"][0].Values[0] == "quux"_S );
   REQUIRE( Document.Root->Nodes["baz"].Num == 0 );
 
   foreach(Node; Document.Root->Nodes)
   {
-    REQUIRE( cast(string)Node->Values[0] == "bar" );
+    REQUIRE( Convert<slice<char const>>(Node->Values[0]) == "bar"_S );
   }
 
   REQUIRE( !Document.Root->Nodes["foo"][0].Attribute("bar").IsValid );
@@ -491,7 +477,7 @@ unittest
 
   cfg_parsing_context Context{ "Query Test 1", GlobalLog };
 
-  auto Document = TestAllocator.New!SDLDocument(TestAllocator);
+  auto Document = TestAllocator.New!cfg_document(TestAllocator);
   auto Source = q"(
     Foo "Bar" "Bar?" "Bar!" Key="Value" {
       Baz "Qux" {

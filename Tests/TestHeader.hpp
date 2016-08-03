@@ -1,12 +1,15 @@
 #pragma once
 
+// Note: Implementations of declarations here can be found in Main.cpp
+
+#include <Core/DynamicArray.hpp>
 #include <Core/Allocator.hpp>
+#include <Core/Math.hpp>
 
 #include "catch.hpp"
 
 using test_allocator = mallocator;
 
-#include <Core/Math.hpp>
 
 inline std::ostream&
 operator <<(std::ostream& OutStream, vec2 const& Vec)
@@ -47,3 +50,6 @@ operator <<(std::ostream& OutStream, mat4x4 const& Mat)
   << '}';
   return OutStream;
 }
+
+bool
+ReadFileContentIntoArray(dynamic_array<uint8>* Array, char const* FileName);

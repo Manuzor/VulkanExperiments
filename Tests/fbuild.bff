@@ -36,7 +36,7 @@
   {
     .TestExecutable = '$ProjectName$'
     .TestOutput = '$BuildPath$/TestsOutput.txt'
-    .TestWorkingDir = '$RepoRoot$'
+    .TestWorkingDir = '$BuildPath$'
     .TestArguments = '--break'
   }
 
