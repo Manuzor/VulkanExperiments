@@ -1088,6 +1088,11 @@ SliceFromString(char const* StringPtr);
 slice<char>
 SliceFromString(char* StringPtr);
 
+/// Custom string literal suffix.
+/// Usage: slice<char const> Foo = "Foo"_S;
+inline slice<char const>
+operator "" _S(char const* StringPtr, size_t Num) { return Slice(Num, StringPtr); }
+
 /// Creates a new slice from an existing slice.
 ///
 /// \param InclusiveStartIndex The index to start slicing from.

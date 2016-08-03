@@ -1,4 +1,4 @@
-# Config Query Sub-Language
+# Cfg Query Sub-Language
 
 Supported by the API and used to query for nodes, attributes, and values within a cfg document in a concise way.
 

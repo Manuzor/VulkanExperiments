@@ -86,3 +86,84 @@ auto
   else
     LogWarning("CfgEndNodeAccess() was called but NumExternalNodePtrs was 0.");
 }
+
+auto
+::CfgNodeNext(cfg_document* Document, cfg_node_handle NodeHandle)
+  -> cfg_node_handle
+{
+  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
+  auto const Node = &Document->AllNodes[NodeIndex];
+  return Node->Next;
+}
+
+auto
+::CfgNodePrevious(cfg_document* Document, cfg_node_handle NodeHandle)
+  -> cfg_node_handle
+{
+  if(NodeHandle == nullptr)
+    return {};
+
+  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
+  auto const Node = &Document->AllNodes[NodeIndex];
+  return Node->Previous;
+}
+
+auto
+::CfgNodeParent(cfg_document* Document, cfg_node_handle NodeHandle)
+  -> cfg_node_handle
+{
+  if(NodeHandle == nullptr)
+    return {};
+
+  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
+  auto const Node = &Document->AllNodes[NodeIndex];
+  return Node->Parent;
+}
+
+auto
+::CfgNodeFirstChild(cfg_document* Document, cfg_node_handle NodeHandle)
+  -> cfg_node_handle
+{
+  if(NodeHandle == nullptr)
+    return {};
+
+  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
+  auto const Node = &Document->AllNodes[NodeIndex];
+  return Node->FirstChild;
+}
+
+auto
+::CfgNodeName(cfg_document* Document, cfg_node_handle NodeHandle)
+  -> cfg_identifier
+{
+  if(NodeHandle == nullptr)
+    return {};
+
+  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
+  auto const Node = &Document->AllNodes[NodeIndex];
+  return Node->Name;
+}
+
+auto
+::CfgNodeValues(cfg_document* Document, cfg_node_handle NodeHandle)
+  -> slice<cfg_literal>
+{
+  if(NodeHandle == nullptr)
+    return {};
+
+  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
+  auto const Node = &Document->AllNodes[NodeIndex];
+  return Slice(&Node->Values);
+}
+
+auto
+::CfgNodeAttributes(cfg_document* Document, cfg_node_handle NodeHandle)
+  -> slice<cfg_attribute>
+{
+  if(NodeHandle == nullptr)
+    return {};
+
+  auto const NodeIndex = GetIndexFromHandle(NodeHandle);
+  auto const Node = &Document->AllNodes[NodeIndex];
+  return Slice(&Node->Attributes);
+}

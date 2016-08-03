@@ -161,3 +161,29 @@ template<> struct impl_convert<uint8,  cfg_literal> : public impl_convert_cfg_li
 template<> struct impl_convert<uint16, cfg_literal> : public impl_convert_cfg_literal_number<uint16> {};
 template<> struct impl_convert<uint32, cfg_literal> : public impl_convert_cfg_literal_number<uint32> {};
 template<> struct impl_convert<uint64, cfg_literal> : public impl_convert_cfg_literal_number<uint64> {};
+
+
+//
+// Node accessor functions
+//
+
+CFG_API cfg_node_handle
+CfgNodeNext(cfg_document* Document, cfg_node_handle NodeHandle);
+
+CFG_API cfg_node_handle
+CfgNodePrevious(cfg_document* Document, cfg_node_handle NodeHandle);
+
+CFG_API cfg_node_handle
+CfgNodeParent(cfg_document* Document, cfg_node_handle NodeHandle);
+
+CFG_API cfg_node_handle
+CfgNodeFirstChild(cfg_document* Document, cfg_node_handle NodeHandle);
+
+CFG_API cfg_identifier
+CfgNodeName(cfg_document* Document, cfg_node_handle NodeHandle);
+
+CFG_API slice<cfg_literal>
+CfgNodeValues(cfg_document* Document, cfg_node_handle NodeHandle);
+
+CFG_API slice<cfg_attribute>
+CfgNodeAttributes(cfg_document* Document, cfg_node_handle NodeHandle);
