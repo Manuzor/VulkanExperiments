@@ -1,4 +1,3 @@
-#if 0
 #include "TestHeader.hpp"
 #include <Cfg/Cfg.hpp>
 #include <Cfg/CfgParser.hpp>
@@ -17,9 +16,9 @@ MakeSourceDataForTesting(char const* String, size_t Offset)
   return Source;
 }
 
-TEST_CASE("Cfg: SkipWhiteSpaceAndComments", "[Cfg]")
+TEST_CASE("Cfg: Skip whitespace and comments", "[Cfg]")
 {
-  cfg_parsing_context Context{ SliceFromString("SDL Test 1"), GlobalLog };
+  cfg_parsing_context Context{ SliceFromString("Cfg Test 1"), GlobalLog };
 
   SECTION("Simple")
   {
@@ -52,6 +51,10 @@ TEST_CASE("Cfg: SkipWhiteSpaceAndComments", "[Cfg]")
     REQUIRE( Source.EndLocation.SourceIndex == Source.Value.Num );
     REQUIRE( CfgSourceCurrentValue(Source) == SliceFromString("text") );
   }
+}
+
+TEST_CASE("Cfg: Parse until", "[Cfg]")
+{
+  cfg_parsing_context Context{ SliceFromString("Cfg Test 2"), GlobalLog };
 
 }
-#endif

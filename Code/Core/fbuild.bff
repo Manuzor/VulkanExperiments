@@ -24,6 +24,7 @@
   {
     .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
                      + ' /DCORE_DLL_EXPORT'
+                     + ' /DLL'
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
   }
