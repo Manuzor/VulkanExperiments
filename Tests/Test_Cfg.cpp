@@ -187,47 +187,46 @@ TEST_CASE("Cfg: Parse simple document with multiple nodes", "[Cfg]")
   REQUIRE( Node->Values[0].String == "qux"_S );
 }
 
-// Below are the unported unit tests from krepel.
-#if 0
-
-// Parse document with child nodes
-unittest
+TEST_CASE("Cfg: Parse simple document with child nodes", "[Cfg]")
 {
-  auto TestAllocator = CreateTestAllocator!StackMemory();
-
+  auto Source = "foo \"bar\" {\n"
+                "  baz \"qux\" {\n"
+                "    baaz \"quux\"\n"
+                "  }\n"
+                "}\n"_S;
+  test_allocator Allocator{};
   cfg_parsing_context Context{ "Cfg Test 8"_S, GlobalLog };
 
-  auto Document = TestAllocator.New!SDLDocument(TestAllocator);
-  auto Source = q"(
-    foo "bar" {
-      baz "qux" {
-        baaz "quux"
-      }
-    }
-  )";
-  Document.ParseDocumentFromString(Source, Context);
+  cfg_document Document{};
+  Init(&Document, &Allocator);
+  Defer [&](){ Finalize(&Document); };
+
+  CfgDocumentParseFromString(&Document, Source, &Context);
 
   auto Node = Document.Root->FirstChild;
   REQUIRE( Node != nullptr );
-  REQUIRE( Node->Name == "foo" );
+  REQUIRE( Node->Name == "foo"_S );
   REQUIRE( Node->Values.Num == 1 );
   REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
-  REQUIRE( Node->Values[0].String == "bar", Node->Values[0].String );
+  REQUIRE( Node->Values[0].String == "bar"_S );
 
   Node = Node->FirstChild;
   REQUIRE( Node != nullptr );
-  REQUIRE( Node->Name == "baz" );
+  REQUIRE( Node->Name == "baz"_S );
   REQUIRE( Node->Values.Num == 1 );
   REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
-  REQUIRE( Node->Values[0].String == "qux", Node->Values[0].String );
+  REQUIRE( Node->Values[0].String == "qux"_S );
 
   Node = Node->FirstChild;
   REQUIRE( Node != nullptr );
-  REQUIRE( Node->Name == "baaz" );
+  REQUIRE( Node->Name == "baaz"_S );
   REQUIRE( Node->Values.Num == 1 );
   REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
-  REQUIRE( Node->Values[0].String == "quux", Node->Values[0].String );
+  REQUIRE( Node->Values[0].String == "quux"_S );
 }
+
+// Below are the unported unit tests from krepel.
+#if 0
 
 unittest
 {
