@@ -159,37 +159,36 @@ TEST_CASE("Cfg: Parse simple document with attributes", "[Cfg]")
   REQUIRE( Node->Attributes[0].Value.String == "qux"_S );
 }
 
-// Below are the unported unit tests from krepel.
-#if 0
-
-// Parse document with multiple nodes
-unittest
+TEST_CASE("Cfg: Parse simple document with multiple nodes", "[Cfg]")
 {
-  auto TestAllocator = CreateTestAllocator!StackMemory();
-
+  auto Source = "foo \"bar\"\n"
+                "baz \"qux\"\n"_S;
+  test_allocator Allocator{};
   cfg_parsing_context Context{ "Cfg Test 7"_S, GlobalLog };
 
-  auto Document = TestAllocator.New!SDLDocument(TestAllocator);
-  auto Source = q"(
-    foo "bar"
-    baz "qux"
-  )";
-  Document.ParseDocumentFromString(Source, Context);
+  cfg_document Document{};
+  Init(&Document, &Allocator);
+  Defer [&](){ Finalize(&Document); };
 
-  auto Node = Document.Root.FirstChild;
-  REQUIRE( Node != nullptr );
-  REQUIRE( Node.Name == "foo" );
-  REQUIRE( Node.Values.Num == 1 );
-  REQUIRE( Node.Values[0].Type == cfg_literal_type::String );
-  REQUIRE( Node.Values[0].String == "bar", Node.Values[0].String );
+  CfgDocumentParseFromString(&Document, Source, &Context);
 
-  Node = Node.Next;
+  auto Node = Document.Root->FirstChild;
   REQUIRE( Node != nullptr );
-  REQUIRE( Node.Name == "baz" );
-  REQUIRE( Node.Values.Num == 1 );
-  REQUIRE( Node.Values[0].Type == cfg_literal_type::String );
-  REQUIRE( Node.Values[0].String == "qux", Node.Values[0].String );
+  REQUIRE( Node->Name == "foo"_S );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
+  REQUIRE( Node->Values[0].String == "bar"_S );
+
+  Node = Node->Next;
+  REQUIRE( Node != nullptr );
+  REQUIRE( Node->Name == "baz"_S );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
+  REQUIRE( Node->Values[0].String == "qux"_S );
 }
+
+// Below are the unported unit tests from krepel.
+#if 0
 
 // Parse document with child nodes
 unittest
@@ -208,26 +207,26 @@ unittest
   )";
   Document.ParseDocumentFromString(Source, Context);
 
-  auto Node = Document.Root.FirstChild;
+  auto Node = Document.Root->FirstChild;
   REQUIRE( Node != nullptr );
-  REQUIRE( Node.Name == "foo" );
-  REQUIRE( Node.Values.Num == 1 );
-  REQUIRE( Node.Values[0].Type == cfg_literal_type::String );
-  REQUIRE( Node.Values[0].String == "bar", Node.Values[0].String );
+  REQUIRE( Node->Name == "foo" );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
+  REQUIRE( Node->Values[0].String == "bar", Node->Values[0].String );
 
-  Node = Node.FirstChild;
+  Node = Node->FirstChild;
   REQUIRE( Node != nullptr );
-  REQUIRE( Node.Name == "baz" );
-  REQUIRE( Node.Values.Num == 1 );
-  REQUIRE( Node.Values[0].Type == cfg_literal_type::String );
-  REQUIRE( Node.Values[0].String == "qux", Node.Values[0].String );
+  REQUIRE( Node->Name == "baz" );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
+  REQUIRE( Node->Values[0].String == "qux", Node->Values[0].String );
 
-  Node = Node.FirstChild;
+  Node = Node->FirstChild;
   REQUIRE( Node != nullptr );
-  REQUIRE( Node.Name == "baaz" );
-  REQUIRE( Node.Values.Num == 1 );
-  REQUIRE( Node.Values[0].Type == cfg_literal_type::String );
-  REQUIRE( Node.Values[0].String == "quux", Node.Values[0].String );
+  REQUIRE( Node->Name == "baaz" );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
+  REQUIRE( Node->Values[0].String == "quux", Node->Values[0].String );
 }
 
 unittest
@@ -239,12 +238,12 @@ unittest
   auto Document = TestAllocator.New!SDLDocument(TestAllocator);
   Document.ParseDocumentFromString(`answer 42`, Context);
 
-  auto Node = Document.Root.FirstChild;
+  auto Node = Document.Root->FirstChild;
   REQUIRE( Node != nullptr );
-  REQUIRE( Node.Name == "answer" );
-  REQUIRE( Node.Values.Num == 1 );
-  REQUIRE( Node.Values[0].Type == cfg_literal_type::Number );
-  REQUIRE( cast(int)Node.Values[0] == 42, Node.Values[0].NumberSource );
+  REQUIRE( Node->Name == "answer" );
+  REQUIRE( Node->Values.Num == 1 );
+  REQUIRE( Node->Values[0].Type == cfg_literal_type::Number );
+  REQUIRE( cast(int)Node->Values[0] == 42, Node->Values[0].NumberSource );
 }
 
 // Parse document from file.
@@ -253,85 +252,85 @@ unittest
   void TheActualTest(SDLDocument Document)
   {
     // foo "bar"
-    auto Node = Document.Root.FirstChild;
+    auto Node = Document.Root->FirstChild;
     REQUIRE( Node != nullptr );
-    REQUIRE( Node.Name == "foo" );
-    REQUIRE( Node.Values.Count == 1 );
-    REQUIRE( cast(string)Node.Values[0] == "bar" );
-    REQUIRE( Node.Attributes.IsEmpty );
+    REQUIRE( Node->Name == "foo" );
+    REQUIRE( Node->Values.Count == 1 );
+    REQUIRE( cast(string)Node->Values[0] == "bar" );
+    REQUIRE( Node->Attributes.IsEmpty );
 
     // foo "bar" "baz"
-    Node = Node.Next;
+    Node = Node->Next;
     REQUIRE( Node != nullptr );
-    REQUIRE( Node.Name == "foo" );
-    REQUIRE( Node.Values.Count == 2 );
-    REQUIRE( cast(string)Node.Values[0] == "bar" );
-    REQUIRE( cast(string)Node.Values[1] == "baz" );
-    REQUIRE( Node.Attributes.IsEmpty );
+    REQUIRE( Node->Name == "foo" );
+    REQUIRE( Node->Values.Count == 2 );
+    REQUIRE( cast(string)Node->Values[0] == "bar" );
+    REQUIRE( cast(string)Node->Values[1] == "baz" );
+    REQUIRE( Node->Attributes.IsEmpty );
 
     // foo "bar" baz="qux"
-    Node = Node.Next;
+    Node = Node->Next;
     REQUIRE( Node != nullptr );
-    REQUIRE( Node.Name == "foo" );
-    REQUIRE( Node.Values.Count == 1 );
-    REQUIRE( cast(string)Node.Values[0] == "bar" );
-    REQUIRE( Node.Attributes.Count == 1 );
-    REQUIRE( Node.Attributes[0].Name == "baz" );
-    REQUIRE( cast(string)Node.Attributes[0].Value == "qux" );
+    REQUIRE( Node->Name == "foo" );
+    REQUIRE( Node->Values.Count == 1 );
+    REQUIRE( cast(string)Node->Values[0] == "bar" );
+    REQUIRE( Node->Attributes.Count == 1 );
+    REQUIRE( Node->Attributes[0].Name == "baz" );
+    REQUIRE( cast(string)Node->Attributes[0].Value == "qux" );
 
     // foo "bar" baz="qux" baaz="quux"
-    Node = Node.Next;
+    Node = Node->Next;
     REQUIRE( Node != nullptr );
-    REQUIRE( Node.Name == "foo" );
-    REQUIRE( Node.Values.Count == 1 );
-    REQUIRE( cast(string)Node.Values[0] == "bar" );
-    REQUIRE( Node.Attributes.Count == 2 );
-    REQUIRE( Node.Attributes[0].Name == "baz" );
-    REQUIRE( cast(string)Node.Attributes[0].Value == "qux" );
-    REQUIRE( Node.Attributes[1].Name == "baaz" );
-    REQUIRE( cast(string)Node.Attributes[1].Value == "quux" );
+    REQUIRE( Node->Name == "foo" );
+    REQUIRE( Node->Values.Count == 1 );
+    REQUIRE( cast(string)Node->Values[0] == "bar" );
+    REQUIRE( Node->Attributes.Count == 2 );
+    REQUIRE( Node->Attributes[0].Name == "baz" );
+    REQUIRE( cast(string)Node->Attributes[0].Value == "qux" );
+    REQUIRE( Node->Attributes[1].Name == "baaz" );
+    REQUIRE( cast(string)Node->Attributes[1].Value == "quux" );
 
     // foo bar="baz"
-    Node = Node.Next;
+    Node = Node->Next;
     REQUIRE( Node != nullptr );
-    REQUIRE( Node.Name == "foo" );
-    REQUIRE( Node.Values.IsEmpty );
-    REQUIRE( Node.Attributes.Count == 1 );
-    REQUIRE( Node.Attributes[0].Name == "bar" );
-    REQUIRE( cast(string)Node.Attributes[0].Value == "baz" );
+    REQUIRE( Node->Name == "foo" );
+    REQUIRE( Node->Values.IsEmpty );
+    REQUIRE( Node->Attributes.Count == 1 );
+    REQUIRE( Node->Attributes[0].Name == "bar" );
+    REQUIRE( cast(string)Node->Attributes[0].Value == "baz" );
 
     // "foo"
-    Node = Node.Next;
+    Node = Node->Next;
     REQUIRE( Node != nullptr );
-    REQUIRE( Node.IsAnonymous );
-    REQUIRE( Node.Name == "content" );
-    REQUIRE( Node.Values.Count == 1 );
-    REQUIRE( cast(string)Node.Values[0] == "foo" );
-    REQUIRE( Node.Attributes.IsEmpty == 1 );
+    REQUIRE( Node->IsAnonymous );
+    REQUIRE( Node->Name == "content" );
+    REQUIRE( Node->Values.Count == 1 );
+    REQUIRE( cast(string)Node->Values[0] == "foo" );
+    REQUIRE( Node->Attributes.IsEmpty == 1 );
 
     // "foo" bar="baz"
-    Node = Node.Next;
+    Node = Node->Next;
     REQUIRE( Node != nullptr );
-    REQUIRE( Node.IsAnonymous );
-    REQUIRE( Node.Name == "content" );
-    REQUIRE( Node.Values.Count == 1 );
-    REQUIRE( cast(string)Node.Values[0] == "foo" );
-    REQUIRE( Node.Attributes.Count == 1 );
-    REQUIRE( Node.Attributes[0].Name == "bar" );
-    REQUIRE( cast(string)Node.Attributes[0].Value == "baz" );
+    REQUIRE( Node->IsAnonymous );
+    REQUIRE( Node->Name == "content" );
+    REQUIRE( Node->Values.Count == 1 );
+    REQUIRE( cast(string)Node->Values[0] == "foo" );
+    REQUIRE( Node->Attributes.Count == 1 );
+    REQUIRE( Node->Attributes[0].Name == "bar" );
+    REQUIRE( cast(string)Node->Attributes[0].Value == "baz" );
 
     /*
       foo {
         baz "baz"
       }
     */
-    Node = Node.Next;
+    Node = Node->Next;
     REQUIRE( Node != nullptr );
-    REQUIRE( Node.Name == "foo" );
-    REQUIRE( Node.Values.IsEmpty );
-    REQUIRE( Node.Attributes.IsEmpty );
+    REQUIRE( Node->Name == "foo" );
+    REQUIRE( Node->Values.IsEmpty );
+    REQUIRE( Node->Attributes.IsEmpty );
     {
-      auto Child = Node.FirstChild;
+      auto Child = Node->FirstChild;
       REQUIRE( Child != nullptr );
       REQUIRE( Child.Name == "bar" );
       REQUIRE( Child.Values.Count == 1 );
@@ -346,13 +345,13 @@ unittest
       when you support multi-line comments
       in a whitespace sensitive language. */ bar="baz"
     +/
-    Node = Node.Next;
+    Node = Node->Next;
     REQUIRE( Node != nullptr );
-    REQUIRE( Node.Name == "foo" );
-    REQUIRE( Node.Values.IsEmpty );
-    REQUIRE( Node.Attributes.Num == 1 );
-    REQUIRE( Node.Attributes[0].Name == "answer" );
-    REQUIRE( cast(int)Node.Attributes[0].Value == 42 );
+    REQUIRE( Node->Name == "foo" );
+    REQUIRE( Node->Values.IsEmpty );
+    REQUIRE( Node->Attributes.Num == 1 );
+    REQUIRE( Node->Attributes[0].Name == "answer" );
+    REQUIRE( cast(int)Node->Attributes[0].Value == 42 );
 
     /+
       foo 1 2 "bar" baz="qux" {
@@ -363,19 +362,19 @@ unittest
         }
       }
     +/
-    Node = Node.Next;
+    Node = Node->Next;
     REQUIRE( Node != nullptr );
-    REQUIRE( Node.Name == "foo" );
-    REQUIRE( Node.Values.Count == 3 );
-    REQUIRE( cast(int)Node.Values[0] == 1 );
-    REQUIRE( cast(int)Node.Values[1] == 2 );
-    REQUIRE( cast(string)Node.Values[2] == "bar" );
-    REQUIRE( Node.Attributes.Count == 1 );
-    REQUIRE( Node.Attributes[0].Name == "baz" );
-    REQUIRE( cast(string)Node.Attributes[0].Value == "qux" );
+    REQUIRE( Node->Name == "foo" );
+    REQUIRE( Node->Values.Count == 3 );
+    REQUIRE( cast(int)Node->Values[0] == 1 );
+    REQUIRE( cast(int)Node->Values[1] == 2 );
+    REQUIRE( cast(string)Node->Values[2] == "bar" );
+    REQUIRE( Node->Attributes.Count == 1 );
+    REQUIRE( Node->Attributes[0].Name == "baz" );
+    REQUIRE( cast(string)Node->Attributes[0].Value == "qux" );
     {
       // inner { 0 1 2 }
-      auto Child = Node.FirstChild;
+      auto Child = Node->FirstChild;
       REQUIRE( Child != nullptr );
       REQUIRE( Child.Name == "inner" );
       REQUIRE( Child.Values.Count == 0 );
@@ -427,7 +426,7 @@ unittest
       }
     }
 
-    REQUIRE( !Node.Next != nullptr );
+    REQUIRE( !Node->Next != nullptr );
   }
 
   auto TestAllocator = CreateTestAllocator!StackMemory();
@@ -473,19 +472,19 @@ unittest
   cfg_parsing_context ParsingContext{ "Convenience", GlobalLog };
   Document.ParseDocumentFromString(SourceString, ParsingContext);
 
-  REQUIRE( cast(string)Document.Root.Nodes["foo"][0].Values[0] == "bar" );
-  REQUIRE( cast(string)Document.Root.Nodes["foo"][0].Nodes["baz"][0].Values[0] == "qux" );
-  REQUIRE( cast(string)Document.Root.Nodes["foo"][0].Nodes["baz"][0].Nodes["baaz"][0].Values[0] == "quux" );
-  REQUIRE( Document.Root.Nodes["baz"].Num == 0 );
+  REQUIRE( cast(string)Document.Root->Nodes["foo"][0].Values[0] == "bar" );
+  REQUIRE( cast(string)Document.Root->Nodes["foo"][0].Nodes["baz"][0].Values[0] == "qux" );
+  REQUIRE( cast(string)Document.Root->Nodes["foo"][0].Nodes["baz"][0].Nodes["baaz"][0].Values[0] == "quux" );
+  REQUIRE( Document.Root->Nodes["baz"].Num == 0 );
 
-  foreach(Node; Document.Root.Nodes)
+  foreach(Node; Document.Root->Nodes)
   {
-    REQUIRE( cast(string)Node.Values[0] == "bar" );
+    REQUIRE( cast(string)Node->Values[0] == "bar" );
   }
 
-  REQUIRE( !Document.Root.Nodes["foo"][0].Attribute("bar").IsValid );
-  REQUIRE( cast(string)Document.Root.Nodes["foo"][0].Nodes["baz"][0].Attribute("key") == "value" );
-  REQUIRE( cast(int)Document.Root.Nodes["foo"][0].Nodes["baz"][0].Nodes["baaz"][0].Attribute("answer") == 42 );
+  REQUIRE( !Document.Root->Nodes["foo"][0].Attribute("bar").IsValid );
+  REQUIRE( cast(string)Document.Root->Nodes["foo"][0].Nodes["baz"][0].Attribute("key") == "value" );
+  REQUIRE( cast(int)Document.Root->Nodes["foo"][0].Nodes["baz"][0].Nodes["baaz"][0].Attribute("answer") == 42 );
 }
 
 // Query
