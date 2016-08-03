@@ -16,13 +16,13 @@ VertexShader {
   }
 
   Code Entry="main" {
-    """
+    `
     void main()
     {
       gl_Position = ViewProjectionMatrix * vec4(Position, 1.0f);
       OutColor = Color;
     }
-    """
+    `
   }
 }
 
@@ -39,11 +39,11 @@ FragmentShader {
   }
 
   Code Entry="main" {
-    """
+    `
     void main()
     {
       FragmentColor = Color;
     }
-    """
+    `
   }
 }
