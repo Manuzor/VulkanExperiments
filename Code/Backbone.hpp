@@ -1635,7 +1635,7 @@ struct impl_convert_string_to_integer_helper
   template<> struct impl_max_integer_type<true>  { using Type = int64;  };
   template<> struct impl_max_integer_type<false> { using Type = uint64; };
 
-  using MaxIntegerType = typename impl_max_integer_type<IntIsSigned<IntegerType>()>::Type;;
+  using MaxIntegerType = typename impl_max_integer_type<IntIsSigned<IntegerType>()>::Type;
 
   template<typename CharType>
   static inline IntegerType

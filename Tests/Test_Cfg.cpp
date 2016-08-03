@@ -126,14 +126,29 @@ TEST_CASE("Cfg: Parse simple document", "[Cfg]")
   Init(&Document, &Allocator);
   Defer [&](){ Finalize(&Document); };
 
-  CfgDocumentParseFromString(&Document, "foo \"bar\""_S, &Context);
+  SECTION("String value")
+  {
+    CfgDocumentParseFromString(&Document, "foo \"bar\""_S, &Context);
 
-  auto Node = Document.Root->FirstChild;
-  REQUIRE( Node != nullptr );
-  REQUIRE( Node->Name == "foo"_S );
-  REQUIRE( Node->Values.Num == 1 );
-  REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
-  REQUIRE( Node->Values[0].String == "bar"_S );
+    auto Node = Document.Root->FirstChild;
+    REQUIRE( Node != nullptr );
+    REQUIRE( Node->Name == "foo"_S );
+    REQUIRE( Node->Values.Num == 1 );
+    REQUIRE( Node->Values[0].Type == cfg_literal_type::String );
+    REQUIRE( Node->Values[0].String == "bar"_S );
+  }
+
+  SECTION("Number value")
+  {
+    CfgDocumentParseFromString(&Document, "answer 42"_S, &Context);
+
+    auto Node = Document.Root->FirstChild;
+    REQUIRE( Node != nullptr );
+    REQUIRE( Node->Name == "answer"_S );
+    REQUIRE( Node->Values.Num == 1 );
+    REQUIRE( Node->Values[0].Type == cfg_literal_type::Number );
+    REQUIRE( Convert<int>(Node->Values[0]) == 42 );
+  }
 }
 
 TEST_CASE("Cfg: Parse simple document with attributes", "[Cfg]")
@@ -227,23 +242,6 @@ TEST_CASE("Cfg: Parse simple document with child nodes", "[Cfg]")
 
 // Below are the unported unit tests from krepel.
 #if 0
-
-unittest
-{
-  auto TestAllocator = CreateTestAllocator!StackMemory();
-
-  cfg_parsing_context Context{ "Cfg Test 9"_S, GlobalLog };
-
-  auto Document = TestAllocator.New!SDLDocument(TestAllocator);
-  Document.ParseDocumentFromString(`answer 42`, Context);
-
-  auto Node = Document.Root->FirstChild;
-  REQUIRE( Node != nullptr );
-  REQUIRE( Node->Name == "answer" );
-  REQUIRE( Node->Values.Num == 1 );
-  REQUIRE( Node->Values[0].Type == cfg_literal_type::Number );
-  REQUIRE( cast(int)Node->Values[0] == 42, Node->Values[0].NumberSource );
-}
 
 // Parse document from file.
 unittest
