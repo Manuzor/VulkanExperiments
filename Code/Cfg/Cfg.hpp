@@ -13,6 +13,12 @@ struct cfg_identifier
   slice<char const> Value;
 };
 
+inline bool operator==(cfg_identifier const& Identifier, slice<char const> Slice) { return Identifier.Value == Slice; }
+inline bool operator==(slice<char const> Slice, cfg_identifier const& Identifier) { return Slice == Identifier.Value; }
+inline bool operator!=(cfg_identifier const& Identifier, slice<char const> Slice) { return !(Identifier == Slice); }
+inline bool operator!=(slice<char const> Slice, cfg_identifier const& Identifier) { return !(Slice == Identifier); }
+
+
 enum class cfg_literal_type
 {
   INVALID,
@@ -58,6 +64,7 @@ struct cfg_node
   dynamic_array<cfg_attribute> Attributes;
 };
 
+// TODO: Memory management overhaul in cfg_documents.
 struct cfg_document
 {
   allocator_interface* Allocator;

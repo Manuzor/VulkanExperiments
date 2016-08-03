@@ -125,36 +125,32 @@ TEST_CASE("Cfg: Parse simple document", "[Cfg]")
 
   auto Node = CfgNodeFirstChild(&Document, Document.Root);
   REQUIRE( Node != nullptr );
-  REQUIRE( CfgNodeName(&Document, Node).Value == "foo"_S );
+  REQUIRE( CfgNodeName(&Document, Node) == "foo"_S );
   REQUIRE( CfgNodeValues(&Document, Node).Num == 1 );
   REQUIRE( CfgNodeValues(&Document, Node)[0].Type == cfg_literal_type::String );
   REQUIRE( CfgNodeValues(&Document, Node)[0].String == "bar"_S );
 }
 
+TEST_CASE("Cfg: Parse simple document with attributes", "[Cfg]")
+{
+  cfg_parsing_context Context{ "Cfg Test 6"_S, GlobalLog };
+  cfg_document Document{};
+  CfgDocumentParseFromString(&Document, "foo \"bar\" baz=\"qux\""_S, &Context);
+
+  auto Node = CfgNodeFirstChild(&Document, Document.Root);
+  REQUIRE( Node != nullptr );
+  REQUIRE( CfgNodeName(&Document, Node) == "foo"_S );
+  REQUIRE( CfgNodeValues(&Document, Node).Num == 1 );
+  REQUIRE( CfgNodeValues(&Document, Node)[0].Type == cfg_literal_type::String );
+  REQUIRE( CfgNodeValues(&Document, Node)[0].String == "bar"_S );
+  REQUIRE( CfgNodeAttributes(&Document, Node).Num == 1 );
+  REQUIRE( CfgNodeAttributes(&Document, Node)[0].Name == "baz"_S );
+  REQUIRE( CfgNodeAttributes(&Document, Node)[0].Value.Type == cfg_literal_type::String );
+  REQUIRE( CfgNodeAttributes(&Document, Node)[0].Value.String == "qux"_S );
+}
+
 // Below are the unported unit tests from krepel.
 #if 0
-
-// Parse simple document with attributes
-unittest
-{
-  auto TestAllocator = CreateTestAllocator!StackMemory();
-
-  cfg_parsing_context Context{ "Cfg Test 6"_S, GlobalLog };
-
-  auto Document = TestAllocator.New!SDLDocument(TestAllocator);
-  Document.ParseDocumentFromString(`foo "bar" baz="qux"`, Context);
-
-  auto Node = Document.Root.FirstChild;
-  REQUIRE( Node != nullptr );
-  REQUIRE( Node.Name == "foo" );
-  REQUIRE( Node.Values.Num == 1 );
-  REQUIRE( Node.Values[0].Type == cfg_literal_type::String );
-  REQUIRE( Node.Values[0].String == "bar", Node.Values[0].String );
-  REQUIRE( Node.Attributes.Num == 1 );
-  REQUIRE( Node.Attributes[0].Name == "baz", Node.Attributes[0].Name );
-  REQUIRE( Node.Attributes[0].Value.Type == cfg_literal_type::String );
-  REQUIRE( Node.Attributes[0].Value.String == "qux", Node.Attributes[0].Value.String );
-}
 
 // Parse document with multiple nodes
 unittest
