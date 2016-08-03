@@ -1287,6 +1287,18 @@ SliceFind(slice<T> Haystack, slice<NeedleType> const& NeedleSequence)
   return Haystack;
 }
 
+template<typename T>
+void
+SliceReverseElements(slice<T> SomeSlice)
+{
+  auto const NumSwaps = SomeSlice.Num / 2;
+  for(size_t FrontIndex = 0; FrontIndex < NumSwaps; ++FrontIndex)
+  {
+    auto const BackIndex = SomeSlice.Num - FrontIndex - 1;
+    Swap(SomeSlice[FrontIndex], SomeSlice[BackIndex]);
+  }
+}
+
 
 /// Compares the contents of the two slices for equality.
 ///
@@ -1619,7 +1631,7 @@ template<> struct impl_convert<float,  slice<char const>>  : public impl_convert
 template<> struct impl_convert<float,  slice<char const>*> : public impl_convert_string_to_floating_point_helper<float>  {};
 
 //
-// Conversion: String -> Unsigned Integer
+// Conversion: String -> Integer
 //
 
 uint64
@@ -1687,6 +1699,65 @@ template<> struct impl_convert<uint64, slice<char>>        : public impl_convert
 template<> struct impl_convert<uint64, slice<char>*>       : public impl_convert_string_to_integer_helper<uint64> {};
 template<> struct impl_convert<uint64, slice<char const>>  : public impl_convert_string_to_integer_helper<uint64> {};
 template<> struct impl_convert<uint64, slice<char const>*> : public impl_convert_string_to_integer_helper<uint64> {};
+
+//
+// Conversion: Integer -> String
+//
+
+slice<char> ImplConvertIntegerToString(int8  Integer, slice<char> Buffer, bool* Success);
+slice<char> ImplConvertIntegerToString(int16 Integer, slice<char> Buffer, bool* Success);
+slice<char> ImplConvertIntegerToString(int32 Integer, slice<char> Buffer, bool* Success);
+slice<char> ImplConvertIntegerToString(int64 Integer, slice<char> Buffer, bool* Success);
+slice<char> ImplConvertIntegerToString(uint8  Integer, slice<char> Buffer, bool* Success);
+slice<char> ImplConvertIntegerToString(uint16 Integer, slice<char> Buffer, bool* Success);
+slice<char> ImplConvertIntegerToString(uint32 Integer, slice<char> Buffer, bool* Success);
+slice<char> ImplConvertIntegerToString(uint64 Integer, slice<char> Buffer, bool* Success);
+
+template<typename CharType, typename IntegerType>
+struct impl_convert_integer_to_string_helper
+{
+  using MutableCharType = rm_ref<CharType>;
+
+  static inline slice<CharType>
+  Do(IntegerType Integer, slice<MutableCharType> Buffer, bool* Success = nullptr)
+  {
+    return ImplConvertIntegerToString(Integer, Buffer, Success);
+  }
+};
+
+template<> struct impl_convert<slice<char>,        int8>     : public impl_convert_integer_to_string_helper<char,       int8>   {};
+template<> struct impl_convert<slice<char>*,       int8>     : public impl_convert_integer_to_string_helper<char,       int8>   {};
+template<> struct impl_convert<slice<char const>,  int8>     : public impl_convert_integer_to_string_helper<char const, int8>   {};
+template<> struct impl_convert<slice<char const>*, int8>     : public impl_convert_integer_to_string_helper<char const, int8>   {};
+template<> struct impl_convert<slice<char>,        int16>    : public impl_convert_integer_to_string_helper<char,       int16>  {};
+template<> struct impl_convert<slice<char>*,       int16>    : public impl_convert_integer_to_string_helper<char,       int16>  {};
+template<> struct impl_convert<slice<char const>,  int16>    : public impl_convert_integer_to_string_helper<char const, int16>  {};
+template<> struct impl_convert<slice<char const>*, int16>    : public impl_convert_integer_to_string_helper<char const, int16>  {};
+template<> struct impl_convert<slice<char>,        int32>    : public impl_convert_integer_to_string_helper<char,       int32>  {};
+template<> struct impl_convert<slice<char>*,       int32>    : public impl_convert_integer_to_string_helper<char,       int32>  {};
+template<> struct impl_convert<slice<char const>,  int32>    : public impl_convert_integer_to_string_helper<char const, int32>  {};
+template<> struct impl_convert<slice<char const>*, int32>    : public impl_convert_integer_to_string_helper<char const, int32>  {};
+template<> struct impl_convert<slice<char>,        int64>    : public impl_convert_integer_to_string_helper<char,       int64>  {};
+template<> struct impl_convert<slice<char>*,       int64>    : public impl_convert_integer_to_string_helper<char,       int64>  {};
+template<> struct impl_convert<slice<char const>,  int64>    : public impl_convert_integer_to_string_helper<char const, int64>  {};
+template<> struct impl_convert<slice<char const>*, int64>    : public impl_convert_integer_to_string_helper<char const, int64>  {};
+
+template<> struct impl_convert<slice<char>,          uint8>  : public impl_convert_integer_to_string_helper<char,       uint8>  {};
+template<> struct impl_convert<slice<char>*,         uint8>  : public impl_convert_integer_to_string_helper<char,       uint8>  {};
+template<> struct impl_convert<slice<char const>,    uint8>  : public impl_convert_integer_to_string_helper<char const, uint8>  {};
+template<> struct impl_convert<slice<char const>*,   uint8>  : public impl_convert_integer_to_string_helper<char const, uint8>  {};
+template<> struct impl_convert<slice<char>,          uint16> : public impl_convert_integer_to_string_helper<char,       uint16> {};
+template<> struct impl_convert<slice<char>*,         uint16> : public impl_convert_integer_to_string_helper<char,       uint16> {};
+template<> struct impl_convert<slice<char const>,    uint16> : public impl_convert_integer_to_string_helper<char const, uint16> {};
+template<> struct impl_convert<slice<char const>*,   uint16> : public impl_convert_integer_to_string_helper<char const, uint16> {};
+template<> struct impl_convert<slice<char>,          uint32> : public impl_convert_integer_to_string_helper<char,       uint32> {};
+template<> struct impl_convert<slice<char>*,         uint32> : public impl_convert_integer_to_string_helper<char,       uint32> {};
+template<> struct impl_convert<slice<char const>,    uint32> : public impl_convert_integer_to_string_helper<char const, uint32> {};
+template<> struct impl_convert<slice<char const>*,   uint32> : public impl_convert_integer_to_string_helper<char const, uint32> {};
+template<> struct impl_convert<slice<char>,          uint64> : public impl_convert_integer_to_string_helper<char,       uint64> {};
+template<> struct impl_convert<slice<char>*,         uint64> : public impl_convert_integer_to_string_helper<char,       uint64> {};
+template<> struct impl_convert<slice<char const>,    uint64> : public impl_convert_integer_to_string_helper<char const, uint64> {};
+template<> struct impl_convert<slice<char const>*,   uint64> : public impl_convert_integer_to_string_helper<char const, uint64> {};
 
 // ====================
 // === Inline Files ===

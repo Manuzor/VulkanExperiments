@@ -86,10 +86,34 @@
 // Targets
 //
 
+
+// Vulkan debug files
+{
+  .Dest = '$BuildPath$/'
+  .MySourceBase = '$VulkanSDKPath$/Source/lib'
+
+  Copy( 'Copy-VulkanLoader-Debug' )
+  {
+    .Source = { '$MySourceBase$/vulkan-1.dll', '$MySourceBase$/vulkan-1.pdb' }
+  }
+
+  CopyDir( 'Copy-VulkanLayers-Debug' )
+  {
+    .SourcePaths = '$MySourceBase$/'
+    .SourcePathsPattern = { 'VkLayer_*' }
+  }
+
+  Alias( 'Copy-VulkanFiles-Debug' )
+  {
+    .Targets = { 'Copy-VulkanLoader-Debug', 'Copy-VulkanLayers-Debug' }
+  }
+}
+
 #include "Data/fbuild.bff"
 
 #include "Code/Core/fbuild.bff"
 #include "Code/Cfg/fbuild.bff"
+#include "Code/ShaderCompiler/fbuild.bff"
 #include "Code/Application/fbuild.bff"
 #include "Tests/fbuild.bff"
 
@@ -110,7 +134,7 @@ VSSolution( 'GenerateVisualStudioSolution' )
 {
   .SolutionOutput = 'Workspace/VisualStudio/VulkanExperiments.sln'
   .SolutionConfigs = .ProjectConfigs
-  .SolutionProjects = { 'Core-Proj', 'Application-Proj', 'Tests-Proj' }
+  .SolutionProjects = { 'Core-Proj', 'Application-Proj', 'Tests-Proj', 'Cfg-Proj', 'ShaderCompiler-Proj' }
   .SolutionBuildProject = 'Application-Proj'
   .ExtraFiles = { 'Utilities/VulkanExperiments.natvis' }
 }

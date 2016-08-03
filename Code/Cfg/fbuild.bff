@@ -19,7 +19,7 @@
     .ProjectInputPaths = { '$SourcePath$' }
   }
 
-  ObjectList( '$ProjectName$-Lib' )
+  ObjectList( '$ProjectName$-Obj' )
   {
     .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
                      + ' /DCFG_DLL_EXPORT'
@@ -30,8 +30,8 @@
 
   DLL( '$ProjectName$-Dll' )
   {
-    .Libraries + '$ProjectName$-Lib'
-               + 'Core-Lib'
+    .Libraries + '$ProjectName$-Obj'
+               + 'Core-Obj'
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
                    + ' /DLL'
     .LinkerOutput = '$BuildPath$/$ProjectName$.dll'

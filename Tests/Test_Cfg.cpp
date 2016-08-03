@@ -437,6 +437,7 @@ TEST_CASE("Cfg: Parse document from file", "[Cfg]")
 // Below are the unported unit tests from krepel.
 #if 0
 
+// Node iterator test
 unittest
 {
   auto TestAllocator = CreateTestAllocator!StackMemory();

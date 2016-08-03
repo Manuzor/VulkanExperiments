@@ -17,7 +17,7 @@
 
   .SourcePath = '$ProjectName$'
 
-  ObjectList( '$ProjectName$-Lib' )
+  ObjectList( '$ProjectName$-Obj' )
   {
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
@@ -25,9 +25,9 @@
 
   Executable( '$ProjectName$' )
   {
-    .Libraries + '$ProjectName$-Lib'
-               + 'Core-Lib'
-               + 'Cfg-Lib'
+    .Libraries + '$ProjectName$-Obj'
+               + 'Core-Obj'
+               + 'Cfg-Obj'
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
     .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
   }

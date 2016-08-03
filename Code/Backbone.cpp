@@ -517,3 +517,101 @@ auto
   return ImplConvertStringToIntegerHelper<int64>(Source, Success, Fallback);
 }
 
+template<typename IntegerType>
+slice<char>
+ImplConvertIntegerToStringHelper(IntegerType Integer, slice<char> Buffer, bool* Success)
+{
+  if(Integer == 0)
+  {
+    Buffer[0] = '0';
+
+    if(Success)
+      *Success = true;
+
+    return Slice(Buffer, 0, 1);
+  }
+
+  size_t NumChars = 0;
+
+  if(Integer < 0)
+  {
+    Buffer[NumChars] = '-';
+    ++NumChars;
+    Integer = Negate(Integer);
+  }
+
+  while(Integer > 0)
+  {
+    auto const FirstDigit = Integer % IntegerType(10);
+    Buffer[NumChars] = '0' + Cast<char>(FirstDigit);
+    ++NumChars;
+    Integer /= 10;
+  }
+
+  auto Result = Slice(Buffer, 0, NumChars);
+
+  // Result now contains the digits in reverse order, so we swap them around.
+  SliceReverseElements(Result);
+
+  if(Success)
+    *Success = true;
+
+  return Result;
+}
+
+auto
+::ImplConvertIntegerToString(int8 Integer, slice<char> Buffer, bool* Success)
+  -> slice<char>
+{
+  return ImplConvertIntegerToStringHelper<int8>(Integer, Buffer, Success);
+}
+
+auto
+::ImplConvertIntegerToString(int16 Integer, slice<char> Buffer, bool* Success)
+  -> slice<char>
+{
+  return ImplConvertIntegerToStringHelper<int16>(Integer, Buffer, Success);
+}
+
+auto
+::ImplConvertIntegerToString(int32 Integer, slice<char> Buffer, bool* Success)
+  -> slice<char>
+{
+  return ImplConvertIntegerToStringHelper<int32>(Integer, Buffer, Success);
+}
+
+auto
+::ImplConvertIntegerToString(int64 Integer, slice<char> Buffer, bool* Success)
+  -> slice<char>
+{
+  return ImplConvertIntegerToStringHelper<int64>(Integer, Buffer, Success);
+}
+
+auto
+::ImplConvertIntegerToString(uint8 Integer, slice<char> Buffer, bool* Success)
+  -> slice<char>
+{
+  return ImplConvertIntegerToStringHelper<uint8>(Integer, Buffer, Success);
+}
+
+auto
+::ImplConvertIntegerToString(uint16 Integer, slice<char> Buffer, bool* Success)
+  -> slice<char>
+{
+  return ImplConvertIntegerToStringHelper<uint16>(Integer, Buffer, Success);
+}
+
+auto
+::ImplConvertIntegerToString(uint32 Integer, slice<char> Buffer, bool* Success)
+  -> slice<char>
+{
+  return ImplConvertIntegerToStringHelper<uint32>(Integer, Buffer, Success);
+}
+
+auto
+::ImplConvertIntegerToString(uint64 Integer, slice<char> Buffer, bool* Success)
+  -> slice<char>
+{
+  return ImplConvertIntegerToStringHelper<uint64>(Integer, Buffer, Success);
+}
+

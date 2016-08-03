@@ -24,6 +24,10 @@ BuildRules = [
     "Arg": "Cfg",
   },
   {
+    "Name": "ShaderCompiler",
+    "Arg": "ShaderCompiler",
+  },
+  {
     "Name": "Application",
     "Arg": "Application",
   },

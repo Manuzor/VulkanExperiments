@@ -22,8 +22,7 @@
     .IncludeSearchPath + '$VulkanSDKPath$/Include;'
   }
 
-
-  ObjectList( '$ProjectName$-Lib' )
+  ObjectList( '$ProjectName$-Obj' )
   {
     .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
     .CompilerInputPath = '$SourcePath$'
@@ -32,32 +31,11 @@
 
   Executable( '$ProjectName$-Exe' )
   {
-    .Libraries + '$ProjectName$-Lib'
-               + 'Core-Lib'
+    .Libraries + '$ProjectName$-Obj'
+               + 'Core-Obj'
+               + 'Cfg-Obj'
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
     .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
-  }
-
-  // Vulkan debug files
-  {
-    .Dest = '$BuildPath$/'
-    .MySourceBase = '$VulkanSDKPath$/Source/lib'
-
-    Copy( 'Copy-VulkanDebugDLL' )
-    {
-      .Source = { '$MySourceBase$/vulkan-1.dll', '$MySourceBase$/vulkan-1.pdb' }
-    }
-
-    CopyDir( 'Copy-VulkanDebugLayers' )
-    {
-      .SourcePaths = '$MySourceBase$/'
-      .SourcePathsPattern = { 'VkLayer_*' }
-    }
-
-    Alias( '$ProjectName$-CopyVulkanDebugFiles' )
-    {
-      .Targets = { 'Copy-VulkanDebugDLL', 'Copy-VulkanDebugLayers' }
-    }
   }
 
   Alias( '$ProjectName$' )
@@ -65,8 +43,8 @@
     .Targets =
     {
       '$ProjectName$-Exe'
-      '$ProjectName$-CopyVulkanDebugFiles'
       'Shaders' // Just require all shaders for now.
+      'Copy-VulkanFiles-Debug'
     }
   }
 

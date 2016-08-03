@@ -3,9 +3,8 @@
   // Base Infos
   //
 
-  .ProjectName = 'Core'
-  .SourcePath = '$RepoRoot$/Code/Core'
-
+  .ProjectName = 'ShaderCompiler'
+  .SourcePath = '$RepoRoot$/Code/ShaderCompiler'
 
   //
   // Rules
@@ -13,31 +12,51 @@
 
   VCXProject( '$ProjectName$-Proj' )
   {
-    .Output = '$BuildPath$/$ProjectName$.dll'
+    .Output = '$BuildPath$/$ProjectName$.exe'
     .OutputDirectory = '$BuildPath$'
 
     .ProjectOutput = 'Workspace/VisualStudio/$ProjectName$.vcxproj'
     .ProjectInputPaths = { '$SourcePath$' }
+    .LocalDebuggerCommand = '$Output$'
+    .LocalDebuggerWorkingDirectory = '$RepoRoot$'
+    .IncludeSearchPath + '$VulkanSDKPath$/Include;'
   }
+
 
   ObjectList( '$ProjectName$-Obj' )
   {
     .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
-                     + ' /DCORE_DLL_EXPORT'
-                     + ' /DLL'
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
+  }
+
+  Executable( '$ProjectName$-Exe' )
+  {
+    .Libraries + '$ProjectName$-Obj'
+               + 'Core-Obj'
+               + 'Cfg-Obj'
+    .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
+    .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
   }
 
   DLL( '$ProjectName$-Dll' )
   {
     .Libraries + '$ProjectName$-Obj'
+               + 'Core-Obj'
+               + 'Cfg-Obj'
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
                    + ' /DLL'
     .LinkerOutput = '$BuildPath$/$ProjectName$.dll'
   }
 
-  Alias( '$ProjectName$' ) { .Targets = { '$ProjectName$-Dll' } }
+  Alias( '$ProjectName$' )
+  {
+    .Targets =
+    {
+      '$ProjectName$-Exe'
+      'Copy-VulkanFiles-Debug'
+    }
+  }
 
   Alias( '$ProjectName$-x64-Debug' )   { .Targets = '$ProjectName$' }
   Alias( '$ProjectName$-x64-Release' ) { .Targets = '$ProjectName$' }
