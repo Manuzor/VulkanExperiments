@@ -21,6 +21,8 @@
     .LocalDebuggerWorkingDirectory = '$RepoRoot$'
     .IncludeSearchPath + '$VulkanSDKPath$/Include;'
   }
+  ^SolutionProjects + '$ProjectName$-Proj'
+
 
   ObjectList( '$ProjectName$-Obj' )
   {

@@ -20,7 +20,9 @@
     .LocalDebuggerCommand = '$Output$'
     .LocalDebuggerWorkingDirectory = '$RepoRoot$'
     .IncludeSearchPath + '$VulkanSDKPath$/Include;'
+                       + '$VulkanSDKPath$/glslang;'
   }
+  ^SolutionProjects + '$ProjectName$-Proj'
 
 
   ObjectList( '$ProjectName$-Obj' )

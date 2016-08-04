@@ -1,7 +1,19 @@
 
+// These get included at the right time. They're just listed here for
+// convenience.
+.SubFiles =
+{
+  'Data/fbuild.bff'
+  'Code/Core/fbuild.bff'
+  'Code/Cfg/fbuild.bff'
+  'Code/ShaderCompiler/fbuild.bff'
+  'Code/Application/fbuild.bff'
+  'Tests/fbuild.bff'
+}
+
 #include "Build/System.bff"
 
-.BuildPath = '$RepoRoot$\Build'
+.BuildPath = '$RepoRoot$/Build'
 
 .Compiler = '$VS2015Path$/VC/bin/amd64/cl.exe'
 .CompilerOptions = '/c %1 /Fo%2'
@@ -87,6 +99,8 @@
 // Targets
 //
 
+.SolutionProjects = {}
+
 Alias( 'GlslangLibs' )
 {
   .MyGlslangBuildPath = '$VulkanSDKPath$/glslang/build'
@@ -122,13 +136,10 @@ Alias( 'GlslangLibs' )
   }
 }
 
-#include "Data/fbuild.bff"
-
-#include "Code/Core/fbuild.bff"
-#include "Code/Cfg/fbuild.bff"
-#include "Code/ShaderCompiler/fbuild.bff"
-#include "Code/Application/fbuild.bff"
-#include "Tests/fbuild.bff"
+ForEach( .File in .SubFiles )
+{
+  #include "$File$"
+}
 
 //
 // Aliases
@@ -147,7 +158,6 @@ VSSolution( 'GenerateVisualStudioSolution' )
 {
   .SolutionOutput = 'Workspace/VisualStudio/VulkanExperiments.sln'
   .SolutionConfigs = .ProjectConfigs
-  .SolutionProjects = { 'Core-Proj', 'Application-Proj', 'Tests-Proj', 'Cfg-Proj', 'ShaderCompiler-Proj' }
   .SolutionBuildProject = 'Application-Proj'
   .ExtraFiles = { 'Utilities/VulkanExperiments.natvis' }
 }

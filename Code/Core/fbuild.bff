@@ -19,6 +19,7 @@
     .ProjectOutput = 'Workspace/VisualStudio/$ProjectName$.vcxproj'
     .ProjectInputPaths = { '$SourcePath$' }
   }
+  ^SolutionProjects + '$ProjectName$-Proj'
 
   ObjectList( '$ProjectName$-Obj' )
   {
