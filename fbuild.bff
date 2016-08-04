@@ -11,7 +11,7 @@
   'Tests/fbuild.bff'
 }
 
-#include "Build/System.bff"
+#include "Workspace/System.bff"
 
 .BuildPath = '$RepoRoot$/Build'
 

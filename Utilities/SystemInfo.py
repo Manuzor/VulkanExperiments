@@ -40,7 +40,7 @@ def RepoRoot(Env):
   return UtilitiesPath.parent
 
 def RepoManifestPath(Env):
-  BuildPath = RepoRoot(Env) / "Build"
+  BuildPath = RepoRoot(Env) / "Workspace"
   ManifestPath = BuildPath / "RepoManifest.json"
   return ManifestPath
 
@@ -50,4 +50,4 @@ def LoadRepoManifestPath(FilePath):
       return json.load(JsonFile)
 
 def SystemBFFPath(Env):
-  return RepoRoot(Env) / "Build" / "System.bff"
+  return RepoRoot(Env) / "Workspace" / "System.bff"
