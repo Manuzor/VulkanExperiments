@@ -207,9 +207,8 @@ auto
   LogMessageDispatch_Helper(Log, LogLevel, FormattedMessage);
 }
 
-auto
-::StdoutLogSink(log_sink_args Args)
-  -> void
+static void
+ImplStdoutLogSink_WithPrefixes(log_sink_args Args)
 {
   #if defined(BB_Platform_Windows)
     auto const ConsoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -232,11 +231,11 @@ auto
 
     switch(Args.LogLevel)
     {
-      case log_level::Info:       WriteConsole(ConsoleHandle, "Info", 4, nullptr, nullptr); break;
-      case log_level::Warning:    WriteConsole(ConsoleHandle, "Warn", 4, nullptr, nullptr); break;
-      case log_level::Error:      WriteConsole(ConsoleHandle, "Err ", 4, nullptr, nullptr); break;
-      case log_level::ScopeBegin: WriteConsole(ConsoleHandle, " >>>", 4, nullptr, nullptr); break;
-      case log_level::ScopeEnd:   WriteConsole(ConsoleHandle, " <<<", 4, nullptr, nullptr); break;
+      case log_level::Info:       WriteConsole(ConsoleHandle, "Ifo", 3, nullptr, nullptr); break;
+      case log_level::Warning:    WriteConsole(ConsoleHandle, "Wrn", 3, nullptr, nullptr); break;
+      case log_level::Error:      WriteConsole(ConsoleHandle, "Err", 3, nullptr, nullptr); break;
+      case log_level::ScopeBegin: WriteConsole(ConsoleHandle, ">>>", 3, nullptr, nullptr); break;
+      case log_level::ScopeEnd:   WriteConsole(ConsoleHandle, "<<<", 3, nullptr, nullptr); break;
     }
 
     if(Args.Message)
@@ -256,11 +255,11 @@ auto
   #else
     switch(Args.LogLevel)
     {
-      case log_level::Info:       printf("Info"); break;
-      case log_level::Warning:    printf("Warn"); break;
-      case log_level::Error:      printf("Err "); break;
-      case log_level::ScopeBegin: printf(" >>>"); break;
-      case log_level::ScopeEnd:   printf(" <<<"); break;
+      case log_level::Info:       printf("Ifo"); break;
+      case log_level::Warning:    printf("Wrn"); break;
+      case log_level::Error:      printf("Err"); break;
+      case log_level::ScopeBegin: printf(">>>"); break;
+      case log_level::ScopeEnd:   printf("<<<"); break;
     }
 
     if(Args.Message)
@@ -280,17 +279,77 @@ auto
   #endif
 }
 
+static void
+ImplStdoutLogSink_WithoutPrefixes(log_sink_args Args)
+{
+  #if defined(BB_Platform_Windows)
+    auto const ConsoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    CONSOLE_SCREEN_BUFFER_INFO CurrentConsoleInfo;
+    GetConsoleScreenBufferInfo(ConsoleHandle, &CurrentConsoleInfo);
+
+    // Restore the current console attributes at the end of the function.
+    Defer [=](){ SetConsoleTextAttribute(ConsoleHandle, CurrentConsoleInfo.wAttributes); };
+
+    auto Color = CurrentConsoleInfo.wAttributes;
+    switch(Args.LogLevel)
+    {
+      case log_level::Info:    Color = Color | FOREGROUND_INTENSITY; break;
+      case log_level::Warning: Color = FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_GREEN; break;
+      case log_level::Error:   Color = FOREGROUND_INTENSITY | FOREGROUND_RED; break;
+    }
+
+    SetConsoleTextAttribute(ConsoleHandle, Color);
+
+    if(Args.Message)
+    {
+      while(Args.Indentation > 0)
+      {
+        WriteConsole(ConsoleHandle, "  ", 2, nullptr, nullptr);
+        --Args.Indentation;
+      }
+
+      WriteConsole(ConsoleHandle, Args.Message.Ptr, Cast<DWORD>(Args.Message.Num), nullptr, nullptr);
+    }
+
+    WriteConsole(ConsoleHandle, "\n", 1, nullptr, nullptr);
+  #else
+    if(Args.Message)
+    {
+      while(Args.Indentation > 0)
+      {
+        printf("  ");
+        --Args.Indentation;
+      }
+
+      printf("%*s", Cast<int>(Args.Message.Num), Args.Message.Ptr);
+    }
+
+    printf("\n");
+  #endif
+}
+
+auto
+::GetStdoutLogSink(stdout_log_sink_enable_prefixes EnablePrefixes)
+  -> log_sink
+{
+  if(EnablePrefixes == stdout_log_sink_enable_prefixes::Yes)
+    return ImplStdoutLogSink_WithPrefixes;
+
+  return ImplStdoutLogSink_WithoutPrefixes;
+}
+
 auto
 ::VisualStudioLogSink(log_sink_args Args)
   -> void
 {
   switch(Args.LogLevel)
   {
-    case log_level::Info:       OutputDebugStringA("[VKExp] Info"); break;
-    case log_level::Warning:    OutputDebugStringA("[VKExp] Warn"); break;
-    case log_level::Error:      OutputDebugStringA("[VKExp] Err "); break;
-    case log_level::ScopeBegin: OutputDebugStringA("[VKExp]  >>>"); break;
-    case log_level::ScopeEnd:   OutputDebugStringA("[VKExp]  <<<"); break;
+    case log_level::Info:       OutputDebugStringA("[VKExp] Ifo"); break;
+    case log_level::Warning:    OutputDebugStringA("[VKExp] Wrn"); break;
+    case log_level::Error:      OutputDebugStringA("[VKExp] Err"); break;
+    case log_level::ScopeBegin: OutputDebugStringA("[VKExp] >>>"); break;
+    case log_level::ScopeEnd:   OutputDebugStringA("[VKExp] <<<"); break;
   }
 
   if(Args.Message)

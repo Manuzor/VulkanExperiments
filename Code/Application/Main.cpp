@@ -1581,7 +1581,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
   Init(GlobalLog, Allocator);
   Defer [=](){ Finalize(GlobalLog); };
   auto SinkSlots = ExpandBy(&GlobalLog->Sinks, 2);
-  SinkSlots[0] = log_sink(StdoutLogSink);
+  SinkSlots[0] = GetStdoutLogSink(stdout_log_sink_enable_prefixes::Yes);
   SinkSlots[1] = log_sink(VisualStudioLogSink);
 
   {

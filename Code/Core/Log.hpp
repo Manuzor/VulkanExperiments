@@ -82,9 +82,11 @@ LogMessageDispatch(log_level LogLevel, log_data* Log, slice<char const> Message,
 // Default Log Sinks
 //
 
+enum class stdout_log_sink_enable_prefixes : bool { No = false, Yes = true };
+
 CORE_API
-void
-StdoutLogSink(log_sink_args Args);
+log_sink
+GetStdoutLogSink(stdout_log_sink_enable_prefixes EnablePrefixes);
 
 CORE_API
 void
