@@ -30,12 +30,11 @@ FragmentShader {
   sampler2D "Sampler" Binding=1
 
   Input {
-    vec3 "Position" Location=0
-    vec4 "Color" Location=1
+    vec4 "Color" Location=0
   }
 
   Output {
-    vec4 "OutColor" Location=0
+    vec4 "FragmentColor" Location=0
   }
 
   Code Entry="main" {

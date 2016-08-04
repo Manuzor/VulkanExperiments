@@ -37,8 +37,13 @@ void
 DestroyShaderCompilerContext(allocator_interface* Allocator, shader_compiler_context* Context);
 
 bool
-CompileCfgToGlsl(shader_compiler_context* Context, cfg_node const* ShaderRoot, glsl_shader* GlslShader);
+CompileCfgToGlsl(shader_compiler_context* Context, cfg_node const* ShaderRoot,
+                 glsl_shader* GlslShader);
 
 bool
 CompileGlslToSpv(shader_compiler_context* Context, glsl_shader const* GlslShader,
                  dynamic_array<uint32>* SpvByteCode);
+
+bool
+CompileCfgToGlslAndSpv(shader_compiler_context* Context, cfg_node const* ShaderRoot,
+                       glsl_shader* GlslShader, dynamic_array<uint32>* SpvByteCode);

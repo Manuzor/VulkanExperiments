@@ -569,8 +569,15 @@ auto
     }
   }
 
-  LogInfo("Compilation successful.");
   return true;
+}
+
+auto
+CompileCfgToGlslAndSpv(shader_compiler_context* Context, cfg_node const* ShaderRoot,
+                       glsl_shader* GlslShader, dynamic_array<uint32>* SpvByteCode)
+  -> bool
+{
+  return CompileCfgToGlsl(Context, ShaderRoot, GlslShader) && CompileGlslToSpv(Context, GlslShader, SpvByteCode);
 }
 
 

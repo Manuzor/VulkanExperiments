@@ -11,11 +11,18 @@
 
 
 static bool
-ReadFileContentIntoArray(dynamic_array<uint8>* Array, char const* FileName)
+ReadFileContentIntoArray(slice<char const> FileName, dynamic_array<uint8>* Array)
 {
   Clear(Array);
 
-  auto File = std::fopen(FileName, "rb");
+
+  temp_allocator TempAllocator{};
+  allocator_interface* Allocator = *TempAllocator;
+  scoped_array<char> SzFileName{ Allocator };
+  SliceCopy(ExpandBy(&SzFileName, FileName.Num), FileName);
+  Expand(&SzFileName) = '\0';
+
+  auto File = std::fopen(SzFileName.Ptr, "rb");
   if(File == nullptr)
     return false;
 
@@ -46,12 +53,61 @@ ReadFileContentIntoArray(dynamic_array<uint8>* Array, char const* FileName)
   }
 }
 
+template<typename T>
+bool
+WriteArrayContentToFile(slice<T> Content, slice<char const> FileName, size_t* NumBytesWritten = nullptr)
+{
+  temp_allocator TempAllocator{};
+  allocator_interface* Allocator = *TempAllocator;
+  scoped_array<char> SzFileName{ Allocator };
+  SliceCopy(ExpandBy(&SzFileName, FileName.Num), FileName);
+  Expand(&SzFileName) = '\0';
+
+  auto File = std::fopen(SzFileName.Ptr, "wb");
+  if(File == nullptr)
+    return false;
+
+  Defer [File](){ std::fclose(File); };
+
+  auto LocalNumBytesWritten = std::fwrite(Content.Ptr, SizeOf<T>(), Content.Num, File);
+  if(NumBytesWritten)
+    *NumBytesWritten = LocalNumBytesWritten;
+  return true;
+}
+
+struct shader_output_path
+{
+  slice<char const> Glsl;
+  slice<char const> Spv;
+};
+
 struct cmd_options
 {
   slice<char const> InputFilePath;
-  slice<char const> VertexShaderOutFilePath;
-  slice<char const> FragmentShaderOutFilePath;
+  shader_output_path VertexShaderOutFilePath;
+  shader_output_path FragmentShaderOutFilePath;
 };
+
+void
+LogUsage(log_data* Log)
+{
+  LogInfo("Usage: (<Argument>|<Option)...");
+  LogInfo("");
+  LogBeginScope("Arguments");
+    LogInfo("InputFilePath    The input config file to compile.");
+  LogEndScope("");
+  LogBeginScope("Options");
+    LogInfo("-glsl-vert <FilePath>    Vertex shader output file as GLSL code.");
+    LogInfo("-spv-vert <FilePath>     Vertex shader output file as SPIR-V bytecode.");
+    LogInfo("-glsl-frag <FilePath>    Fragment shader output file as GLSL code.");
+    LogInfo("-spv-frag <FilePath>     Fragment shader output file as SPIR-V bytecode.");
+    LogInfo("-help                    Show this hint text and terminate.");
+  LogEndScope("");
+  LogBeginScope("Notes");
+    LogInfo("Additional prefixed '-' characters are ignored. "
+            "This means that -help is equivalent to --help.");
+  LogEndScope("");
+}
 
 bool
 ParseCommandLineOptions(slice<char const*> Args, cmd_options* Options)
@@ -68,30 +124,62 @@ ParseCommandLineOptions(slice<char const*> Args, cmd_options* Options)
 
       if(Arg == "help"_S || Arg == "h"_S)
       {
-        LogInfo("Args: (-h | -help) | <InputFilePath> [-vert <VertexShaderOutFilePath>] [-frag <FragmentShaderOutFilePath>]");
+        LogUsage(GlobalLog);
         return false;
       }
-      else if(Arg == "vert"_S)
+      else if(Arg == "glsl-vert"_S)
       {
         ++Index;
         if(Index >= Args.Num)
         {
-          LogError("Missing argument for -vert.");
+          LogError("Missing argument for -glsl-vert.");
+          LogUsage(GlobalLog);
           return false;
         }
 
-        Options->VertexShaderOutFilePath = SliceFromString(Args[Index]);
+        Options->VertexShaderOutFilePath.Glsl = SliceFromString(Args[Index]);
       }
-      else if(Arg == "frag"_S)
+      else if(Arg == "glsl-spv"_S)
+      {
+        ++Index;
+        if(Index >= Args.Num)
+        {
+          LogError("Missing argument for -glsl-spv.");
+          LogUsage(GlobalLog);
+          return false;
+        }
+
+        Options->VertexShaderOutFilePath.Spv = SliceFromString(Args[Index]);
+      }
+      else if(Arg == "glsl-frag"_S)
       {
         ++Index;
         if(Index >= Args.Num)
         {
           LogError("Missing argument for -frag.");
+          LogUsage(GlobalLog);
           return false;
         }
 
-        Options->FragmentShaderOutFilePath = SliceFromString(Args[Index]);
+        Options->FragmentShaderOutFilePath.Glsl = SliceFromString(Args[Index]);
+      }
+      else if(Arg == "glsl-frag"_S)
+      {
+        ++Index;
+        if(Index >= Args.Num)
+        {
+          LogError("Missing argument for -frag.");
+          LogUsage(GlobalLog);
+          return false;
+        }
+
+        Options->FragmentShaderOutFilePath.Glsl = SliceFromString(Args[Index]);
+      }
+      else
+      {
+        LogError("Unknown argument: %s", Args[Index]);
+        LogUsage(GlobalLog);
+        return false;
       }
     }
     else
@@ -103,6 +191,7 @@ ParseCommandLineOptions(slice<char const*> Args, cmd_options* Options)
       else
       {
         LogError("Expected only 1 positional argument (InputFilePath).");
+        LogUsage(GlobalLog);
         return false;
       }
     }
@@ -111,6 +200,7 @@ ParseCommandLineOptions(slice<char const*> Args, cmd_options* Options)
   if(!Options->InputFilePath)
   {
     LogError("Missing required positional argument (InputFilePath).");
+    LogUsage(GlobalLog);
     return false;
   }
 
@@ -131,7 +221,7 @@ main(int NumArgs, char const* Args[])
   Defer [=](){ Finalize(GlobalLog); };
   {
     auto DefaultSinkSlots = ExpandBy(&GlobalLog->Sinks, 2);
-    DefaultSinkSlots[0] = log_sink(StdoutLogSink);
+    DefaultSinkSlots[0] = GetStdoutLogSink(stdout_log_sink_enable_prefixes::No);
     DefaultSinkSlots[1] = log_sink(VisualStudioLogSink);
   }
 
@@ -141,24 +231,13 @@ main(int NumArgs, char const* Args[])
     return -1;
   }
 
-  if(!Options.VertexShaderOutFilePath)
-  {
-    // TODO: Use the InputFilePath name and change the extension.
-    Options.VertexShaderOutFilePath = "Shader.vert"_S;
-  }
-
-  if(!Options.FragmentShaderOutFilePath)
-  {
-    // TODO: Use the InputFilePath name and change the extension.
-    Options.FragmentShaderOutFilePath = "Shader.frag"_S;
-  }
-
-  char const* InputFilePath = Options.InputFilePath.Ptr; // It's 0-terminated.
+  auto const InputFilePath = Options.InputFilePath;
 
   scoped_array<uint8> Content{ Allocator };
-  if(!ReadFileContentIntoArray(&Content, InputFilePath))
+  if(!ReadFileContentIntoArray(InputFilePath, &Content))
   {
-    printf("%s: Failed to read file\n", InputFilePath);
+    LogError("Failed to read file: %*s", Convert<int>(InputFilePath.Num), InputFilePath.Ptr);
+    LogUsage(GlobalLog);
     return 2;
   }
 
@@ -168,11 +247,11 @@ main(int NumArgs, char const* Args[])
 
   {
     // TODO: Supply the GlobalLog here as soon as the cfg parser code is more robust.
-    cfg_parsing_context Context{ SliceFromString(InputFilePath), nullptr };
+    cfg_parsing_context Context{ InputFilePath, nullptr };
 
     if(!CfgDocumentParseFromString(&Document, SliceReinterpret<char const>(Slice(&Content)), &Context))
     {
-      printf("An error occurred while parsing the document.\n");
+      LogError("Failed to parse cfg.");
       return 3;
     }
   }
@@ -189,6 +268,7 @@ main(int NumArgs, char const* Args[])
   auto Context = CreateShaderCompilerContext(Allocator);
   Defer [=](){ DestroyShaderCompilerContext(Allocator, Context); };
 
+
   //
   // Vertex Shader
   //
@@ -196,20 +276,46 @@ main(int NumArgs, char const* Args[])
   scoped_array<uint32> VertexShaderByteCode{ Allocator };
   if(VertexShaderNode)
   {
-    if(!CompileCfgToGlsl(Context, VertexShaderNode, &VertexShader))
+    //
+    // Compile to GLSL
+    //
+    LogBeginScope("Compiling vertex shader from Cfg to GLSL");
+    bool const CompiledGLSL = CompileCfgToGlsl(Context, VertexShaderNode, &VertexShader);
+    LogEndScope("Finished compiling vertex shader from Cfg to GLSL");
+
+    //
+    // Write GLSL file
+    //
+    if(CompiledGLSL && Options.VertexShaderOutFilePath.Glsl)
     {
-      printf("Failed to compile vertex shader from cfg.");
-      return 4;
+      auto const FileName = Options.VertexShaderOutFilePath.Glsl;
+      if(!WriteArrayContentToFile(Slice(&VertexShader.Code), FileName))
+      {
+        LogWarning("%*s: Failed to write glsl vertex shader file.", Convert<int>(FileName.Num), FileName.Ptr);
+      }
     }
 
-    auto const FileName = Options.VertexShaderOutFilePath;
-    LogBeginScope("Compiling To Spv: %*s", Convert<int>(FileName.Num), FileName.Ptr);
-    if(!CompileGlslToSpv(Context, &VertexShader, &VertexShaderByteCode))
+    //
+    // Compile to SPIR-V
+    //
+    if(CompiledGLSL)
     {
-      printf("Failed to compile generated GLSL code to SPIR-V bytecode.");
-      return 42;
+      LogBeginScope("Compiling vertex shader from GLSL to SPIR-V");
+      bool const CompiledSpv = CompileGlslToSpv(Context, &VertexShader, &VertexShaderByteCode);
+      LogEndScope("Finished compiling vertex shader from GLSL to SPIR-V");
+
+      //
+      // Write SPIR-V file
+      //
+      if(CompiledSpv && Options.VertexShaderOutFilePath.Spv)
+      {
+        auto const FileName = Options.VertexShaderOutFilePath.Spv;
+        if(!WriteArrayContentToFile(Slice(&VertexShaderByteCode), FileName))
+        {
+          LogWarning("%*s: Failed to write spv vertex shader file.", Convert<int>(FileName.Num), FileName.Ptr);
+        }
+      }
     }
-    LogEndScope("Compiled: %*s", Convert<int>(FileName.Num), FileName.Ptr);
   }
 
 
@@ -217,24 +323,50 @@ main(int NumArgs, char const* Args[])
   // Fragment Shader
   //
   glsl_shader FragmentShader{ Allocator };
+  scoped_array<uint32> FragmentShaderByteCode{ Allocator };
   if(FragmentShaderNode)
   {
-    if(!CompileCfgToGlsl(Context, FragmentShaderNode, &FragmentShader))
+    //
+    // Compile to GLSL
+    //
+    LogBeginScope("Compiling fragment shader from Cfg to GLSL");
+    bool const CompiledGLSL = CompileCfgToGlsl(Context, FragmentShaderNode, &FragmentShader);
+    LogEndScope("Finished compiling fragment shader from Cfg to GLSL");
+
+    //
+    // Write GLSL file
+    //
+    if(CompiledGLSL && Options.FragmentShaderOutFilePath.Glsl)
     {
-      printf("Failed to extract fragment shader from cfg.");
-      return 4;
+      auto const FileName = Options.FragmentShaderOutFilePath.Glsl;
+      if(!WriteArrayContentToFile(Slice(&FragmentShader.Code), FileName))
+      {
+        LogWarning("%*s: Failed to write glsl fragment shader file.", Convert<int>(FileName.Num), FileName.Ptr);
+      }
+    }
+
+    //
+    // Compile to SPIR-V
+    //
+    if(CompiledGLSL)
+    {
+      LogBeginScope("Compiling fragment shader from GLSL to SPIR-V");
+      bool const CompiledSpv = CompileGlslToSpv(Context, &FragmentShader, &FragmentShaderByteCode);
+      LogEndScope("Finished compiling fragment shader from GLSL to SPIR-V");
+
+      //
+      // Write SPIR-V file
+      //
+      if(CompiledSpv && Options.FragmentShaderOutFilePath.Spv)
+      {
+        auto const FileName = Options.FragmentShaderOutFilePath.Spv;
+        if(!WriteArrayContentToFile(Slice(&FragmentShaderByteCode), FileName))
+        {
+          LogWarning("%*s: Failed to write spv fragment shader file.", Convert<int>(FileName.Num), FileName.Ptr);
+        }
+      }
     }
   }
-
-  // TODO: Write the results to the respective files.
-
-  // printf("%*s: %s",
-  //        Convert<int>(Options.VertexShaderOutFilePath.Num), Options.VertexShaderOutFilePath.Ptr,
-  //        VertexShader.Code.Ptr);
-
-  // printf("%*s: %s",
-  //        Convert<int>(Options.FragmentShaderOutFilePath.Num), Options.FragmentShaderOutFilePath.Ptr,
-  //        FragmentShader.Code.Ptr);
 
   return 0;
 }
