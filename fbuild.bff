@@ -19,10 +19,10 @@
                    + ' /GR-'     // /GR[-]   Enable runtime type information
                    + ' /EHa-'    // /EHa[-]  Something about exception handling
                    + ' /TP'      // /TP      Compile all as .cpp
-                   + ' /MTd'     // /MD[d] /MT[d] Dynamically or statically linked C run-time library (d = debug)
+                   + ' /MDd'     // /MD[d] /MT[d] Dynamically or statically linked C run-time library (d = debug)
                    + ' /EHsc'    // Enable exception handling.
 
-                   + ' /ICode'
+                   + ' /I$RepoRoot$/Code'
 
                    //
                    // Defines

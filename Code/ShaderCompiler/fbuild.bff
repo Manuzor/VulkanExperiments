@@ -26,28 +26,37 @@
   ObjectList( '$ProjectName$-Obj' )
   {
     .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
+                     + ' /I"$VulkanSDKPath$/glslang"'
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
   }
 
-  Executable( '$ProjectName$-Exe' )
   {
+    .MyGlslangBuildPath = '$VulkanSDKPath$/glslang/build'
+
     .Libraries + '$ProjectName$-Obj'
                + 'Core-Obj'
                + 'Cfg-Obj'
+               + '$MyGlslangBuildPath$/glslang/Debug/glslang.lib'
+               + '$MyGlslangBuildPath$/glslang/OSDependent/Windows/Debug/OSDependent.lib'
+               + '$MyGlslangBuildPath$/OGLCompilersDLL/Debug/OGLCompiler.lib'
+               + '$MyGlslangBuildPath$/hlsl/Debug/HLSL.lib'
+               + '$MyGlslangBuildPath$/SPIRV/Debug/SPIRV.lib'
+
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
-    .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
+
+    Executable( '$ProjectName$-Exe' )
+    {
+      .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
+    }
+
+    DLL( '$ProjectName$-Dll' )
+    {
+      .LinkerOptions + ' /DLL'
+      .LinkerOutput = '$BuildPath$/$ProjectName$.dll'
+    }
   }
 
-  DLL( '$ProjectName$-Dll' )
-  {
-    .Libraries + '$ProjectName$-Obj'
-               + 'Core-Obj'
-               + 'Cfg-Obj'
-    .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
-                   + ' /DLL'
-    .LinkerOutput = '$BuildPath$/$ProjectName$.dll'
-  }
 
   Alias( '$ProjectName$' )
   {

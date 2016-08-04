@@ -121,7 +121,19 @@ ParseCommandLineOptions(slice<char const*> Args, cmd_options* Options)
 int
 main(int NumArgs, char const* Args[])
 {
-  // TODO: Set up logging.
+  mallocator Mallocator = {};
+  allocator_interface* Allocator = &Mallocator;
+  log_data Log = {};
+  GlobalLog = &Log;
+  Defer [=](){ GlobalLog = nullptr; };
+
+  Init(GlobalLog, Allocator);
+  Defer [=](){ Finalize(GlobalLog); };
+  {
+    auto DefaultSinkSlots = ExpandBy(&GlobalLog->Sinks, 2);
+    DefaultSinkSlots[0] = log_sink(StdoutLogSink);
+    DefaultSinkSlots[1] = log_sink(VisualStudioLogSink);
+  }
 
   cmd_options Options{};
   if(!ParseCommandLineOptions(Slice(NumArgs - 1, &Args[1]), &Options))
@@ -141,15 +153,12 @@ main(int NumArgs, char const* Args[])
     Options.FragmentShaderOutFilePath = "Shader.frag"_S;
   }
 
-  char const* FileName = Options.InputFilePath.Ptr; // It's 0-terminated.
-
-  temp_allocator TempAllocator;
-  allocator_interface* Allocator = *TempAllocator;
+  char const* InputFilePath = Options.InputFilePath.Ptr; // It's 0-terminated.
 
   scoped_array<uint8> Content{ Allocator };
-  if(!ReadFileContentIntoArray(&Content, FileName))
+  if(!ReadFileContentIntoArray(&Content, InputFilePath))
   {
-    printf("%s: Failed to read file\n", FileName);
+    printf("%s: Failed to read file\n", InputFilePath);
     return 2;
   }
 
@@ -157,12 +166,15 @@ main(int NumArgs, char const* Args[])
   Init(&Document, Allocator);
   Defer [&](){ Finalize(&Document); };
 
-  cfg_parsing_context Context{ SliceFromString(FileName), GlobalLog };
-
-  if(!CfgDocumentParseFromString(&Document, SliceReinterpret<char const>(Slice(&Content)), &Context))
   {
-    printf("An error occurred while parsing the document.\n");
-    return 3;
+    // TODO: Supply the GlobalLog here as soon as the cfg parser code is more robust.
+    cfg_parsing_context Context{ SliceFromString(InputFilePath), nullptr };
+
+    if(!CfgDocumentParseFromString(&Document, SliceReinterpret<char const>(Slice(&Content)), &Context))
+    {
+      printf("An error occurred while parsing the document.\n");
+      return 3;
+    }
   }
 
   cfg_node* VertexShaderNode = nullptr;
@@ -174,37 +186,55 @@ main(int NumArgs, char const* Args[])
     else if(Node->Name == "FragmentShader"_S) FragmentShaderNode = Node;
   }
 
-  scoped_array<char> VertexShaderCode{ Allocator };
+  auto Context = CreateShaderCompilerContext(Allocator);
+  Defer [=](){ DestroyShaderCompilerContext(Allocator, Context); };
+
+  //
+  // Vertex Shader
+  //
+  glsl_shader VertexShader{ Allocator };
+  scoped_array<uint32> VertexShaderByteCode{ Allocator };
   if(VertexShaderNode)
   {
-    if(!CompileCfgAsShader(VertexShaderNode, &VertexShaderCode))
+    if(!CompileCfgToGlsl(Context, VertexShaderNode, &VertexShader))
     {
-      printf("Failed to extract vertex shader from cfg.");
+      printf("Failed to compile vertex shader from cfg.");
       return 4;
     }
-    Expand(&VertexShaderCode) = '\0';
+
+    auto const FileName = Options.VertexShaderOutFilePath;
+    LogBeginScope("Compiling To Spv: %*s", Convert<int>(FileName.Num), FileName.Ptr);
+    if(!CompileGlslToSpv(Context, &VertexShader, &VertexShaderByteCode))
+    {
+      printf("Failed to compile generated GLSL code to SPIR-V bytecode.");
+      return 42;
+    }
+    LogEndScope("Compiled: %*s", Convert<int>(FileName.Num), FileName.Ptr);
   }
 
-  scoped_array<char> FragmentShaderCode{ Allocator };
+
+  //
+  // Fragment Shader
+  //
+  glsl_shader FragmentShader{ Allocator };
   if(FragmentShaderNode)
   {
-    if(!CompileCfgAsShader(FragmentShaderNode, &FragmentShaderCode))
+    if(!CompileCfgToGlsl(Context, FragmentShaderNode, &FragmentShader))
     {
       printf("Failed to extract fragment shader from cfg.");
       return 4;
     }
-    Expand(&FragmentShaderCode) = '\0';
   }
 
   // TODO: Write the results to the respective files.
 
-  printf("%*s: %s",
-         Convert<int>(Options.VertexShaderOutFilePath.Num), Options.VertexShaderOutFilePath.Ptr,
-         VertexShaderCode.Ptr);
+  // printf("%*s: %s",
+  //        Convert<int>(Options.VertexShaderOutFilePath.Num), Options.VertexShaderOutFilePath.Ptr,
+  //        VertexShader.Code.Ptr);
 
-  printf("%*s: %s",
-         Convert<int>(Options.FragmentShaderOutFilePath.Num), Options.FragmentShaderOutFilePath.Ptr,
-         FragmentShaderCode.Ptr);
+  // printf("%*s: %s",
+  //        Convert<int>(Options.FragmentShaderOutFilePath.Num), Options.FragmentShaderOutFilePath.Ptr,
+  //        FragmentShader.Code.Ptr);
 
   return 0;
 }
