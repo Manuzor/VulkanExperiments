@@ -86,6 +86,20 @@
 // Targets
 //
 
+// TODO: Remove this. It's just a temporary workaround for my incompetent DLL setup.
+Alias( 'GlslangLibs' )
+{
+  .MyGlslangBuildPath = '$VulkanSDKPath$/glslang/build'
+  .Targets =
+  {
+    '$MyGlslangBuildPath$/glslang/Debug/glslang.lib'
+    '$MyGlslangBuildPath$/glslang/OSDependent/Windows/Debug/OSDependent.lib'
+    '$MyGlslangBuildPath$/OGLCompilersDLL/Debug/OGLCompiler.lib'
+    '$MyGlslangBuildPath$/hlsl/Debug/HLSL.lib'
+    '$MyGlslangBuildPath$/SPIRV/Debug/SPIRV.lib'
+  }
+}
+
 
 // Vulkan debug files
 {

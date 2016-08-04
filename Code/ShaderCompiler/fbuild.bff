@@ -27,6 +27,7 @@
   {
     .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
                      + ' /I"$VulkanSDKPath$/glslang"'
+                     + ' /DSHADER_COMPILER_EXPORT_DLL'
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
   }

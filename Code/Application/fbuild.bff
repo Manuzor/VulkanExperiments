@@ -34,6 +34,8 @@
     .Libraries + '$ProjectName$-Obj'
                + 'Core-Obj'
                + 'Cfg-Obj'
+               + 'GlslangLibs' // TODO: Once dlls work properly, remove this.
+               + 'ShaderCompiler-Obj'
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
     .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
   }
