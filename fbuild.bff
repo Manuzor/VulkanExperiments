@@ -47,6 +47,7 @@
                    + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\shared"'
                    + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\um"'
                    + ' /I"$Windows10SDKPath$\Include\$Windows10SDKVersion$\winrt"'
+.CompilerInputFiles = {}
 
 .Linker = '$VS2015Path$/VC/bin/amd64/link.exe'
 .LinkerOptions = '%1 /OUT:%2'
@@ -86,7 +87,6 @@
 // Targets
 //
 
-// TODO: Remove this. It's just a temporary workaround for my incompetent DLL setup.
 Alias( 'GlslangLibs' )
 {
   .MyGlslangBuildPath = '$VulkanSDKPath$/glslang/build'
@@ -99,7 +99,6 @@ Alias( 'GlslangLibs' )
     '$MyGlslangBuildPath$/SPIRV/Debug/SPIRV.lib'
   }
 }
-
 
 // Vulkan debug files
 {

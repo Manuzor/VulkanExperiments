@@ -21,13 +21,14 @@
   {
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
+    .CompilerInputFiles + '$RepoRoot$/Code/Backbone.cpp'
   }
 
   Executable( '$ProjectName$' )
   {
     .Libraries + '$ProjectName$-Obj'
-               + 'Core-Obj'
-               + 'Cfg-Obj'
+               + 'Core-Dll'
+               + 'Cfg-Dll'
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
     .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
   }

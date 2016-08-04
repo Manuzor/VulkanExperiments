@@ -27,6 +27,7 @@
                      + ' /DLL'
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
+    .CompilerInputFiles + '$RepoRoot$/Code/Backbone.cpp'
   }
 
   DLL( '$ProjectName$-Dll' )

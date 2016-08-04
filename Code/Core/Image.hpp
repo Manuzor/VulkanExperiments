@@ -27,19 +27,24 @@ struct image : public image_header
   dynamic_array<uint8> Data;
 };
 
-CORE_API void
+CORE_API
+void
 Init(image* Image, allocator_interface* Allocator);
 
-CORE_API void
+CORE_API
+void
 Finalize(image* Image);
 
-CORE_API uint32
+CORE_API
+uint32
 ImageNumBlocksX(image const* Image, uint32 MipLevel = 0);
 
-CORE_API uint32
+CORE_API
+uint32
 ImageNumBlocksY(image const* Image, uint32 MipLevel = 0);
 
-CORE_API uint32
+CORE_API
+uint32
 ImageDataSize(image const* Image);
 
 
@@ -47,27 +52,33 @@ ImageDataSize(image const* Image);
 ///
 /// When creating an image, call this method after setting the dimensions and number of mip levels, faces and array indices.
 /// Changing the image dimensions or number of sub-images will not automatically reallocate the data.
-CORE_API void
+CORE_API
+void
 ImageAllocateData(image* Image);
 
 /// \brief Returns the offset in bytes between two subsequent rows of the given mip level.
 ///
 /// This function is only valid to use when the image format is a linear pixel format.
-CORE_API uint32
+CORE_API
+uint32
 ImageRowPitch(image const* Image, uint32 MipLevel = 0);
 
 /// \brief Returns the offset in bytes between two subsequent depth slices of the given mip level.
-CORE_API uint32
+CORE_API
+uint32
 ImageDepthPitch(image const* Image, uint32 MipLevel = 0);
 
 /// \brief Returns the position in bytes in the data array of the given sub-image.
-CORE_API uint32
+CORE_API
+uint32
 ImageDataOffSet(image const* Image, uint32 MipLevel = 0, uint32 Face = 0, uint32 ArrayIndex = 0);
 
-CORE_API image::sub_image const*
+CORE_API
+image::sub_image const*
 ImageInternalSubImage(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex);
 
-CORE_API image::sub_image*
+CORE_API
+image::sub_image*
 ImageInternalSubImage(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex);
 
 
@@ -163,5 +174,6 @@ ImageBlockPointer(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex,
 //
 
 /// Set's the image data to be a solid color in the given format.
+CORE_API
 bool
 ImageSetAsSolidColor(image* Image, union color_linear const& Color, image_format Format);

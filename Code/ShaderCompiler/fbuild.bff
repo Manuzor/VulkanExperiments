@@ -30,19 +30,16 @@
                      + ' /DSHADER_COMPILER_EXPORT_DLL'
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
+    .CompilerInputFiles + '$RepoRoot$/Code/Backbone.cpp'
   }
 
   {
     .MyGlslangBuildPath = '$VulkanSDKPath$/glslang/build'
 
     .Libraries + '$ProjectName$-Obj'
-               + 'Core-Obj'
-               + 'Cfg-Obj'
-               + '$MyGlslangBuildPath$/glslang/Debug/glslang.lib'
-               + '$MyGlslangBuildPath$/glslang/OSDependent/Windows/Debug/OSDependent.lib'
-               + '$MyGlslangBuildPath$/OGLCompilersDLL/Debug/OGLCompiler.lib'
-               + '$MyGlslangBuildPath$/hlsl/Debug/HLSL.lib'
-               + '$MyGlslangBuildPath$/SPIRV/Debug/SPIRV.lib'
+               + 'Core-Dll'
+               + 'Cfg-Dll'
+               + 'GlslangLibs'
 
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
 

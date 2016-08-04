@@ -26,12 +26,13 @@
                      + ' /DLL'
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
+    .CompilerInputFiles + '$RepoRoot$/Code/Backbone.cpp'
   }
 
   DLL( '$ProjectName$-Dll' )
   {
     .Libraries + '$ProjectName$-Obj'
-               + 'Core-Obj'
+               + 'Core-Dll'
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
                    + ' /DLL'
     .LinkerOutput = '$BuildPath$/$ProjectName$.dll'

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "CoreAPI.hpp"
+
 #include <Backbone.hpp>
 
 enum class image_format_type
@@ -156,39 +158,51 @@ enum class image_format
 constexpr size_t
 NumImageFormats() { return Cast<size_t>(image_format::NUM); }
 
+CORE_API
 char const*
 ImageFormatName(image_format Format);
 
+CORE_API
 uint32
 ImageFormatBitsPerPixel(image_format Format);
 
+CORE_API
 uint32
 ImageFormatRedMask(image_format Format);
 
+CORE_API
 uint32
 ImageFormatGreenMask(image_format Format);
 
+CORE_API
 uint32
 ImageFormatBlueMask(image_format Format);
 
+CORE_API
 uint32
 ImageFormatAlphaMask(image_format Format);
 
+CORE_API
 image_format_type
 ImageFormatType(image_format Format);
 
+CORE_API
 image_format
 ImageFormatFromPixelMask(uint32 RedMask, uint32 GreenMask, uint32 BlueMask, uint32 AlphaMask,
                          uint32 BitsPerPixel);
 
+CORE_API
 uint32
 ImageFormatToDxgiFormat(image_format Format);
 
+CORE_API
 image_format
 ImageFormatFromDxgiFormat(uint32 DxgiFormat);
 
+CORE_API
 uint32
 ImageFormatToFourCc(image_format Format);
 
+CORE_API
 image_format
 ImageFormatFromFourCc(uint32 FourCc);

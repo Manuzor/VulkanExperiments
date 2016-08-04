@@ -27,15 +27,15 @@
     .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
+    .CompilerInputFiles + '$RepoRoot$/Code/Backbone.cpp'
   }
 
   Executable( '$ProjectName$-Exe' )
   {
     .Libraries + '$ProjectName$-Obj'
-               + 'Core-Obj'
-               + 'Cfg-Obj'
-               + 'GlslangLibs' // TODO: Once dlls work properly, remove this.
-               + 'ShaderCompiler-Obj'
+               + 'Core-Dll'
+               + 'Cfg-Dll'
+               + 'ShaderCompiler-Dll'
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
     .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
   }
