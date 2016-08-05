@@ -51,5 +51,27 @@ operator <<(std::ostream& OutStream, mat4x4 const& Mat)
   return OutStream;
 }
 
+inline std::ostream&
+operator <<(std::ostream& OutStream, slice<char const> String)
+{
+  if(String.Num == 0)
+  {
+    return OutStream << "<EmptyString>";
+  }
+
+  // TODO: Check if you can supply String.Num somehow.
+  for(auto Char : String)
+  {
+    OutStream << Char;
+  }
+  return OutStream;
+}
+
+inline std::ostream&
+operator <<(std::ostream& OutStream, slice<char> String)
+{
+  return OutStream << AsConst(String);
+}
+
 bool
 ReadFileContentIntoArray(dynamic_array<uint8>* Array, char const* FileName);
