@@ -882,6 +882,9 @@ struct slice
   /// considered invalid (`false`).
   operator bool() const { return Num && Ptr; }
 
+  /// Implicit conversion to const version.
+  operator slice<ElementType const>() const { return { Num, Ptr }; }
+
   /// Index operator to access elements of the slice.
   template<typename IndexType>
   auto
@@ -891,21 +894,6 @@ struct slice
     BoundsCheck(Index >= 0 && Index < Num);
     return Ptr[Index];
   }
-};
-
-template<>
-struct slice<void>
-{
-  using element_type = void;
-
-  size_t Num;
-  element_type* Ptr;
-
-  /// Test whether this slice is valid or not.
-  ///
-  /// A slice is considered valid if it does not point to null and contains at
-  /// least one element.
-  operator bool() const { return Num && Ptr; }
 };
 
 template<>
@@ -921,6 +909,24 @@ struct slice<void const>
   /// A slice is considered valid if it does not point to null and contains at
   /// least one element.
   operator bool() const { return Num && Ptr; }
+};
+
+template<>
+struct slice<void>
+{
+  using element_type = void;
+
+  size_t Num;
+  element_type* Ptr;
+
+  /// Test whether this slice is valid or not.
+  ///
+  /// A slice is considered valid if it does not point to null and contains at
+  /// least one element.
+  operator bool() const { return Num && Ptr; }
+
+  /// Implicit conversion to const version.
+  operator slice<void const>() const { return { Num, Ptr }; }
 };
 
 template<typename T>
@@ -1829,19 +1835,21 @@ struct impl_find_file_extension
   static slice<CharType>
   Do(slice<CharType> FileName, path_options Options)
   {
-    while(FileName.Num)
+    auto Seek = OnePastLast(FileName);
+    size_t Num = 0;
+    while(Num < FileName.Num)
     {
-      --FileName.Num;
-      ++FileName.Ptr;
+      ++Num;
+      --Seek;
 
-      char const Character = *First(FileName);
+      auto const Character = *Seek;
 
       // Found the path separator before the extension marker?
       if(Character == Options.Separator)
         break;
 
       if(Character == '.')
-        return FileName;
+        return Slice(Num, Seek);
     }
 
     // Return an empty slice that still points to the correct memory.

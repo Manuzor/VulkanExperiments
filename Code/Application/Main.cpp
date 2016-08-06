@@ -1584,6 +1584,18 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
   SinkSlots[0] = GetStdoutLogSink(stdout_log_sink_enable_prefixes::Yes);
   SinkSlots[1] = log_sink(VisualStudioLogSink);
 
+  image_loader_registry* ImageLoaderRegistry = CreateImageLoaderRegistry(Allocator);
+  Defer [=](){ DestroyImageLoaderRegistry(Allocator, ImageLoaderRegistry); };
+
+  {
+    auto ImageLoaderModule = RegisterImageLoaderModule(ImageLoaderRegistry,
+                                                       "DDS"_S,
+                                                       "Core.dll"_S,
+                                                       "CreateImageLoader_DDS"_S,
+                                                       "DestroyImageLoader_DDS"_S);
+    AssociateImageLoaderModuleWithFileExtension(ImageLoaderModule, ".dds"_S);
+  }
+
   {
     auto Vulkan = Allocate<vulkan>(Allocator);
     *Vulkan = {};
@@ -1862,18 +1874,28 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       bool const LoadFromFile = true;
       if(LoadFromFile)
       {
-        auto FileName = SliceFromString("Data/Kitten_DXT1_Mipmaps.dds");
-        auto ImageLoaderFactory = ImageLoaderFactoryByFileExtension(FindFileExtension(FileName));
-        auto ImageLoader = ImageLoaderFactory.CreateImageLoader(Allocator);
-        if(LoadImageFromFile(ImageLoader, &Kitten->Texture.Image, FileName))
+        arc_string FileName = "Data/Kitten_DXT1_Mipmaps.dds";
+        auto FileExtension = AsConst(FindFileExtension(Slice(FileName)));
+        auto Factory = GetImageLoaderFactoryByFileExtension(ImageLoaderRegistry, FileExtension);
+
+        if(Factory)
         {
-          LogInfo("Loaded image file: %*s", Convert<int>(FileName.Num), FileName.Ptr);
+          auto ImageLoader = CreateImageLoader(Factory);
+          Defer [=](){ DestroyImageLoader(Factory, ImageLoader); };
+
+          if(LoadImageFromFile(ImageLoader, &Kitten->Texture.Image, Slice(FileName)))
+          {
+            LogInfo("Loaded image file: %s", StrPtr(FileName));
+          }
+          else
+          {
+            LogWarning("Failed to load image file: %s", StrPtr(FileName));
+          }
         }
         else
         {
-          LogWarning("Failed to load image file: %*s", Convert<int>(FileName.Num), FileName.Ptr);
+          LogWarning("Failed to find image loader for: %s", StrPtr(FileName));
         }
-        ImageLoaderFactory.DestroyImageLoader(Allocator, ImageLoader);
       }
       else
       {

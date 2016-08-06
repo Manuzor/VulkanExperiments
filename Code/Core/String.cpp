@@ -10,6 +10,26 @@ GetDefaultStringAllocator()
   return &Allocator;
 }
 
+static arc_string::internal*
+CreateInternal(allocator_interface* Allocator)
+{
+  auto Internal = Allocate<arc_string::internal>(Allocator);
+  Assert(Internal);
+  *Internal = {};
+  Init(&Internal->Data, Allocator);
+  Internal->RefCount = 1;
+
+  return Internal;
+}
+
+static void
+DestroyInternal(allocator_interface* Allocator, arc_string::internal* Internal)
+{
+  Finalize(&Internal->Data);
+  if(Allocator)
+    Deallocate(Allocator, Internal);
+}
+
 static bool
 StrIsInitialized(arc_string const& String)
 {
@@ -40,9 +60,7 @@ StrReleaseRef(allocator_interface* Allocator, arc_string::internal* Internal)
 
   if(Internal->RefCount <= 0)
   {
-    Finalize(&Internal->Data);
-    if(Allocator)
-      Deallocate(Allocator, Internal);
+    DestroyInternal(Allocator, Internal);
   }
 }
 
@@ -98,6 +116,7 @@ arc_string::arc_string(arc_string&& Copy)
 arc_string::~arc_string()
 {
   StrReleaseRef(this->Allocator, this->Internal);
+  this->Internal = nullptr;
 }
 
 auto
@@ -145,18 +164,6 @@ arc_string::operator=(slice<char> Content)
   StrSet(*this, AsConst(Content));
 }
 
-static arc_string::internal*
-CreateInternal(allocator_interface* Allocator)
-{
-  auto Internal = Allocate<arc_string::internal>(Allocator);
-  Assert(Internal);
-  *Internal = {};
-  Init(&Internal->Data, Allocator);
-  Internal->RefCount = 1;
-
-  return Internal;
-}
-
 auto
 ::StrEnsureInitialized(arc_string& String)
   -> void
@@ -177,8 +184,11 @@ auto
   StrEnsureInitialized(String);
   if(String.Internal->RefCount > 1)
   {
+    auto Allocator = String.Allocator;
     auto OldInternal = String.Internal;
-    auto NewInternal = CreateInternal(String.Allocator);
+    StrReleaseRef(Allocator, OldInternal);
+
+    auto NewInternal = CreateInternal(Allocator);
 
     // Copy the old content over.
     SliceCopy(ExpandBy(&NewInternal->Data, OldInternal->Data.Num),
@@ -204,7 +214,7 @@ auto
 }
 
 auto
-::StrNumBytes(arc_string& String)
+::StrNumBytes(arc_string const& String)
   -> size_t
 {
   if(StrIsInitialized(String))
@@ -213,7 +223,7 @@ auto
 }
 
 auto
-::StrNumChars(arc_string& String)
+::StrNumChars(arc_string const& String)
   -> size_t
 {
   // TODO: Decode?
@@ -223,7 +233,7 @@ auto
 }
 
 auto
-::StrIsEmpty(arc_string& String)
+::StrIsEmpty(arc_string const& String)
   -> bool
 {
   return StrNumBytes(String) == 0;
@@ -273,15 +283,28 @@ auto
 ::StrClear(arc_string& String)
   -> void
 {
-  if(StrIsInitialized(String))
-    Clear(&String.Internal->Data);
+  if(!StrIsInitialized(String))
+    return;
+
+  StrEnsureUnique(String);
+  Clear(&String.Internal->Data);
+  StrEnsureZeroTerminated(String);
+}
+
+void
+StrReset(arc_string& String)
+{
+  if(!StrIsInitialized(String))
+    return;
+
+  StrReleaseRef(String.Allocator, String.Internal);
+  String.Internal = nullptr;
 }
 
 auto
 ::StrSet(arc_string& String, slice<char const> Content)
   -> void
 {
-  StrEnsureUnique(String);
   StrClear(String);
   StrAppend(String, Content);
 }
@@ -298,10 +321,9 @@ auto
 }
 
 auto
-::StrConcat(arc_string& String, slice<char const> More)
+::StrConcat(arc_string const& String, slice<char const> More)
   -> arc_string
 {
-  StrEnsureInitialized(String);
   auto Copy = String;
   StrAppend(Copy, More);
   return Copy;

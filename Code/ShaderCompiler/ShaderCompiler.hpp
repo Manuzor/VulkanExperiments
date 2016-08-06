@@ -7,6 +7,8 @@
 #endif
 
 #include <Core/Allocator.hpp>
+#include <Core/DynamicArray.hpp>
+#include <Core/string.hpp>
 
 #include <Cfg/Cfg.hpp>
 
@@ -21,20 +23,36 @@ enum class glsl_shader_stage
   Compute,
 };
 
-class SHADER_COMPILER_API glsl_shader
+struct glsl_shader
 {
-public:
-  dynamic_array<char> EntryPoint{};
+  arc_string EntryPoint{};
   glsl_shader_stage Stage{};
-  dynamic_array<char> Code{};
-
-  glsl_shader(allocator_interface* Allocator);
-  ~glsl_shader();
+  arc_string Code{};
 };
 
-struct shader_compiler_context
+SHADER_COMPILER_API
+void
+Init(glsl_shader& GlslShader, allocator_interface* Allocator, glsl_shader_stage Stage);
+
+SHADER_COMPILER_API
+void
+Finalize(glsl_shader& GlslShader);
+
+struct spirv_shader
 {
+  dynamic_array<uint32> Code{};
 };
+
+SHADER_COMPILER_API
+void
+Init(spirv_shader& SpirvShader, allocator_interface* Allocator);
+
+SHADER_COMPILER_API
+void
+Finalize(spirv_shader& SpirvShader);
+
+
+struct shader_compiler_context;
 
 SHADER_COMPILER_API
 shader_compiler_context*
@@ -52,9 +70,9 @@ CompileCfgToGlsl(shader_compiler_context* Context, cfg_node const* ShaderRoot,
 SHADER_COMPILER_API
 bool
 CompileGlslToSpv(shader_compiler_context* Context, glsl_shader const* GlslShader,
-                 dynamic_array<uint32>* SpvByteCode);
+                 spirv_shader* SpirvShader);
 
 SHADER_COMPILER_API
 bool
 CompileCfgToGlslAndSpv(shader_compiler_context* Context, cfg_node const* ShaderRoot,
-                       glsl_shader* GlslShader, dynamic_array<uint32>* SpvByteCode);
+                       glsl_shader* GlslShader, spirv_shader* SpirvShader);

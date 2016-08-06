@@ -9,6 +9,8 @@ auto
 ::Init(vulkan* Vulkan, allocator_interface* Allocator)
   -> void
 {
+  Vulkan->ShaderManagerAllocator = Allocator;
+  Vulkan->ShaderManager = CreateShaderManager(Vulkan->ShaderManagerAllocator);
   Init(&Vulkan->Gpu.QueueProperties, Allocator);
   Init(&Vulkan->Framebuffers, Allocator);
   Init(&Vulkan->SceneObjects, Allocator);
@@ -35,6 +37,7 @@ auto
   Finalize(&Vulkan->SceneObjects);
   Finalize(&Vulkan->Framebuffers);
   Finalize(&Vulkan->Gpu.QueueProperties);
+  DestroyShaderManager(Vulkan->ShaderManagerAllocator, Vulkan->ShaderManager);
 }
 
 auto

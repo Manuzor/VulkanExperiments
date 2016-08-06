@@ -140,4 +140,14 @@
     <DisplayString>{{ R={R,g}, G={G,g}, B={B,g}, A={A,g} }}</DisplayString>
   </Type>
 
+  <Type Name="arc_string">
+    <DisplayString Condition="Internal != nullptr">{Internal->Data.Ptr,s8}</DisplayString>
+    <DisplayString Condition="Internal == nullptr">{{ Null String }}</DisplayString>
+    <StringView Condition="Internal != nullptr">Internal->Data.Ptr,s8</StringView>
+    <Expand>
+      <Item Name="Num Bytes" Condition="Internal != nullptr">Internal->Data.Num</Item>
+      <Item Name="Data Ptr" Condition="Internal != nullptr">Internal->Data.Ptr</Item>
+    </Expand>
+  </Type>
+
 </AutoVisualizer>

@@ -6,6 +6,8 @@
 #include <Core/Color.hpp>
 #include <Core/Image.hpp>
 
+#include "ShaderManager.hpp"
+
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.h>
 
@@ -158,6 +160,9 @@ struct vulkan : public vulkan_instance_functions
   HMODULE DLL;
   fixed_block<KiB(1), char> DLLNameBuffer;
   slice<char> DLLName;
+
+  shader_manager* ShaderManager;
+  allocator_interface* ShaderManagerAllocator;
 
   VkInstance InstanceHandle;
 

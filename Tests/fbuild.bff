@@ -30,6 +30,7 @@
     .Libraries + '$ProjectName$-Obj'
                + 'Core-Dll'
                + 'Cfg-Dll'
+               + 'ShaderCompiler-Dll'
     .LinkerOptions + ' /PDB:$BuildPath$/$ProjectName$.pdb'
     .LinkerOutput = '$BuildPath$/$ProjectName$.exe'
   }

@@ -5,17 +5,39 @@
 #include <glslang/Public/ShaderLang.h>
 #include <SPIRV/GlslangToSpv.h>
 
-
-glsl_shader::glsl_shader(allocator_interface* Allocator)
+struct shader_compiler_context
 {
-  Init(&this->EntryPoint, Allocator);
-  Init(&this->Code, Allocator);
+};
+
+auto
+::Init(glsl_shader& GlslShader, allocator_interface* Allocator, glsl_shader_stage Stage)
+  -> void
+{
+  GlslShader.Stage = Stage;
+  GlslShader.EntryPoint.Allocator = Allocator;
+  GlslShader.Code.Allocator = Allocator;
 }
 
-glsl_shader::~glsl_shader()
+auto
+::Finalize(glsl_shader& GlslShader)
+  -> void
 {
-  Finalize(&this->Code);
-  Finalize(&this->EntryPoint);
+  StrClear(GlslShader.EntryPoint);
+  StrClear(GlslShader.Code);
+}
+
+auto
+Init(spirv_shader& SpirvShader, allocator_interface* Allocator)
+  -> void
+{
+  Init(&SpirvShader.Code, Allocator);
+}
+
+auto
+Finalize(spirv_shader& SpirvShader)
+  -> void
+{
+  Finalize(&SpirvShader.Code);
 }
 
 int GlobalShaderCompilerCount = 0;
@@ -59,14 +81,6 @@ auto
   }
 }
 
-
-template<typename T, typename U>
-void
-ArrayAppend(dynamic_array<T>* Array, slice<U> ToAppend)
-{
-  auto NewSlice = ExpandBy(Array, ToAppend.Num);
-  SliceCopy(NewSlice, ToAppend);
-}
 
 cfg_node const*
 FindSibling(cfg_node const* Node, char const* Name)
@@ -155,7 +169,7 @@ GetShaderData(cfg_node const* ShaderNode,
               dynamic_array<buffer>* Buffers,                 // Out
               dynamic_array<declaration>* InputDeclarations,  // Out
               dynamic_array<declaration>* OutputDeclarations, // Out
-              dynamic_array<char>* EntryPoint,                // Out
+              arc_string* EntryPoint,                         // Out
               dynamic_array<slice<char const>>* Code)         // Out
 {
   if(ShaderNode->FirstChild == nullptr)
@@ -270,7 +284,7 @@ GetShaderData(cfg_node const* ShaderNode,
         if(Attribute.Name == "Entry"_S)
         {
           auto EntryPointValue = Convert<slice<char const>>(Attribute.Value);
-          ArrayAppend(EntryPoint, EntryPointValue);
+          *EntryPoint = EntryPointValue;
         }
       }
     }
@@ -303,8 +317,8 @@ auto
   fixed_block<256, char> FormattingFixedBuffer;
   auto FormattingBuffer = Slice(FormattingFixedBuffer);
 
-  Clear(&GlslShader->EntryPoint);
-  Clear(&GlslShader->Code);
+  StrClear(GlslShader->EntryPoint);
+  StrClear(GlslShader->Code);
 
   scoped_array<declaration> Sampler2Ds{ Allocator };
   scoped_array<declaration> InputDeclarations{ Allocator };
@@ -331,53 +345,53 @@ auto
 
   // TODO: Support reading #version and #extension values from cfg?
   // Add default version and extensions.
-  ArrayAppend(&GlslShader->Code, "#version 450\n\n"
-                                 "#extension GL_ARB_separate_shader_objects : enable\n"
-                                 "#extension GL_ARB_shading_language_420pack : enable\n\n"_S);
+  GlslShader->Code += "#version 450\n\n"
+                      "#extension GL_ARB_separate_shader_objects : enable\n"
+                      "#extension GL_ARB_shading_language_420pack : enable\n\n";
 
   if(Sampler2Ds.Num)
   {
     for(auto& Decl : Slice(&Sampler2Ds))
     {
-      ArrayAppend(&GlslShader->Code, "layout("_S);
+      GlslShader->Code += "layout(";
       bool NeedComma = false;
       if(Decl.Location != -1)
       {
-        ArrayAppend(&GlslShader->Code, "location="_S);
+        GlslShader->Code += "location=(";
         auto LocationString = Convert<slice<char>>(Decl.Location, FormattingBuffer);
-        ArrayAppend(&GlslShader->Code, AsConst(LocationString));
+        GlslShader->Code += LocationString;
         NeedComma = true;
       }
-      ArrayAppend(&GlslShader->Code, ") in "_S);
-      ArrayAppend(&GlslShader->Code, Decl.TypeName);
-      ArrayAppend(&GlslShader->Code, " "_S);
-      ArrayAppend(&GlslShader->Code, Decl.Identifier);
-      ArrayAppend(&GlslShader->Code, ";\n"_S);
+      GlslShader->Code += ") in ";
+      GlslShader->Code += Decl.TypeName;
+      GlslShader->Code += " ";
+      GlslShader->Code += Decl.Identifier;
+      GlslShader->Code += ";\n";
     }
   }
 
   if(Buffers.Num)
   {
-    ArrayAppend(&GlslShader->Code, "\n"
-                                   "//\n"
-                                   "// Buffers\n"
-                                   "//\n"_S);
+    GlslShader->Code += "\n"
+                        "//\n"
+                        "// Buffers\n"
+                        "//\n";
     for(auto& Buffer : Slice(&Buffers))
     {
-      ArrayAppend(&GlslShader->Code, "layout("_S);
+      GlslShader->Code += "layout(";
       bool NeedComma = false;
       if(Buffer.Binding != -1)
       {
-        ArrayAppend(&GlslShader->Code, "binding="_S);
+        GlslShader->Code += "binding=";
         auto BindingString = Convert<slice<char>>(Buffer.Binding, FormattingBuffer);
-        ArrayAppend(&GlslShader->Code, AsConst(BindingString));
+        GlslShader->Code += BindingString;
         NeedComma = true;
       }
-      ArrayAppend(&GlslShader->Code, ") "_S);
-      ArrayAppend(&GlslShader->Code, Buffer.TypeName);
-      ArrayAppend(&GlslShader->Code, " "_S);
-      ArrayAppend(&GlslShader->Code, Buffer.Identifier);
-      ArrayAppend(&GlslShader->Code, "\n{\n"_S);
+      GlslShader->Code += ") ";
+      GlslShader->Code += Buffer.TypeName;
+      GlslShader->Code += " ";
+      GlslShader->Code += Buffer.Identifier;
+      GlslShader->Code += "\n{\n";
       for(auto& Decl : Slice(&Buffer.Declarations))
       {
         if(Decl.Location != -1)
@@ -385,92 +399,84 @@ auto
           LogWarning("Ignoring layout spec `location` in buffer declaration.");
         }
 
-        ArrayAppend(&GlslShader->Code, "  "_S);
-        ArrayAppend(&GlslShader->Code, Decl.TypeName);
-        ArrayAppend(&GlslShader->Code, " "_S);
-        ArrayAppend(&GlslShader->Code, Decl.Identifier);
-        ArrayAppend(&GlslShader->Code, ";\n"_S);
+        GlslShader->Code += "  ";
+        GlslShader->Code += Decl.TypeName;
+        GlslShader->Code += " ";
+        GlslShader->Code += Decl.Identifier;
+        GlslShader->Code += ";\n";
       }
-      ArrayAppend(&GlslShader->Code, "};\n"_S);
+      GlslShader->Code += "};\n";
     }
   }
 
   if(InputDeclarations.Num)
   {
-    ArrayAppend(&GlslShader->Code, "\n"
-                                   "//\n"
-                                   "// Input\n"
-                                   "//\n"_S);
+    GlslShader->Code += "\n"
+                        "//\n"
+                        "// Input\n"
+                        "//\n";
 
     for(auto& Decl : Slice(&InputDeclarations))
     {
-      ArrayAppend(&GlslShader->Code, "layout("_S);
+      GlslShader->Code += "layout(";
       bool NeedComma = false;
       if(Decl.Location != -1)
       {
         // TODO: Location is an integer, convert it to string somehow.
-        ArrayAppend(&GlslShader->Code, "location="_S);
+        GlslShader->Code += "location=";
         auto LocationString = Convert<slice<char>>(Decl.Location, FormattingBuffer);
-        ArrayAppend(&GlslShader->Code, AsConst(LocationString));
+        GlslShader->Code += LocationString;
         NeedComma = true;
       }
-      ArrayAppend(&GlslShader->Code, ") in "_S);
-      ArrayAppend(&GlslShader->Code, Decl.TypeName);
-      ArrayAppend(&GlslShader->Code, " "_S);
-      ArrayAppend(&GlslShader->Code, Decl.Identifier);
-      ArrayAppend(&GlslShader->Code, ";\n"_S);
+      GlslShader->Code += ") in ";
+      GlslShader->Code += Decl.TypeName;
+      GlslShader->Code += " ";
+      GlslShader->Code += Decl.Identifier;
+      GlslShader->Code += ";\n";
     }
   }
 
   if(OutputDeclarations.Num)
   {
-    ArrayAppend(&GlslShader->Code, "\n"
-                                   "//\n"
-                                   "// Output\n"
-                                   "//\n"_S);
+    GlslShader->Code += "\n"
+                        "//\n"
+                        "// Output\n"
+                        "//\n";
 
     for(auto& Decl : Slice(&OutputDeclarations))
     {
-      ArrayAppend(&GlslShader->Code, "layout("_S);
+      GlslShader->Code += "layout(";
       bool NeedComma = false;
       if(Decl.Location != -1)
       {
         // TODO: Location is an integer, convert it to string somehow.
-        ArrayAppend(&GlslShader->Code, "location="_S);
+        GlslShader->Code += "location=";
         auto LocationString = Convert<slice<char>>(Decl.Location, FormattingBuffer);
-        ArrayAppend(&GlslShader->Code, AsConst(LocationString));
+        GlslShader->Code += AsConst(LocationString);
         NeedComma = true;
       }
-      ArrayAppend(&GlslShader->Code, ") out "_S);
-      ArrayAppend(&GlslShader->Code, Decl.TypeName);
-      ArrayAppend(&GlslShader->Code, " "_S);
-      ArrayAppend(&GlslShader->Code, Decl.Identifier);
-      ArrayAppend(&GlslShader->Code, ";\n"_S);
+      GlslShader->Code += ") out ";
+      GlslShader->Code += Decl.TypeName;
+      GlslShader->Code += " ";
+      GlslShader->Code += Decl.Identifier;
+      GlslShader->Code += ";\n";
     }
-    ArrayAppend(&GlslShader->Code, "\n"_S);
+    GlslShader->Code += "\n";
   }
 
   if(ExtraCode.Num)
   {
-    ArrayAppend(&GlslShader->Code, "\n"
-                                   "//\n"
-                                   "// Code\n"
-                                   "//\n"_S);
+    GlslShader->Code += "\n"
+                        "//\n"
+                        "// Code\n"
+                        "//\n";
 
     for(auto& Line : Slice(&ExtraCode))
     {
-      ArrayAppend(&GlslShader->Code, Line);
-      ArrayAppend(&GlslShader->Code, "\n"_S);
+      GlslShader->Code += Line;
+      GlslShader->Code += "\n";
     }
   }
-
-  // Append a 0-terminator but don't add it to the actual code.
-  Reserve(&GlslShader->Code, GlslShader->Code.Num + 1);
-  char* Foo = OnePastLast(Slice(&GlslShader->Code));
-  *Foo = '\0';
-
-  Reserve(&GlslShader->EntryPoint, GlslShader->EntryPoint.Num + 1);
-  *OnePastLast(Slice(&GlslShader->EntryPoint)) = '\0';
 
   return true;
 }
@@ -495,7 +501,7 @@ extern const TBuiltInResource GlobalDefaultGlslangBuiltInResources;
 
 auto
 ::CompileGlslToSpv(shader_compiler_context* Context, glsl_shader const* GlslShader,
-                   dynamic_array<uint32>* SpvByteCode)
+                   spirv_shader* SpirvShader)
   -> bool
 {
   {
@@ -505,9 +511,10 @@ auto
     glslang::TProgram Program;
 
 
-    int NumBytes = Convert<int>(GlslShader->Code.Num);
-    Shader.setStringsWithLengths(&GlslShader->Code.Ptr, &NumBytes, 1);
-    Shader.setEntryPoint(GlslShader->EntryPoint.Ptr);
+    int NumBytes = Convert<int>(StrNumBytes(GlslShader->Code));
+    auto StringPtr = StrPtr(GlslShader->Code);
+    Shader.setStringsWithLengths(&StringPtr, &NumBytes, 1);
+    Shader.setEntryPoint(StrPtr(GlslShader->EntryPoint));
 
     const int DefaultVersion = 110; // For Desktop;
     EShMessages Messages{ Coerce<EShMessages>(EShMsgDefault | EShMsgSpvRules | EShMsgVulkanRules) };
@@ -552,9 +559,9 @@ auto
         return false;
       }
 
-      std::vector<unsigned int> SpvByteCodeVector;
+      std::vector<unsigned int> SpirvCodeVector;
       spv::SpvBuildLogger Logger;
-      glslang::GlslangToSpv(*Intermediate, SpvByteCodeVector, &Logger);
+      glslang::GlslangToSpv(*Intermediate, SpirvCodeVector, &Logger);
 
       auto BuildMessages = Logger.getAllMessages();
       if(!BuildMessages.empty())
@@ -563,9 +570,9 @@ auto
       }
 
       // Copy over the result.
-      SetNum(SpvByteCode, SpvByteCodeVector.size());
-      SliceCopy(Slice(SpvByteCode),
-                AsConst(Slice(SpvByteCodeVector.size(), SpvByteCodeVector.data())));
+      SetNum(&SpirvShader->Code, SpirvCodeVector.size());
+      SliceCopy(Slice(&SpirvShader->Code),
+                AsConst(Slice(SpirvCodeVector.size(), SpirvCodeVector.data())));
     }
   }
 
@@ -574,10 +581,10 @@ auto
 
 auto
 CompileCfgToGlslAndSpv(shader_compiler_context* Context, cfg_node const* ShaderRoot,
-                       glsl_shader* GlslShader, dynamic_array<uint32>* SpvByteCode)
+                       glsl_shader* GlslShader, spirv_shader* SpirvShader)
   -> bool
 {
-  return CompileCfgToGlsl(Context, ShaderRoot, GlslShader) && CompileGlslToSpv(Context, GlslShader, SpvByteCode);
+  return CompileCfgToGlsl(Context, ShaderRoot, GlslShader) && CompileGlslToSpv(Context, GlslShader, SpirvShader);
 }
 
 
