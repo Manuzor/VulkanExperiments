@@ -80,8 +80,9 @@ Manifest["Windows10SDK"]["Version"] = Windows10SDKVersion
 #
 Manifest["VulkanSDK"] = {}
 
-VulkanSDKPath = SystemInfo.VulkanSDKPath(os.environ)
+VulkanSDKPath, VulkanSDKVersion = SystemInfo.VulkanSDKPathAndLatestVersion(os.environ)
 Manifest["VulkanSDK"]["Path"] = VulkanSDKPath.as_posix()
+Manifest["VulkanSDK"]["Version"] = VulkanSDKVersion
 
 #
 # Write The File

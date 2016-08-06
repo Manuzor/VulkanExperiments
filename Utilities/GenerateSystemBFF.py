@@ -28,6 +28,7 @@ Windows10SDKPath = Path(Manifest["Windows10SDK"]["Path"])
 Windows10SDKVersion = Manifest["Windows10SDK"]["Version"]
 VS2015Path = Path(Manifest["VS2015"]["Path"])
 VulkanSDKPath = Path(Manifest["VulkanSDK"]["Path"])
+VulkanSDKVersion = Path(Manifest["VulkanSDK"]["Version"])
 
 assert Windows10SDKPath and Windows10SDKPath.exists()
 assert Windows10SDKVersion
@@ -52,3 +53,4 @@ with OutFilePath.open("w") as OutFile:
 
   if VulkanSDKPath.exists():
     Write(".VulkanSDKPath = '{}'".format(VulkanSDKPath))
+    Write(".VulkanSDKVersion = '{}'".format(VulkanSDKVersion))

@@ -29,10 +29,15 @@ def Windows10SDKPathAndLatestVersion(Env):
 
   return WindowsSdkDir, Windows10SDKVersions[-1]
 
-def VulkanSDKPath(Env):
+def VulkanSDKPathAndLatestVersion(Env):
   VulkanSDKPath_Fallback = Path("C:/", "VulkanSDK", "1.0.13.0")
   VulkanSDKPath = Path(Env.get("VULKAN_SDK", Env.get("VK_SDK_PATH", VulkanSDKPath_Fallback)))
-  return VulkanSDKPath
+
+  if not VulkanSDKPath.exists():
+    return VulkanSDKPath, None
+
+  VulkanSDKVersion = VulkanSDKPath.name
+  return VulkanSDKPath, VulkanSDKVersion
 
 def RepoRoot(Env):
   ThisFilePath = Path(__file__)
@@ -51,3 +56,18 @@ def LoadRepoManifestPath(FilePath):
 
 def SystemBFFPath(Env):
   return RepoRoot(Env) / "Workspace" / "System.bff"
+
+def BackbonePath(Env):
+  Result = Env.get("BACKBONE_REPO_ROOT", None)
+  if Result:
+    return Path()
+
+  Result = Path.cwd()
+  while Result.parent != Result:
+    Candidate = Result / "Backbone"
+    if Candidate.is_dir():
+      return Candidate
+
+    Result = Result.parent
+
+  return Path()

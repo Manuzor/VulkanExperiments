@@ -88,7 +88,7 @@ FileTemplate = """{{
     }},
     {{
       "path": "{VulkanSDK[Path]}",
-      "name": "Vulkan SDK",
+      "name": "Vulkan SDK {VulkanSDK[Version]}",
       "file_include_patterns": [ "*.h", "*.hpp" ]
     }}
   ]
