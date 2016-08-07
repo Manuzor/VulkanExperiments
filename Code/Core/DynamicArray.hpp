@@ -138,6 +138,17 @@ Expand(dynamic_array<T>* Array)
   return ExpandBy(Array, 1)[0];
 }
 
+template<typename T, typename U>
+void
+Append(dynamic_array<T>* Array, slice<U> More)
+{
+  if(More.Num)
+  {
+    auto NewSpace = ExpandBy(Array, More.Num);
+    SliceCopy(NewSpace, More);
+  }
+}
+
 template<typename T>
 void
 SetNum(dynamic_array<T>* Array, size_t NewNum)

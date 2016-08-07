@@ -103,14 +103,12 @@ namespace
     slice<char const> TypeName = {};
     slice<char const> Identifier = {};
     int Location = -1;
+    int Binding = -1;
   };
 
-  struct buffer
+  struct buffer : public declaration
   {
-    slice<char const> TypeName = {};
-    slice<char const> Identifier = {};
-    int Binding = -1;
-    dynamic_array<declaration> Declarations = {};
+    dynamic_array<declaration> InnerDeclarations = {};
   };
 }
 
@@ -165,7 +163,7 @@ GetDeclarations(cfg_node const* FirstSibling, dynamic_array<declaration>* OutDec
 static void
 GetShaderData(cfg_node const* ShaderNode,
               allocator_interface* Allocator,
-              dynamic_array<declaration>* Sampler2Ds,         // Out
+              dynamic_array<declaration>* MiscGlobals,        // Out
               dynamic_array<buffer>* Buffers,                 // Out
               dynamic_array<declaration>* InputDeclarations,  // Out
               dynamic_array<declaration>* OutputDeclarations, // Out
@@ -175,30 +173,47 @@ GetShaderData(cfg_node const* ShaderNode,
   if(ShaderNode->FirstChild == nullptr)
     return;
 
-  //
-  // Buffers
-  //
+  for(auto Node = ShaderNode->FirstChild;
+      Node != nullptr;
+      Node = Node->Next)
   {
-    auto BuffersNode = FindSibling(ShaderNode->FirstChild, "Buffers");
-    if(BuffersNode)
+    if(Node->Name == "Input"_S)
     {
-      auto Node = BuffersNode->FirstChild;
-      while(Node)
+      GetDeclarations(Node->FirstChild, InputDeclarations);
+    }
+    else if(Node->Name == "Output"_S)
+    {
+      GetDeclarations(Node->FirstChild, OutputDeclarations);
+    }
+    else if(Node->Name == "Code"_S)
+    {
+      for(auto LineNode = Node->FirstChild; LineNode; LineNode = LineNode->Next)
       {
-        auto& Buffer = Expand(Buffers);
-
-        if(Node->Name == "uniform"_S ||
-           Node->Name == "buffer"_S)
+        if(LineNode->Name != ""_S)
         {
-          Buffer.TypeName = Node->Name.Value;
-        }
-        else
-        {
-          LogError("Unknown buffer type: %*s",
-                   Convert<int>(Node->Name.Value.Num), Node->Name.Value.Ptr);
-          ShrinkBy(Buffers, 1);
+          LogWarning("Ignoring named child in Code node.");
           continue;
         }
+
+        for(auto& Line : Slice(&LineNode->Values))
+        {
+          Expand(Code) = Convert<slice<char const>>(Line);
+        }
+      }
+
+      for(auto& Attribute : Slice(&Node->Attributes))
+      {
+        if(Attribute.Name == "Entry"_S)
+        {
+          auto EntryPointValue = Convert<slice<char const>>(Attribute.Value);
+          *EntryPoint = EntryPointValue;
+        }
+      }
+    }
+    else if(Node->Name == "uniform"_S || Node->Name == "buffer"_S)
+    {
+        auto& Buffer = Expand(Buffers);
+        Buffer.TypeName = Node->Name.Value;
 
         if(Node->Values.Num == 0)
         {
@@ -217,93 +232,91 @@ GetShaderData(cfg_node const* ShaderNode,
           }
         }
 
-        Init(&Buffer.Declarations, Allocator);
-        GetDeclarations(Node->FirstChild, &Buffer.Declarations);
-
-        Node = Node->Next;
-      }
+        Init(&Buffer.InnerDeclarations, Allocator);
+        GetDeclarations(Node->FirstChild, &Buffer.InnerDeclarations);
     }
-  }
-
-  //
-  // Input
-  //
-  {
-    auto InputNode = FindSibling(ShaderNode->FirstChild, "Input");
-    if(InputNode)
+    else if(Node->Name == "sampler2D"_S)
     {
-      GetDeclarations(InputNode->FirstChild, InputDeclarations);
+      auto& Sampler2D = Expand(MiscGlobals);
+      Sampler2D.TypeName = Node->Name.Value;
+
+      if(Node->Values.Num == 0)
+      {
+        LogError("sampler2D needs to have a name.");
+        ShrinkBy(MiscGlobals, 1);
+        continue;
+      }
+
+      Sampler2D.Identifier = Convert<slice<char const>>(Node->Values[0]);
+
+      for(auto& Attribute : Slice(&Node->Attributes))
+      {
+        if(Attribute.Name == "Binding"_S)
+        {
+          Sampler2D.Binding = Convert<int>(Attribute.Value);
+        }
+      }
     }
     else
     {
-      LogWarning("No input declarations in vertex shader.");
+      arc_string NodeName = Node->Name.Value;
+      LogWarning("Unrecognized top-level node: %s", StrPtr(NodeName));
     }
   }
+}
 
-
-  //
-  // Output
-  //
+static void
+WriteDeclaration(slice<char const> Prefix, declaration const& Decl, arc_string& String, bool WriteLayout, bool WriteSemicolon = true)
+{
+  if(WriteLayout)
   {
-    auto OutputNode = FindSibling(ShaderNode->FirstChild, "Output");
-    if(OutputNode)
+    // Used to format integers to a string.
+    fixed_block<256, char> FormattingFixedBuffer;
+    auto FormattingBuffer = Slice(FormattingFixedBuffer);
+
+    bool NeedComma = false;
+
+    String += "layout(";
+
+    if(Decl.Location != -1)
     {
-      GetDeclarations(OutputNode->FirstChild, OutputDeclarations);
+      if(NeedComma)
+        String += ", ";
+
+      String += "location = ";
+      auto LocationString = Convert<slice<char>>(Decl.Location, FormattingBuffer);
+      String += LocationString;
+      NeedComma = true;
     }
-    else
+
+    if(Decl.Binding != -1)
     {
-      LogWarning("No input declarations in vertex shader.");
+      if(NeedComma)
+        String += ", ";
+
+      String += "binding = ";
+      auto BindingString = Convert<slice<char>>(Decl.Binding, FormattingBuffer);
+      String += BindingString;
+      NeedComma = true;
     }
+
+    String += ") ";
   }
 
-
-  //
-  // Code
-  //
+  if(Prefix)
   {
-    auto CodeNode = FindSibling(ShaderNode->FirstChild, "Code");
-    if(CodeNode)
-    {
-
-      for(auto LineNode = CodeNode->FirstChild; LineNode; LineNode = LineNode->Next)
-      {
-        if(LineNode->Name != ""_S)
-        {
-          LogWarning("Ignoring named child in Code node.");
-          continue;
-        }
-
-        for(auto& Line : Slice(&LineNode->Values))
-        {
-          Expand(Code) = Convert<slice<char const>>(Line);
-        }
-      }
-
-      for(auto& Attribute : Slice(&CodeNode->Attributes))
-      {
-        if(Attribute.Name == "Entry"_S)
-        {
-          auto EntryPointValue = Convert<slice<char const>>(Attribute.Value);
-          *EntryPoint = EntryPointValue;
-        }
-      }
-    }
+    String += Prefix;
+    String += " ";
   }
 
+  String += Decl.TypeName;
+  String += " ";
+  String += Decl.Identifier;
 
-  //
-  // sampler2D
-  //
-  {
-    cfg_node const* Sampler2DNode = ShaderNode->FirstChild;
-    while(true)
-    {
-      Sampler2DNode = FindSibling(Sampler2DNode->Next, "sampler2D");
+  if(WriteSemicolon)
+    String += ";";
 
-      if(Sampler2DNode == nullptr)
-        break;
-    }
-  }
+  String += "\n";
 }
 
 auto
@@ -314,13 +327,10 @@ auto
   temp_allocator TempAllocator;
   allocator_interface* Allocator = *TempAllocator;
 
-  fixed_block<256, char> FormattingFixedBuffer;
-  auto FormattingBuffer = Slice(FormattingFixedBuffer);
-
   StrClear(GlslShader->EntryPoint);
   StrClear(GlslShader->Code);
 
-  scoped_array<declaration> Sampler2Ds{ Allocator };
+  scoped_array<declaration> MiscGlobals{ Allocator };
   scoped_array<declaration> InputDeclarations{ Allocator };
   scoped_array<declaration> OutputDeclarations{ Allocator };
   slice<char const> EntryPoint{};
@@ -330,13 +340,13 @@ auto
   {
     for(auto& Buffer : Slice(&Buffers))
     {
-      Finalize(&Buffer.Declarations);
+      Finalize(&Buffer.InnerDeclarations);
     }
   };
 
   GetShaderData(ShaderRoot,
                 Allocator,
-                &Sampler2Ds,
+                &MiscGlobals,
                 &Buffers,
                 &InputDeclarations,
                 &OutputDeclarations,
@@ -349,25 +359,14 @@ auto
                       "#extension GL_ARB_separate_shader_objects : enable\n"
                       "#extension GL_ARB_shading_language_420pack : enable\n\n";
 
-  if(Sampler2Ds.Num)
+  if(MiscGlobals.Num > 0)
   {
-    for(auto& Decl : Slice(&Sampler2Ds))
+    GlslShader->Code += "\n";
+    for(auto& Decl : Slice(&MiscGlobals))
     {
-      GlslShader->Code += "layout(";
-      bool NeedComma = false;
-      if(Decl.Location != -1)
-      {
-        GlslShader->Code += "location=(";
-        auto LocationString = Convert<slice<char>>(Decl.Location, FormattingBuffer);
-        GlslShader->Code += LocationString;
-        NeedComma = true;
-      }
-      GlslShader->Code += ") in ";
-      GlslShader->Code += Decl.TypeName;
-      GlslShader->Code += " ";
-      GlslShader->Code += Decl.Identifier;
-      GlslShader->Code += ";\n";
+      WriteDeclaration("uniform"_S, Decl, GlslShader->Code, true);
     }
+    GlslShader->Code += "\n";
   }
 
   if(Buffers.Num)
@@ -378,35 +377,27 @@ auto
                         "//\n";
     for(auto& Buffer : Slice(&Buffers))
     {
-      GlslShader->Code += "layout(";
-      bool NeedComma = false;
-      if(Buffer.Binding != -1)
-      {
-        GlslShader->Code += "binding=";
-        auto BindingString = Convert<slice<char>>(Buffer.Binding, FormattingBuffer);
-        GlslShader->Code += BindingString;
-        NeedComma = true;
-      }
-      GlslShader->Code += ") ";
-      GlslShader->Code += Buffer.TypeName;
-      GlslShader->Code += " ";
-      GlslShader->Code += Buffer.Identifier;
-      GlslShader->Code += "\n{\n";
-      for(auto& Decl : Slice(&Buffer.Declarations))
+      WriteDeclaration({}, Buffer, GlslShader->Code, true, false);
+
+      GlslShader->Code += "{\n";
+      for(auto& Decl : Slice(&Buffer.InnerDeclarations))
       {
         if(Decl.Location != -1)
         {
           LogWarning("Ignoring layout spec `location` in buffer declaration.");
         }
 
+        if(Decl.Binding != -1)
+        {
+          LogWarning("Ignoring layout spec `binding` in buffer declaration.");
+        }
+
         GlslShader->Code += "  ";
-        GlslShader->Code += Decl.TypeName;
-        GlslShader->Code += " ";
-        GlslShader->Code += Decl.Identifier;
-        GlslShader->Code += ";\n";
+        WriteDeclaration({}, Decl, GlslShader->Code, false);
       }
       GlslShader->Code += "};\n";
     }
+    GlslShader->Code += "\n";
   }
 
   if(InputDeclarations.Num)
@@ -418,22 +409,9 @@ auto
 
     for(auto& Decl : Slice(&InputDeclarations))
     {
-      GlslShader->Code += "layout(";
-      bool NeedComma = false;
-      if(Decl.Location != -1)
-      {
-        // TODO: Location is an integer, convert it to string somehow.
-        GlslShader->Code += "location=";
-        auto LocationString = Convert<slice<char>>(Decl.Location, FormattingBuffer);
-        GlslShader->Code += LocationString;
-        NeedComma = true;
-      }
-      GlslShader->Code += ") in ";
-      GlslShader->Code += Decl.TypeName;
-      GlslShader->Code += " ";
-      GlslShader->Code += Decl.Identifier;
-      GlslShader->Code += ";\n";
+      WriteDeclaration("in"_S, Decl, GlslShader->Code, true);
     }
+    GlslShader->Code += "\n";
   }
 
   if(OutputDeclarations.Num)
@@ -445,21 +423,7 @@ auto
 
     for(auto& Decl : Slice(&OutputDeclarations))
     {
-      GlslShader->Code += "layout(";
-      bool NeedComma = false;
-      if(Decl.Location != -1)
-      {
-        // TODO: Location is an integer, convert it to string somehow.
-        GlslShader->Code += "location=";
-        auto LocationString = Convert<slice<char>>(Decl.Location, FormattingBuffer);
-        GlslShader->Code += AsConst(LocationString);
-        NeedComma = true;
-      }
-      GlslShader->Code += ") out ";
-      GlslShader->Code += Decl.TypeName;
-      GlslShader->Code += " ";
-      GlslShader->Code += Decl.Identifier;
-      GlslShader->Code += ";\n";
+      WriteDeclaration("out"_S, Decl, GlslShader->Code, true);
     }
     GlslShader->Code += "\n";
   }

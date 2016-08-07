@@ -163,3 +163,22 @@ Remove(dictionary<K, V>* Dict, IndexType KeyIndex)
   --Dict->Num;
   return true;
 }
+
+template<typename K, typename V>
+struct scoped_dictionary : public dictionary<K, V>
+{
+  scoped_dictionary() = default;
+  scoped_dictionary(allocator_interface* NewAllocator) { Init(NewAllocator); }
+  ~scoped_dictionary() { Finalize(); }
+
+  void Init(allocator_interface* NewAllocator)
+  {
+    *this = {};
+    ::Init(this, NewAllocator);
+  }
+
+  void Finalize()
+  {
+    ::Finalize(this);
+  }
+};

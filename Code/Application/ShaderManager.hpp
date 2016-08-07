@@ -4,6 +4,7 @@
 
 #include <Core/Allocator.hpp>
 #include <Core/DynamicArray.hpp>
+#include <Core/Dictionary.hpp>
 
 
 #include <vulkan/vulkan.h>
@@ -57,5 +58,16 @@ GenerateVertexInputDescriptions(compiled_shader* CompiledShader,
                                 VkVertexInputBindingDescription const& Binding,
                                 dynamic_array<VkVertexInputAttributeDescription>* InputAttributes);
 
+shader_stage
+ShaderStageFromName(slice<char const> ShaderStageName);
+
 VkShaderStageFlagBits
 ShaderStageToVulkan(shader_stage Stage);
+
+void
+GetDescriptorTypeCounts(compiled_shader* CompiledShader,
+                        dictionary<VkDescriptorType, uint32>* DescriptorCounts);
+
+void
+GetDescriptorSetLayoutBindings(compiled_shader* CompiledShader,
+                               dynamic_array<VkDescriptorSetLayoutBinding>* LayoutBindings);

@@ -409,6 +409,17 @@ auto
 }
 
 auto
+::ShaderStageFromName(slice<char const> ShaderStageName)
+  -> shader_stage
+{
+  if(SliceStartsWith(ShaderStageName, "Vertex"_S))   return shader_stage::Vertex;
+  if(SliceStartsWith(ShaderStageName, "Fragment"_S)) return shader_stage::Fragment;
+
+  // Invalid value.
+  return Coerce<shader_stage>(-1);
+}
+
+auto
 ::ShaderStageToVulkan(shader_stage Stage)
   -> VkShaderStageFlagBits
 {
@@ -428,4 +439,107 @@ auto
   LogError("Unknown shader stage: %u", Stage);
   Assert(0);
   return VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
+}
+
+static VkDescriptorType
+GetDescriptorTypeFromName(slice<char const> DescriptorName)
+{
+  if(DescriptorName == "sampler2D"_S)    return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  else if(DescriptorName == "buffer"_S)  return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  else if(DescriptorName == "uniform"_S) return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+  return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+}
+
+auto
+::GetDescriptorTypeCounts(compiled_shader* CompiledShader,
+                          dictionary<VkDescriptorType, uint32>* DescriptorCounts)
+  -> void
+{
+  if(CompiledShader == nullptr)
+  {
+    LogError("Invalid CompiledShader ptr.");
+    return;
+  }
+
+  for(auto Node = CompiledShader->Cfg.Root->FirstChild;
+      Node != nullptr;
+      Node = Node->Next)
+  {
+    for(auto Descriptor = Node->FirstChild;
+        Descriptor != nullptr;
+        Descriptor = Descriptor->Next)
+    {
+      auto DescriptorType = GetDescriptorTypeFromName(Descriptor->Name.Value);
+      if(DescriptorType != VK_DESCRIPTOR_TYPE_MAX_ENUM)
+      {
+        ++*GetOrCreate(DescriptorCounts, DescriptorType);
+      }
+      else
+      {
+        arc_string DescriptorName{ Descriptor->Name.Value };
+        LogWarning("Unknown descriptor name: %s", StrPtr(DescriptorName));
+      }
+    }
+  }
+}
+
+auto
+::GetDescriptorSetLayoutBindings(compiled_shader* CompiledShader,
+                                 dynamic_array<VkDescriptorSetLayoutBinding>* LayoutBindings)
+  -> void
+{
+  if(CompiledShader == nullptr)
+  {
+    LogError("Invalid CompiledShader ptr.");
+    return;
+  }
+
+  temp_allocator TempAllocator{};
+  allocator_interface* Allocator = *TempAllocator;
+
+  scoped_dictionary<uint32, VkDescriptorSetLayoutBinding> BindingSet{ Allocator };
+
+  for(auto ShaderNode = CompiledShader->Cfg.Root->FirstChild;
+      ShaderNode != nullptr;
+      ShaderNode = ShaderNode->Next)
+  {
+    auto ShaderStage = ShaderStageFromName(ShaderNode->Name.Value);
+    auto VulkanStageBit = ShaderStageToVulkan(ShaderStage);
+    Assert(VulkanStageBit != VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM);
+
+    for(auto Node = ShaderNode->FirstChild;
+        Node != nullptr;
+        Node = Node->Next)
+    {
+      if(Node->Values.Num == 0)
+      {
+        // Just ignore those nodes that don't have a value.
+        continue;
+      }
+
+      for(auto Attr : Slice(&Node->Attributes))
+      {
+        if(Attr.Name == "Binding"_S)
+        {
+          auto BindingValue = Convert<uint32>(Attr.Value);
+          auto Binding = Get(&BindingSet, BindingValue);
+          if(Binding == nullptr)
+          {
+            Binding = GetOrCreate(&BindingSet, BindingValue);
+            *Binding = InitStruct<VkDescriptorSetLayoutBinding>();
+            Binding->binding = BindingValue;
+            Binding->descriptorType = GetDescriptorTypeFromName(Node->Name.Value);
+            Assert(Binding->descriptorType != VK_DESCRIPTOR_TYPE_MAX_ENUM);
+          }
+
+          ++Binding->descriptorCount;
+          Binding->stageFlags |= VulkanStageBit;
+          break;
+        }
+      }
+    }
+  }
+
+  Append(LayoutBindings, AsConst(Values(&BindingSet)));
 }

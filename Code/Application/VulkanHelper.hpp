@@ -44,10 +44,17 @@ struct vulkan_depth
   VkImageView View;
 };
 
-struct vulkan_uniform_buffer
+struct vulkan_shader_buffer_header
 {
-  VkBuffer Buffer;
-  VkDeviceMemory Memory;
+  VkDescriptorType DescriptorType;
+  VkBuffer BufferHandle;
+  VkDeviceMemory MemoryHandle;
+};
+
+template<typename DataType>
+struct vulkan_shader_buffer : public vulkan_shader_buffer_header
+{
+  DataType Data;
 };
 
 struct vulkan_texture2d
@@ -92,16 +99,17 @@ struct vulkan_debug_grid_vertex
   color_linear Color;
 };
 
+struct vulkan_scene_object_shader_globals
+{
+  mat4x4 ViewProjectionMatrix;
+};
+
 struct vulkan_scene_object_gfx_state
 {
   VkPipeline Pipeline;
   VkPipelineLayout PipelineLayout;
   VkDescriptorSetLayout DescriptorSetLayout;
-  vulkan_uniform_buffer GlobalsUBO;
-  struct
-  {
-    mat4x4 ViewProjectionMatrix;
-  } GlobalsUBOData;
+  vulkan_shader_buffer<vulkan_scene_object_shader_globals> GlobalsUBO;
 
   dynamic_array<VkVertexInputBindingDescription> VertexInputBindingDescs;
   dynamic_array<VkVertexInputAttributeDescription> VertexInputAttributeDescs;
@@ -406,3 +414,16 @@ Init(vulkan_texture2d* Texture, allocator_interface* Allocator);
 
 void
 Finalize(vulkan_texture2d* Texture);
+
+
+void
+ImplCreateShaderBuffer(vulkan* Vulkan, vulkan_shader_buffer_header* ShaderBuffer, size_t NumBytesForBuffer, bool IsReadOnlyForShader);
+
+enum class is_read_only_for_shader : bool { No = false, Yes = true };
+
+template<typename T>
+void
+CreateShaderBuffer(vulkan* Vulkan, vulkan_shader_buffer<T>* ShaderBuffer, is_read_only_for_shader IsReadOnlyForShader)
+{
+  ImplCreateShaderBuffer(Vulkan, ShaderBuffer, SizeOf<T>(), IsReadOnlyForShader == is_read_only_for_shader::Yes);
+}

@@ -1,9 +1,7 @@
 
 VertexShader {
-  Buffers {
-    uniform "Globals" Binding=0 {
-      mat4 "ViewProjectionMatrix"
-    }
+  uniform "Globals" Binding=0 {
+    mat4 "ViewProjectionMatrix"
   }
 
   Input {

@@ -2314,7 +2314,7 @@ auto
   //
   auto DescriptorBufferInfo = InitStruct<VkDescriptorBufferInfo>();
   {
-    DescriptorBufferInfo.buffer = Vulkan->SceneObjectGraphicsState.GlobalsUBO.Buffer;
+    DescriptorBufferInfo.buffer = Vulkan->SceneObjectGraphicsState.GlobalsUBO.BufferHandle;
     DescriptorBufferInfo.offset = 0;
     DescriptorBufferInfo.range = VK_WHOLE_SIZE;
   }
@@ -2324,7 +2324,7 @@ auto
   {
     GlobalUBOUpdateInfo.dstSet = SceneObject->DescriptorSet;
     GlobalUBOUpdateInfo.dstBinding = 0;
-    GlobalUBOUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    GlobalUBOUpdateInfo.descriptorType = Vulkan->SceneObjectGraphicsState.GlobalsUBO.DescriptorType;
     GlobalUBOUpdateInfo.descriptorCount = 1;
     GlobalUBOUpdateInfo.pBufferInfo = &DescriptorBufferInfo;
   }
@@ -2350,4 +2350,49 @@ auto
   -> void
 {
   Finalize(&Texture->Image);
+}
+
+auto
+::ImplCreateShaderBuffer(vulkan* Vulkan, vulkan_shader_buffer_header* ShaderBuffer, size_t NumBytesForBuffer, bool IsReadOnlyForShader)
+  -> void
+{
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
+  BufferCreateInfo.size = NumBytesForBuffer;
+
+  if(IsReadOnlyForShader)
+  {
+    ShaderBuffer->DescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    BufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+  }
+  else
+  {
+    ShaderBuffer->DescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    BufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  }
+
+  VulkanVerify(Device.vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr,
+                                     &ShaderBuffer->BufferHandle));
+
+  VkMemoryRequirements MemoryRequirements;
+  Device.vkGetBufferMemoryRequirements(DeviceHandle, ShaderBuffer->BufferHandle,
+                                       &MemoryRequirements);
+
+  auto MemoryAllocationInfo = InitStruct<VkMemoryAllocateInfo>();
+  {
+    MemoryAllocationInfo.allocationSize = MemoryRequirements.size;
+    MemoryAllocationInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Device.Gpu->MemoryProperties,
+                                                                          MemoryRequirements.memoryTypeBits,
+                                                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    Assert(MemoryAllocationInfo.memoryTypeIndex != IntMaxValue<uint32>());
+  }
+
+  VulkanVerify(Device.vkAllocateMemory(DeviceHandle, &MemoryAllocationInfo, nullptr, &ShaderBuffer->MemoryHandle));
+
+  VulkanVerify(Device.vkBindBufferMemory(DeviceHandle,
+                                         ShaderBuffer->BufferHandle,
+                                         ShaderBuffer->MemoryHandle,
+                                         0));
 }
