@@ -1757,7 +1757,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       AddInputSlotMapping(&SystemInput, keyboard::Up,   MyInputSlots.Camera.RelPitch, -1);
       AddInputSlotMapping(&SystemInput, keyboard::Down, MyInputSlots.Camera.RelPitch, 1);
 
-      float const CameraMouseSensitivity = 0.05f;
+      float const CameraMouseSensitivity = 0.01f;
 
       RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.AbsYaw);
       AddInputSlotMapping(&SystemInput, mouse::XDelta, MyInputSlots.Camera.AbsYaw);
