@@ -486,12 +486,12 @@ ToShLanguage(glsl_shader_stage ShaderStage)
 {
   switch(ShaderStage)
   {
-    case glsl_shader_stage::Vertex:                return EShLangVertex;
-    case glsl_shader_stage::TesselationControl:    return EShLangTessControl;
-    case glsl_shader_stage::TesselationEvaluation: return EShLangTessEvaluation;
-    case glsl_shader_stage::Geometry:              return EShLangGeometry;
-    case glsl_shader_stage::Fragment:              return EShLangFragment;
-    case glsl_shader_stage::Compute:               return EShLangCompute;
+    case glsl_shader_stage::Vertex:                 return EShLangVertex;
+    case glsl_shader_stage::TessellationControl:    return EShLangTessControl;
+    case glsl_shader_stage::TessellationEvaluation: return EShLangTessEvaluation;
+    case glsl_shader_stage::Geometry:               return EShLangGeometry;
+    case glsl_shader_stage::Fragment:               return EShLangFragment;
+    case glsl_shader_stage::Compute:                return EShLangCompute;
     default: return EShLangCount;
   };
 }

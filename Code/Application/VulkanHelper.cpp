@@ -2040,10 +2040,12 @@ auto
   auto const Device = &Vulkan->Device;
   auto const DeviceHandle = Device->DeviceHandle;
 
-  vertex const TopLeft    { Vec3( 0.0f,  0.0f,  0.0f) * 1.0f, Vec2(0.0f, 0.0f) };
-  vertex const TopRight   { Vec3( 0.0f,  1.0f,  0.0f) * 1.0f, Vec2(1.0f, 0.0f) };
-  vertex const BottomLeft { Vec3( 0.0f,  1.0f,  1.0f) * 1.0f, Vec2(0.0f, 1.0f) };
-  vertex const BottomRight{ Vec3( 0.0f,  1.0f,  1.0f) * 1.0f, Vec2(1.0f, 1.0f) };
+  using vertex = vulkan_scene_object_vertex;
+
+  vertex const TopLeft     { Vec3( 0.0f,  0.0f,  0.0f) * 1.0f, Vec2(0.0f, 0.0f) };
+  vertex const TopRight    { Vec3( 0.0f,  1.0f,  0.0f) * 1.0f, Vec2(1.0f, 0.0f) };
+  vertex const BottomLeft  { Vec3( 0.0f,  1.0f,  1.0f) * 1.0f, Vec2(0.0f, 1.0f) };
+  vertex const BottomRight { Vec3( 0.0f,  1.0f,  1.0f) * 1.0f, Vec2(1.0f, 1.0f) };
 
   vertex const GeometryDataArray[] =
   {
@@ -2322,7 +2324,7 @@ auto
   {
     GlobalUBOUpdateInfo.dstSet = SceneObject->DescriptorSet;
     GlobalUBOUpdateInfo.dstBinding = 0;
-    GlobalUBOUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    GlobalUBOUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     GlobalUBOUpdateInfo.descriptorCount = 1;
     GlobalUBOUpdateInfo.pBufferInfo = &DescriptorBufferInfo;
   }

@@ -6,6 +6,16 @@
   .ProjectName = 'Application'
   .SourcePath = '$RepoRoot$/Code/Application'
 
+  .MyIncludes =
+  {
+    '$VulkanSDKPath$/Include'
+  }
+
+  .MyDefines =
+  {
+    'VK_USE_PLATFORM_WIN32_KHR'
+  }
+
   //
   // Rules
   //
@@ -19,17 +29,36 @@
     .ProjectInputPaths = { '$SourcePath$' }
     .LocalDebuggerCommand = '$Output$'
     .LocalDebuggerWorkingDirectory = '$RepoRoot$'
-    .IncludeSearchPath + '$VulkanSDKPath$/Include;'
+
+    ForEach( .Path in .MyIncludes )
+    {
+      ^IncludeSearchPath + '$Path$;'
+    }
+
+    .PreprocessorDefinitions = ' '
+    ForEach( .Define in .MyDefines )
+    {
+      ^PreprocessorDefinitions + '$Define$;'
+    }
   }
   ^SolutionProjects + '$ProjectName$-Proj'
 
 
   ObjectList( '$ProjectName$-Obj' )
   {
-    .CompilerOptions + ' /I"$VulkanSDKPath$/Include"'
     .CompilerInputPath = '$SourcePath$'
     .CompilerOutputPath = '$BuildPath$/$ProjectName$'
     .CompilerInputFiles + '$RepoRoot$/Code/Backbone.cpp'
+
+    ForEach( .Path in .MyIncludes )
+    {
+      ^CompilerOptions + ' /I"$Path$"'
+    }
+
+    ForEach( .Define in .MyDefines )
+    {
+      ^CompilerOptions + ' /D$Define$'
+    }
   }
 
   Executable( '$ProjectName$-Exe' )

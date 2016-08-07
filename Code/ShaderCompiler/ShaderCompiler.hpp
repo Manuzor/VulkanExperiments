@@ -16,8 +16,8 @@
 enum class glsl_shader_stage
 {
   Vertex,
-  TesselationControl,
-  TesselationEvaluation,
+  TessellationControl,
+  TessellationEvaluation,
   Geometry,
   Fragment,
   Compute,

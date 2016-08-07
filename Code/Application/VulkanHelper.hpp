@@ -8,7 +8,6 @@
 
 #include "ShaderManager.hpp"
 
-#define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.h>
 
 #include <Windows.h>
@@ -81,10 +80,10 @@ struct index_buffer
   uint32 NumIndices;
 };
 
-struct vertex
+struct vulkan_scene_object_vertex
 {
   vec3 Position;
-  vec2 TexCoord;
+  vec2 TextureCoordinates;
 };
 
 struct vulkan_debug_grid_vertex

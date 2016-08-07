@@ -1,5 +1,7 @@
 #include "ShaderManager.hpp"
 
+#include <Core/Log.hpp>
+
 #include <ShaderCompiler/ShaderCompiler.hpp>
 #include <Cfg/Cfg.hpp>
 #include <Cfg/CfgParser.hpp>
@@ -7,6 +9,7 @@
 struct compiled_shader
 {
   arc_string Id;
+  arc_string CfgSource;
   cfg_document Cfg{};
   glsl_shader GlslVertexShader;
   spirv_shader SpirvVertexShader;
@@ -73,7 +76,7 @@ auto
 
 // TODO: This function is duplicated in a lot of places.
 //       Maybe put it in the Core?
-#include <stdio.h>
+#include <cstdio>
 
 static bool
 ReadFileContentIntoArray(char const* FileName, dynamic_array<uint8>* Array, log_data* Log)
@@ -132,11 +135,14 @@ LoadAndCompileShader(shader_manager* ShaderManager, slice<char const> FileName,
   auto CompiledShader = CreateCompiledShader(Allocator);
   CompiledShader->Id = InputFilePath;
 
+  // Copy over the source to ensure it lives as long as the document itself.
+  CompiledShader->CfgSource = SliceReinterpret<char const>(Slice(&Content));
+
   {
     // TODO: Supply the GlobalLog here as soon as the cfg parser code is more robust.
     cfg_parsing_context ParsingContext{ InputFilePath, Log };
 
-    if(!CfgDocumentParseFromString(&CompiledShader->Cfg, SliceReinterpret<char const>(Slice(&Content)), &ParsingContext))
+    if(!CfgDocumentParseFromString(&CompiledShader->Cfg, Slice(CompiledShader->CfgSource), &ParsingContext))
     {
       LogError(Log, "Failed to parse cfg.");
       return nullptr;
@@ -228,29 +234,198 @@ auto
 }
 
 auto
-::GetGlslVertexShader(compiled_shader* CompiledShader)
+::HasShaderStage(compiled_shader* CompiledShader, shader_stage Stage)
+  -> bool
+{
+  switch(Stage)
+  {
+    case shader_stage::Vertex:   return CompiledShader->SpirvVertexShader.Code.Num > 0;
+    case shader_stage::Fragment: return CompiledShader->SpirvFragmentShader.Code.Num > 0;
+    default: return false;
+  }
+}
+
+auto
+::GetGlslShader(compiled_shader* CompiledShader, shader_stage Stage)
   -> glsl_shader*
 {
-  return &CompiledShader->GlslVertexShader;
+  switch(Stage)
+  {
+    case shader_stage::Vertex:   return &CompiledShader->GlslVertexShader;
+    case shader_stage::Fragment: return &CompiledShader->GlslFragmentShader;
+    default:
+      break;
+  }
+
+  LogError("Unknown shader stage: %u", Stage);
+  Assert(0);
+  return nullptr;
 }
 
 auto
-::GetGlslFragmentShader(compiled_shader* CompiledShader)
-  -> glsl_shader*
-{
-  return &CompiledShader->GlslFragmentShader;
-}
-
-auto
-::GetSpirvVertexShader(compiled_shader* CompiledShader)
+::GetSpirvShader(compiled_shader* CompiledShader, shader_stage Stage)
   -> spirv_shader*
 {
-  return &CompiledShader->SpirvVertexShader;
+  switch(Stage)
+  {
+    case shader_stage::Vertex:   return &CompiledShader->SpirvVertexShader;
+    case shader_stage::Fragment: return &CompiledShader->SpirvFragmentShader;
+    default:
+      break;
+  }
+
+  LogError("Unknown shader stage: %u", Stage);
+  Assert(0);
+  return nullptr;
+}
+
+static void
+MapShaderTypeNameToFormatAndSize(slice<char const> TypeName, VkFormat* Format, uint32* Size)
+{
+  if(TypeName == "float"_S)
+  {
+    *Format = VK_FORMAT_R32_SFLOAT;
+    *Size = Convert<uint32>(sizeof(float));
+  }
+  else if(TypeName == "vec2"_S)
+  {
+    *Format = VK_FORMAT_R32G32_SFLOAT;
+    *Size = Convert<uint32>(2 * sizeof(float));
+  }
+  else if(TypeName == "vec3"_S)
+  {
+    *Format = VK_FORMAT_R32G32B32_SFLOAT;
+    *Size = Convert<uint32>(3 * sizeof(float));
+  }
+  else if(TypeName == "vec4"_S)
+  {
+    *Format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    *Size = Convert<uint32>(4 * sizeof(float));
+  }
+  else
+  {
+    *Format = VK_FORMAT_UNDEFINED;
+    *Size = IntMinValue<uint32>();
+  }
 }
 
 auto
-::GetSpirvFragmentShader(compiled_shader* CompiledShader)
-  -> spirv_shader*
+::GenerateVertexInputDescriptions(compiled_shader* CompiledShader,
+                                  VkVertexInputBindingDescription const& InputBinding,
+                                  dynamic_array<VkVertexInputAttributeDescription>* InputAttributes)
+  -> void
 {
-  return &CompiledShader->SpirvFragmentShader;
+  // Note: this procedure assumes the shader code was compiled successfully
+  //       before and is valid.
+
+  if(CompiledShader == nullptr)
+  {
+    LogError("Invalid CompiledShader ptr.");
+    return;
+  }
+
+  cfg_node* VertexShaderNode{};
+  for(auto Node = CompiledShader->Cfg.Root->FirstChild;
+      Node != nullptr;
+      Node = Node->Next)
+  {
+    if(Node->Name == "VertexShader"_S)
+    {
+      VertexShaderNode = Node;
+      break;
+    }
+  }
+
+  if(VertexShaderNode == nullptr)
+  {
+    LogError("No VertexShader node in Cfg document.");
+    return;
+  }
+
+  cfg_node* InputNode{};
+  for(auto Node = VertexShaderNode->FirstChild;
+      Node != nullptr;
+      Node = Node->Next)
+  {
+    if(Node->Name == "Input"_S)
+    {
+      InputNode = Node;
+      break;
+    }
+  }
+
+  if(InputNode == nullptr)
+  {
+    LogError("No Input node below VertexShader node.");
+    return;
+  }
+
+  struct input_decl
+  {
+    slice<char const> TypeName;
+    slice<char const> Identifier;
+    int Location;
+  };
+
+  temp_allocator TempAllocator{};
+  allocator_interface* Allocator = *TempAllocator;
+  scoped_array<input_decl> Decls{ Allocator };
+
+  for(auto Node = InputNode->FirstChild;
+      Node != nullptr;
+      Node = Node->Next)
+  {
+    auto& Decl = Expand(&Decls);
+    Decl.TypeName = Node->Name.Value;
+    Decl.Identifier = Convert<slice<char const>>(Node->Values[0]);
+    Decl.Location = -1;
+    for(auto& Attr : Slice(&Node->Attributes))
+    {
+      if(Attr.Name == "Location"_S)
+      {
+        Decl.Location = Convert<int>(Attr.Value);
+      }
+    }
+    Assert(Decl.Location != -1);
+  }
+
+  // TODO: Sort by Location!
+
+  uint32 CurrentOffset = 0;
+
+  for(auto& Decl : Slice(&Decls))
+  {
+    auto& Desc = Expand(InputAttributes);
+    Desc = InitStruct<VkVertexInputAttributeDescription>();
+    Desc.binding = InputBinding.binding;
+    Desc.location = Decl.Location;
+    Desc.offset = CurrentOffset;
+    uint32 Size{};
+    MapShaderTypeNameToFormatAndSize(Decl.TypeName, &Desc.format, &Size);
+    CurrentOffset += Convert<uint32>(Size);
+  }
+
+  Assert(InputBinding.stride >= CurrentOffset);
+}
+
+auto
+::ShaderStageToVulkan(shader_stage Stage)
+  -> VkShaderStageFlagBits
+{
+  switch(Stage)
+  {
+    case shader_stage::Vertex:                 return VK_SHADER_STAGE_VERTEX_BIT;
+    case shader_stage::TessellationControl:    return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+    case shader_stage::TessellationEvaluation: return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+    case shader_stage::Geometry:               return VK_SHADER_STAGE_GEOMETRY_BIT;
+    case shader_stage::Fragment:               return VK_SHADER_STAGE_FRAGMENT_BIT;
+    case shader_stage::Compute:                return VK_SHADER_STAGE_COMPUTE_BIT;
+
+    default:
+      break;
+  };
+
+  LogError("Unknown shader stage: %u", Stage);
+  Assert(0);
+  return VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
 }

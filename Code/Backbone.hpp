@@ -225,6 +225,26 @@ template<typename T>
 constexpr bool
 IsPOD() { return impl_is_pod<T>::Value; }
 
+
+template<typename NumberType> struct impl_negate;
+template<> struct impl_negate<float>  { static constexpr float  Do(float  Value) { return -Value; } };
+template<> struct impl_negate<double> { static constexpr double Do(double Value) { return -Value; } };
+template<> struct impl_negate<int8>   { static constexpr int8   Do(int8  Value)  { return -Value; } };
+template<> struct impl_negate<int16>  { static constexpr int16  Do(int16 Value)  { return -Value; } };
+template<> struct impl_negate<int32>  { static constexpr int32  Do(int32 Value)  { return -Value; } };
+template<> struct impl_negate<int64>  { static constexpr int64  Do(int64 Value)  { return -Value; } };
+template<> struct impl_negate<uint8>  { static constexpr uint8  Do(uint8  Value) { return  Value; } };
+template<> struct impl_negate<uint16> { static constexpr uint16 Do(uint16 Value) { return  Value; } };
+template<> struct impl_negate<uint32> { static constexpr uint32 Do(uint32 Value) { return  Value; } };
+template<> struct impl_negate<uint64> { static constexpr uint64 Do(uint64 Value) { return  Value; } };
+
+template<typename NumberType>
+NumberType
+Negate(NumberType Value)
+{
+  return impl_negate<NumberType>::Do(Value);
+}
+
 /// Get the number of bits of a given type.
 ///
 /// Note: The type 'void' is not supported.
@@ -248,7 +268,7 @@ template<typename T>
 constexpr T
 IntMinValue()
 {
-  return IntIsSigned<T>() ? -(T(1) << (NumBits<T>() - 1))
+  return IntIsSigned<T>() ? Negate(T(1) << (NumBits<T>() - 1))
                           : T(0);
 }
 
@@ -502,26 +522,6 @@ Sqrt(T Value) { return (ReturnType)Sqrt((double)Value); }
 
 float
 InvSqrt(float Value);
-
-
-template<typename NumberType> struct impl_negate;
-template<> struct impl_negate<float>  { static constexpr float  Do(float  Value) { return -Value; } };
-template<> struct impl_negate<double> { static constexpr double Do(double Value) { return -Value; } };
-template<> struct impl_negate<int8>   { static constexpr int8   Do(int8  Value)  { return -Value; } };
-template<> struct impl_negate<int16>  { static constexpr int16  Do(int16 Value)  { return -Value; } };
-template<> struct impl_negate<int32>  { static constexpr int32  Do(int32 Value)  { return -Value; } };
-template<> struct impl_negate<int64>  { static constexpr int64  Do(int64 Value)  { return -Value; } };
-template<> struct impl_negate<uint8>  { static constexpr uint8  Do(uint8  Value) { return  Value; } };
-template<> struct impl_negate<uint16> { static constexpr uint16 Do(uint16 Value) { return  Value; } };
-template<> struct impl_negate<uint32> { static constexpr uint32 Do(uint32 Value) { return  Value; } };
-template<> struct impl_negate<uint64> { static constexpr uint64 Do(uint64 Value) { return  Value; } };
-
-template<typename NumberType>
-NumberType
-Negate(NumberType Value)
-{
-  return impl_negate<NumberType>::Do(Value);
-}
 
 // Project a value from [LowerBound, UpperBound] to [0, 1]
 // Example:

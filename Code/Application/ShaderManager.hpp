@@ -4,8 +4,12 @@
 
 #include <Core/Allocator.hpp>
 #include <Core/DynamicArray.hpp>
-#include <Core/String.hpp>
-#include <Core/Log.hpp>
+
+
+#include <vulkan/vulkan.h>
+
+
+struct log_data;
 
 
 // Include <ShaderCompiler/ShaderCompiler.hpp> for these types.
@@ -18,6 +22,17 @@ struct compiled_shader;
 struct shader_manager;
 
 
+enum class shader_stage
+{
+  Vertex,
+  TessellationControl,
+  TessellationEvaluation,
+  Geometry,
+  Fragment,
+  Compute,
+};
+
+
 shader_manager*
 CreateShaderManager(allocator_interface* Allocator);
 
@@ -28,14 +43,19 @@ compiled_shader*
 GetCompiledShader(shader_manager* Manager, slice<char const> FileName,
                   log_data* Log = nullptr);
 
-glsl_shader*
-GetGlslVertexShader(compiled_shader* CompiledShader);
+bool
+HasShaderStage(compiled_shader* CompiledShader, shader_stage Stage);
 
 glsl_shader*
-GetGlslFragmentShader(compiled_shader* CompiledShader);
+GetGlslShader(compiled_shader* CompiledShader, shader_stage Stage);
 
 spirv_shader*
-GetSpirvVertexShader(compiled_shader* CompiledShader);
+GetSpirvShader(compiled_shader* CompiledShader, shader_stage Stage);
 
-spirv_shader*
-GetSpirvFragmentShader(compiled_shader* CompiledShader);
+void
+GenerateVertexInputDescriptions(compiled_shader* CompiledShader,
+                                VkVertexInputBindingDescription const& Binding,
+                                dynamic_array<VkVertexInputAttributeDescription>* InputAttributes);
+
+VkShaderStageFlagBits
+ShaderStageToVulkan(shader_stage Stage);

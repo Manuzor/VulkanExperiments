@@ -11,10 +11,13 @@
 
 #include <Core/Math.hpp>
 #include <Core/Color.hpp>
+#include <Core/String.hpp>
 
 #include <Core/Camera.hpp>
 
 #include <Backbone.hpp>
+
+#include <ShaderCompiler/ShaderCompiler.hpp>
 
 #include <Windows.h>
 
@@ -624,6 +627,206 @@ VulkanFinalizeGraphics(vulkan* Vulkan)
   Vulkan->vkDestroyDevice(DeviceHandle, nullptr);
 }
 
+struct vulkan_graphics_pipeline_desc
+{
+  arc_string ShaderPath{}; // Path to a Cfg file containing the shader.
+
+  VkPipelineRasterizationStateCreateInfo RasterizationState
+  {
+    VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, // sType
+    nullptr,                                                    // pNext
+    0,                                                          // flags
+    VK_FALSE,                                                   // depthClampEnable
+    VK_FALSE,                                                   // rasterizerDiscardEnable
+    VK_POLYGON_MODE_MAX_ENUM,                                   // ! polygonMode
+    VK_CULL_MODE_NONE,                                          // cullMode
+    VK_FRONT_FACE_COUNTER_CLOCKWISE,                            // frontFace
+    VK_FALSE,                                                   // depthBiasEnable
+    0,                                                          // depthBiasConstantFactor
+    0,                                                          // depthBiasClamp
+    0,                                                          // depthBiasSlopeFactor
+    1,                                                          // lineWidth
+  };
+
+  VkPipelineInputAssemblyStateCreateInfo InputAssemblyState
+  {
+    VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, // sType
+    nullptr,                                                     // pNext
+    0,                                                           // flags
+    VK_PRIMITIVE_TOPOLOGY_MAX_ENUM,                              // ! topology
+    VK_FALSE,                                                    // primitiveRestartEnable
+  };
+
+  VkPipelineMultisampleStateCreateInfo MultisampleState
+  {
+    VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, // sType
+    nullptr,                                                  // pNext
+    0,                                                        // flags
+    VK_SAMPLE_COUNT_1_BIT,                                    // rasterizationSamples
+    VK_FALSE,                                                 // sampleShadingEnable
+    0.0f,                                                     // minSampleShading
+    nullptr,                                                  // pSampleMask
+    VK_FALSE,                                                 // alphaToCoverageEnable
+    VK_FALSE,                                                 // alphaToOneEnable
+  };
+
+  VkPipelineDepthStencilStateCreateInfo DepthStencilState
+  {
+    VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO, // sType
+    nullptr,                                                    // pNext
+    0,                                                          // flags
+    VK_TRUE,                                                    // depthTestEnable
+    VK_TRUE,                                                    // depthWriteEnable
+    VK_COMPARE_OP_LESS_OR_EQUAL,                                // depthCompareOp
+    VK_FALSE,                                                   // depthBoundsTestEnable
+    VK_FALSE,                                                   // stencilTestEnable
+    {                                                           // front
+      VK_STENCIL_OP_KEEP,   // failOp
+      VK_STENCIL_OP_KEEP,   // passOp
+      VK_STENCIL_OP_KEEP,   // depthFailOp
+      VK_COMPARE_OP_NEVER,  // compareOp
+      0,                    // compareMask
+      0,                    // writeMask
+      0,                    // reference
+    },
+    {                                                           // back
+      VK_STENCIL_OP_KEEP,   // failOp
+      VK_STENCIL_OP_KEEP,   // passOp
+      VK_STENCIL_OP_KEEP,   // depthFailOp
+      VK_COMPARE_OP_ALWAYS, // compareOp
+      0,                    // compareMask
+      0,                    // writeMask
+      0,                    // reference
+    },
+    0,                                                          // minDepthBounds
+    0,                                                          // maxDepthBounds
+  };
+};
+
+template<typename VertexType>
+static VkPipeline
+VulkanCreateGraphicsPipeline(vulkan* Vulkan, shader_manager* ShaderManager, vulkan_graphics_pipeline_desc& Desc)
+{
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  temp_allocator TempAllocator{};
+  allocator_interface* Allocator = *TempAllocator;
+
+  LogBeginScope("Creating graphics pipeline.");
+  Defer [](){ LogEndScope("Finished creating graphics pipeline."); };
+
+  auto CompiledShader = GetCompiledShader(ShaderManager, Slice(Desc.ShaderPath), GlobalLog);
+
+  if(CompiledShader == nullptr)
+  {
+    LogError("Unable to create graphics pipeline without a shader.");
+    return nullptr;
+  }
+
+  auto const MaxNumShaderStages = (Cast<size_t>(shader_stage::Fragment) - Cast<size_t>(shader_stage::Vertex)) + 1;
+  scoped_array<VkPipelineShaderStageCreateInfo> PipelineShaderStageInfos{ Allocator };
+  Reserve(&PipelineShaderStageInfos, MaxNumShaderStages);
+
+  for(size_t StageIndex = 0; StageIndex < MaxNumShaderStages; ++StageIndex)
+  {
+    auto Stage = Cast<shader_stage>(Cast<size_t>(shader_stage::Vertex) + StageIndex);
+    if(!HasShaderStage(CompiledShader, Stage))
+      continue;
+
+    auto& StageInfo = Expand(&PipelineShaderStageInfos);
+    StageInfo = InitStruct<VkPipelineShaderStageCreateInfo>();
+    StageInfo.stage = ShaderStageToVulkan(Stage);
+    StageInfo.pName = StrPtr(GetGlslShader(CompiledShader, Stage)->EntryPoint);
+
+    auto SpirvShader = GetSpirvShader(CompiledShader, Stage);
+    Assert(SpirvShader);
+
+    auto ShaderModuleCreateInfo = InitStruct<VkShaderModuleCreateInfo>();
+    ShaderModuleCreateInfo.codeSize = SliceByteSize(Slice(&SpirvShader->Code)); // In bytes, regardless of the fact that decltype(*pCode) == uint.
+    ShaderModuleCreateInfo.pCode = SpirvShader->Code.Ptr;
+
+    VulkanVerify(Device.vkCreateShaderModule(DeviceHandle, &ShaderModuleCreateInfo, nullptr, &StageInfo.module));
+  }
+
+  // Note(Manu): Can safely destroy the shader modules on our side once the pipeline was created.
+  Defer [&]()
+  {
+    for(auto& StageInfo : Slice(&PipelineShaderStageInfos))
+    {
+      Device.vkDestroyShaderModule(DeviceHandle, StageInfo.module, nullptr);
+    }
+  };
+
+  VkVertexInputBindingDescription VertexInputBinding = InitStruct<VkVertexInputBindingDescription>();
+  {
+    VertexInputBinding.binding = 0;
+    VertexInputBinding.stride = Cast<uint32>(SizeOf<VertexType>());
+    VertexInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+  }
+
+  scoped_array<VkVertexInputAttributeDescription> VertexInputAttributeDescs{ Allocator };
+  GenerateVertexInputDescriptions(CompiledShader, VertexInputBinding, &VertexInputAttributeDescs);
+
+  auto VertexInputState = InitStruct<VkPipelineVertexInputStateCreateInfo>();
+  {
+    VertexInputState.vertexBindingDescriptionCount = 1;
+    VertexInputState.pVertexBindingDescriptions    = &VertexInputBinding;
+    VertexInputState.vertexAttributeDescriptionCount = Cast<uint32>(VertexInputAttributeDescs.Num);
+    VertexInputState.pVertexAttributeDescriptions    = &VertexInputAttributeDescs[0];
+  }
+
+  auto ViewportState = InitStruct<VkPipelineViewportStateCreateInfo>();
+  {
+    ViewportState.viewportCount = 1;
+    ViewportState.scissorCount = 1;
+  }
+
+  VkPipelineColorBlendAttachmentState ColorBlendStateAttachment = InitStruct<VkPipelineColorBlendAttachmentState>();
+  {
+    ColorBlendStateAttachment.colorWriteMask = 0xf;
+    ColorBlendStateAttachment.blendEnable = VK_FALSE;
+  }
+
+  auto ColorBlendState = InitStruct<VkPipelineColorBlendStateCreateInfo>();
+  {
+    ColorBlendState.attachmentCount = 1;
+    ColorBlendState.pAttachments = &ColorBlendStateAttachment;
+  }
+
+  fixed_block<2, VkDynamicState> DynamicStatesBlock;
+  DynamicStatesBlock[0] = VK_DYNAMIC_STATE_VIEWPORT;
+  DynamicStatesBlock[1] = VK_DYNAMIC_STATE_SCISSOR;
+  auto DynamicState = InitStruct<VkPipelineDynamicStateCreateInfo>();
+  {
+    DynamicState.dynamicStateCount = Cast<uint32>(DynamicStatesBlock.Num);
+    DynamicState.pDynamicStates = &DynamicStatesBlock[0];
+  }
+
+  auto GraphicsPipelineCreateInfo = InitStruct<VkGraphicsPipelineCreateInfo>();
+  {
+    GraphicsPipelineCreateInfo.stageCount = Cast<uint32>(PipelineShaderStageInfos.Num);
+    GraphicsPipelineCreateInfo.pStages = PipelineShaderStageInfos.Ptr;
+    GraphicsPipelineCreateInfo.pVertexInputState = &VertexInputState;
+    GraphicsPipelineCreateInfo.pInputAssemblyState = &Desc.InputAssemblyState;
+    GraphicsPipelineCreateInfo.pViewportState = &ViewportState;
+    GraphicsPipelineCreateInfo.pRasterizationState = &Desc.RasterizationState;
+    GraphicsPipelineCreateInfo.pMultisampleState = &Desc.MultisampleState;
+    GraphicsPipelineCreateInfo.pDepthStencilState = &Desc.DepthStencilState;
+    GraphicsPipelineCreateInfo.pColorBlendState = &ColorBlendState;
+    GraphicsPipelineCreateInfo.pDynamicState = &DynamicState;
+    GraphicsPipelineCreateInfo.layout = Vulkan->SceneObjectGraphicsState.PipelineLayout;
+    GraphicsPipelineCreateInfo.renderPass = Vulkan->RenderPass;
+  }
+
+  VkPipeline Pipeline{};
+  VulkanVerify(Device.vkCreateGraphicsPipelines(DeviceHandle, Vulkan->PipelineCache,
+                                                1, &GraphicsPipelineCreateInfo,
+                                                nullptr,
+                                                &Pipeline));
+  return Pipeline;
+}
+
 static bool
 VulkanPrepareRenderPass(vulkan* Vulkan)
 {
@@ -656,7 +859,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     {
       auto& Layout = Expand(&LayoutBindings);
       Layout.binding = 0;
-      Layout.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // TODO: Make it UNIFORM again?
+      Layout.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
       Layout.descriptorCount = 1;
       Layout.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
     }
@@ -756,6 +959,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
   //
   // Prepare Pipeline
   //
+  if(false)
   {
     LogBeginScope("Preparing pipeline.");
     Defer [](){ LogEndScope("Finished preparing pipeline."); };
@@ -961,6 +1165,15 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
                                                   nullptr,
                                                   &Vulkan->SceneObjectGraphicsState.Pipeline));
   }
+  {
+    vulkan_graphics_pipeline_desc PipelineDesc{};
+    PipelineDesc.ShaderPath = "Data/Shader/DebugGrid.shader";
+    PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
+    PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    auto Pipeline = VulkanCreateGraphicsPipeline<vulkan_debug_grid_vertex>(Vulkan, Vulkan->ShaderManager, PipelineDesc);
+    Assert(Pipeline);
+    Vulkan->SceneObjectGraphicsState.Pipeline = Pipeline;
+  }
 
   //
   // Prepare Descriptor Pool
@@ -979,7 +1192,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
 
     {
       auto& Size = Expand(&PoolSizes);
-      Size.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      Size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
       Size.descriptorCount = 1;
     }
 
@@ -1002,7 +1215,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
   {
     auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
-      BufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+      BufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
       BufferCreateInfo.size = SizeOf<decltype(Vulkan->SceneObjectGraphicsState.GlobalsUBOData)>();
     }
 
