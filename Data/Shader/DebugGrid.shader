@@ -5,8 +5,8 @@ VertexShader {
   }
 
   Input {
-    vec3 "Position" Location=0
-    vec4 "Color" Location=1
+    vec3 "VertexPosition" Location=0
+    vec4 "VertexColor" Location=1
   }
 
   Output {
@@ -17,8 +17,8 @@ VertexShader {
     `
     void main()
     {
-      gl_Position = ViewProjectionMatrix * vec4(Position, 1.0f);
-      OutColor = Color;
+      gl_Position = ViewProjectionMatrix * vec4(VertexPosition, 1.0f);
+      OutColor = VertexColor;
     }
     `
   }

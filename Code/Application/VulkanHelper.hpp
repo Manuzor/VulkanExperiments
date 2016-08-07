@@ -89,14 +89,14 @@ struct index_buffer
 
 struct vulkan_scene_object_vertex
 {
-  vec3 Position;
-  vec2 TextureCoordinates;
+  vec3 VertexPosition;
+  vec2 VertexTextureCoordinates;
 };
 
 struct vulkan_debug_grid_vertex
 {
-  vec3 Position;
-  color_linear Color;
+  vec3 VertexPosition;
+  color_linear VertexColor;
 };
 
 struct vulkan_scene_object_shader_globals
