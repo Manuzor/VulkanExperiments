@@ -1,7 +1,11 @@
 
 VertexShader {
-  uniform "Globals" Binding=0 {
+  uniform "GlobalsBuffer" Binding=0 {
     mat4 "ViewProjectionMatrix"
+  }
+
+  uniform "ModelBuffer" Binding=1 {
+    mat4 "ModelViewProjectionMatrix"
   }
 
   Input {
@@ -17,7 +21,7 @@ VertexShader {
     `
     void main()
     {
-      gl_Position = ViewProjectionMatrix * vec4(VertexPosition, 1.0f);
+      gl_Position = ModelViewProjectionMatrix * vec4(VertexPosition, 1.0f);
       UV = VertexUV;
     }
     `
@@ -25,7 +29,7 @@ VertexShader {
 }
 
 FragmentShader {
-  sampler2D "Sampler" Binding=1
+  sampler2D "Sampler" Binding=10
 
   Input {
     vec2 "UV" Location=0

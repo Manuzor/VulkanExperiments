@@ -68,6 +68,40 @@ vulkan_scene_object::PrepareForDrawing(struct vulkan* Vulkan)
   auto const& Device = Vulkan->Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
+  temp_allocator TempAllocator{};
+  allocator_interface* Allocator = *TempAllocator;
+
+  //
+  // Create UboModel
+  //
+  {
+    VulkanCreateShaderBuffer(Vulkan, &this->UboModel, is_read_only_for_shader::Yes);
+  }
+
+  scoped_array<VkWriteDescriptorSet> DescriptorSetWrites{ Allocator };
+
+  //
+  // Associate UboModel with the DescriptorSet
+  //
+  auto DescriptorBufferInfo = InitStruct<VkDescriptorBufferInfo>();
+  {
+    DescriptorBufferInfo.buffer = this->UboModel.BufferHandle;
+    DescriptorBufferInfo.offset = 0;
+    DescriptorBufferInfo.range = VK_WHOLE_SIZE;
+  }
+
+  {
+    auto UboModelUpdateInfo = InitStruct<VkWriteDescriptorSet>();
+
+    UboModelUpdateInfo.dstSet = this->DescriptorSet;
+    UboModelUpdateInfo.dstBinding = 1;
+    UboModelUpdateInfo.descriptorType = this->UboModel.DescriptorType;
+    UboModelUpdateInfo.descriptorCount = 1;
+    UboModelUpdateInfo.pBufferInfo = &DescriptorBufferInfo;
+
+    Expand(&DescriptorSetWrites) = UboModelUpdateInfo;
+  }
+
   //
   // Update the texture and sampler in use by the shader.
   //
@@ -78,21 +112,24 @@ vulkan_scene_object::PrepareForDrawing(struct vulkan* Vulkan)
     TextureDescriptor.imageLayout = this->Texture.ImageLayout;
   }
 
-  auto TextureAndSamplerUpdateInfo = InitStruct<VkWriteDescriptorSet>();
   {
+    auto TextureAndSamplerUpdateInfo = InitStruct<VkWriteDescriptorSet>();
+
     TextureAndSamplerUpdateInfo.dstSet = this->DescriptorSet;
-    TextureAndSamplerUpdateInfo.dstBinding = 1;
+    TextureAndSamplerUpdateInfo.dstBinding = 10;
     TextureAndSamplerUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     TextureAndSamplerUpdateInfo.descriptorCount = 1;
     TextureAndSamplerUpdateInfo.pImageInfo = &TextureDescriptor;
+
+    Expand(&DescriptorSetWrites) = TextureAndSamplerUpdateInfo;
   }
 
 
   //
-  // Push descriptor set update.
+  // Push descriptor set updates.
   //
   Device.vkUpdateDescriptorSets(DeviceHandle,
-                                1, &TextureAndSamplerUpdateInfo,
+                                Convert<uint32>(DescriptorSetWrites.Num), DescriptorSetWrites.Ptr,
                                 0, nullptr);
 }
 
@@ -2543,94 +2580,6 @@ auto
     VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, IndexBuffer->BufferHandle, IndexBuffer->MemoryHandle, 0));
   }
 }
-
-#if 0
-auto
-::VulkanPrepareSceneObjectForRendering(vulkan const* Vulkan,
-                                       vulkan_scene_object* SceneObject)
-  -> void
-{
-  auto const& Device = Vulkan->Device;
-  auto const DeviceHandle = Device.DeviceHandle;
-
-  temp_allocator TempAllocator;
-  allocator_interface* Allocator = *TempAllocator;
-
-
-  //
-  // Ensure the pipeline is set.
-  //
-  SceneObject->Pipeline = Vulkan->SceneObjectGraphicsState.Pipeline;
-
-
-  //
-  // Allocate DescriptorSet
-  //
-  {
-    auto DescriptorSetAllocateInfo = InitStruct<VkDescriptorSetAllocateInfo>();
-    {
-      DescriptorSetAllocateInfo.descriptorPool = Vulkan->DescriptorPool;
-      DescriptorSetAllocateInfo.descriptorSetCount = 1;
-      DescriptorSetAllocateInfo.pSetLayouts = &Vulkan->SceneObjectGraphicsState.DescriptorSetLayout;
-    }
-    VulkanVerify(Device.vkAllocateDescriptorSets(DeviceHandle,
-                                                 &DescriptorSetAllocateInfo,
-                                                 &SceneObject->DescriptorSet));
-  }
-
-  scoped_array<VkWriteDescriptorSet> DescriptorSetWrites{ Allocator };
-
-
-  //
-  // Update the texture and sampler in use by the shader.
-  //
-  auto TextureDescriptor = InitStruct<VkDescriptorImageInfo>();
-  {
-    TextureDescriptor.sampler = SceneObject->Texture.SamplerHandle;
-    TextureDescriptor.imageView = SceneObject->Texture.ImageViewHandle;
-    TextureDescriptor.imageLayout = SceneObject->Texture.ImageLayout;
-  }
-
-  auto& TextureAndSamplerUpdateInfo = Expand(&DescriptorSetWrites);
-  TextureAndSamplerUpdateInfo = InitStruct<VkWriteDescriptorSet>();
-  {
-    TextureAndSamplerUpdateInfo.dstSet = SceneObject->DescriptorSet;
-    TextureAndSamplerUpdateInfo.dstBinding = 1;
-    TextureAndSamplerUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    TextureAndSamplerUpdateInfo.descriptorCount = 1;
-    TextureAndSamplerUpdateInfo.pImageInfo = &TextureDescriptor;
-  }
-
-
-  //
-  // Associate the Globals UBO with the DescriptorSet
-  //
-  auto DescriptorBufferInfo = InitStruct<VkDescriptorBufferInfo>();
-  {
-    DescriptorBufferInfo.buffer = Vulkan->SceneObjectGraphicsState.GlobalsUBO.BufferHandle;
-    DescriptorBufferInfo.offset = 0;
-    DescriptorBufferInfo.range = VK_WHOLE_SIZE;
-  }
-
-  auto& GlobalUBOUpdateInfo = Expand(&DescriptorSetWrites);
-  GlobalUBOUpdateInfo = InitStruct<VkWriteDescriptorSet>();
-  {
-    GlobalUBOUpdateInfo.dstSet = SceneObject->DescriptorSet;
-    GlobalUBOUpdateInfo.dstBinding = 0;
-    GlobalUBOUpdateInfo.descriptorType = Vulkan->SceneObjectGraphicsState.GlobalsUBO.DescriptorType;
-    GlobalUBOUpdateInfo.descriptorCount = 1;
-    GlobalUBOUpdateInfo.pBufferInfo = &DescriptorBufferInfo;
-  }
-
-  //
-  // Push descriptor set updates.
-  //
-  Device.vkUpdateDescriptorSets(
-    DeviceHandle,
-    Convert<uint32>(DescriptorSetWrites.Num), DescriptorSetWrites.Ptr,
-    0, nullptr);
-}
-#endif
 
 auto
 ::Init(vulkan_texture2d* Texture, allocator_interface* Allocator)

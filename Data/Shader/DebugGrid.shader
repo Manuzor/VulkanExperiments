@@ -25,8 +25,6 @@ VertexShader {
 }
 
 FragmentShader {
-  sampler2D "Sampler" Binding=1
-
   Input {
     vec4 "Color" Location=0
   }

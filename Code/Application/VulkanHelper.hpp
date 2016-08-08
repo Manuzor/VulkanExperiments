@@ -130,10 +130,9 @@ struct vulkan_scene_object : public vulkan_renderable
 {
   struct ubo_model_data
   {
-    mat4x4 ModelMatrix;
+    mat4x4 ViewProjectionMatrix;
   };
 
-  // TODO: Use this UBO type.
   using ubo_model = vulkan_shader_buffer<ubo_model_data>;
 
   struct vertex
@@ -146,20 +145,16 @@ struct vulkan_scene_object : public vulkan_renderable
   index_buffer IndexBuffer{};
   vulkan_texture2d Texture{};
 
+  ubo_model UboModel{};
+
+  transform Transform{ IdentityTransform };
+
   virtual void PrepareForDrawing(struct vulkan* Vulkan) override;
   virtual void Draw(struct vulkan* Vulkan, VkCommandBuffer CommandBuffer) override;
 };
 
 struct vulkan_debug_grid : public vulkan_renderable
 {
-  struct ubo_model_data
-  {
-    // mat4x4 ModelMatrix;
-  };
-
-  // TODO: Use this UBO type?
-  using ubo_model = vulkan_shader_buffer<ubo_model_data>;
-
   struct vertex
   {
     vec3 VertexPosition;

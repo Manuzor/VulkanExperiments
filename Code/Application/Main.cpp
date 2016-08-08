@@ -1900,6 +1900,8 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         auto Kitten = VulkanCreateSceneObject(Vulkan, "Kitten 1"_S);
         // TODO: Cleanup
 
+        Kitten->Transform.Translation = Vec3(0, 0, 2);
+
         Copy(&Kitten->Texture.Image, KittenImage);
         VulkanUploadTexture(*Vulkan,
                             TextureUploadCommandBuffer,
@@ -2011,7 +2013,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
 
       //
-      // Upload shader globals
+      // Upload shader buffers
       //
       {
         Vulkan->DebugGridsFoo.UboGlobals.Data.ViewProjectionMatrix = ViewProjectionMatrix;
@@ -2019,6 +2021,13 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
         Vulkan->SceneObjectsFoo.UboGlobals.Data.ViewProjectionMatrix = ViewProjectionMatrix;
         VulkanUploadShaderBufferData(Vulkan, Vulkan->SceneObjectsFoo.UboGlobals);
+
+        // TODO: Don't do this every frame?
+        for(auto SceneObject : Slice(&Vulkan->SceneObjects))
+        {
+          SceneObject->UboModel.Data.ViewProjectionMatrix = Mat4x4(SceneObject->Transform) * ViewProjectionMatrix;
+          VulkanUploadShaderBufferData(Vulkan, SceneObject->UboModel);
+        }
       }
 
 
