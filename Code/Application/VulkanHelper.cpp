@@ -4,22 +4,142 @@
 #include <Core/Image.hpp>
 #include <Core/ImageLoader.hpp>
 
+void
+vulkan_renderable::PrepareForDrawing(struct vulkan* Vulkan)
+{
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  //
+  // Ensure foo is valid.
+  //
+  Assert(this->Foo != nullptr && this->Foo->Pipeline != nullptr);
+
+
+  //
+  // Allocate DescriptorSet
+  //
+  if(this->DescriptorSet == nullptr)
+  {
+    auto DescriptorSetAllocateInfo = InitStruct<VkDescriptorSetAllocateInfo>();
+    {
+      DescriptorSetAllocateInfo.descriptorPool = Vulkan->DescriptorPool;
+      DescriptorSetAllocateInfo.descriptorSetCount = 1;
+      DescriptorSetAllocateInfo.pSetLayouts = &this->Foo->DescriptorSetLayout;
+    }
+    VulkanVerify(Device.vkAllocateDescriptorSets(DeviceHandle,
+                                                 &DescriptorSetAllocateInfo,
+                                                 &this->DescriptorSet));
+  }
+
+  //
+  // Associate the Globals UBO with the DescriptorSet
+  //
+  auto DescriptorBufferInfo = InitStruct<VkDescriptorBufferInfo>();
+  {
+    DescriptorBufferInfo.buffer = this->Foo->UboGlobals.BufferHandle;
+    DescriptorBufferInfo.offset = 0;
+    DescriptorBufferInfo.range = VK_WHOLE_SIZE;
+  }
+
+  auto GlobalUBOUpdateInfo = InitStruct<VkWriteDescriptorSet>();
+  {
+    GlobalUBOUpdateInfo.dstSet = this->DescriptorSet;
+    GlobalUBOUpdateInfo.dstBinding = 0;
+    GlobalUBOUpdateInfo.descriptorType = this->Foo->UboGlobals.DescriptorType;
+    GlobalUBOUpdateInfo.descriptorCount = 1;
+    GlobalUBOUpdateInfo.pBufferInfo = &DescriptorBufferInfo;
+  }
+
+  //
+  // Push descriptor set update.
+  //
+  Device.vkUpdateDescriptorSets(DeviceHandle,
+                                1, &GlobalUBOUpdateInfo,
+                                0, nullptr);
+}
+
+void
+vulkan_scene_object::PrepareForDrawing(struct vulkan* Vulkan)
+{
+  vulkan_renderable::PrepareForDrawing(Vulkan);
+
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  //
+  // Update the texture and sampler in use by the shader.
+  //
+  auto TextureDescriptor = InitStruct<VkDescriptorImageInfo>();
+  {
+    TextureDescriptor.sampler = this->Texture.SamplerHandle;
+    TextureDescriptor.imageView = this->Texture.ImageViewHandle;
+    TextureDescriptor.imageLayout = this->Texture.ImageLayout;
+  }
+
+  auto TextureAndSamplerUpdateInfo = InitStruct<VkWriteDescriptorSet>();
+  {
+    TextureAndSamplerUpdateInfo.dstSet = this->DescriptorSet;
+    TextureAndSamplerUpdateInfo.dstBinding = 1;
+    TextureAndSamplerUpdateInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    TextureAndSamplerUpdateInfo.descriptorCount = 1;
+    TextureAndSamplerUpdateInfo.pImageInfo = &TextureDescriptor;
+  }
+
+
+  //
+  // Push descriptor set update.
+  //
+  Device.vkUpdateDescriptorSets(DeviceHandle,
+                                1, &TextureAndSamplerUpdateInfo,
+                                0, nullptr);
+}
+
+void
+vulkan_scene_object::Draw(vulkan* Vulkan, VkCommandBuffer CommandBuffer)
+{
+  auto const& Device = Vulkan->Device;
+  VkDeviceSize NoOffset{};
+
+  Device.vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &this->VertexBuffer.BufferHandle, &NoOffset);
+  Device.vkCmdBindIndexBuffer(CommandBuffer, this->IndexBuffer.BufferHandle, NoOffset, VK_INDEX_TYPE_UINT32);
+  Device.vkCmdDrawIndexed(CommandBuffer, this->IndexBuffer.NumIndices, 1, 0, 0, 0);
+}
+
+void
+vulkan_debug_grid::PrepareForDrawing(struct vulkan* Vulkan)
+{
+  vulkan_renderable::PrepareForDrawing(Vulkan);
+}
+
+void
+vulkan_debug_grid::Draw(vulkan* Vulkan, VkCommandBuffer CommandBuffer)
+{
+  auto const& Device = Vulkan->Device;
+  VkDeviceSize NoOffset{};
+
+  Device.vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &this->VertexBuffer.BufferHandle, &NoOffset);
+  Device.vkCmdBindIndexBuffer(CommandBuffer, this->IndexBuffer.BufferHandle, NoOffset, VK_INDEX_TYPE_UINT32);
+  Device.vkCmdDrawIndexed(CommandBuffer, this->IndexBuffer.NumIndices, 1, 0, 0, 0);
+}
 
 auto
-::Init(vulkan* Vulkan, allocator_interface* Allocator)
+::Init(vulkan* Vulkan,
+       allocator_interface* Allocator)
   -> void
 {
+  Vulkan->RenderableAllocator = Allocator;
   Vulkan->ShaderManagerAllocator = Allocator;
   Vulkan->ShaderManager = CreateShaderManager(Vulkan->ShaderManagerAllocator);
   Init(&Vulkan->Gpu.QueueProperties, Allocator);
   Init(&Vulkan->Framebuffers, Allocator);
   Init(&Vulkan->SceneObjects, Allocator);
+  Init(&Vulkan->DebugGrids, Allocator);
+  Init(&Vulkan->Renderables, Allocator);
   Init(&Vulkan->Swapchain, &Vulkan->Device, Allocator);
   Init(&Vulkan->DrawCommandBuffers, Allocator);
   Init(&Vulkan->PrePresentCommandBuffers, Allocator);
   Init(&Vulkan->PostPresentCommandBuffers, Allocator);
-  Init(&Vulkan->SceneObjectGraphicsState.VertexInputBindingDescs, Allocator);
-  Init(&Vulkan->SceneObjectGraphicsState.VertexInputAttributeDescs, Allocator);
   Vulkan->Gpu.Vulkan = Vulkan;
   Vulkan->Device.Gpu = &Vulkan->Gpu;
 }
@@ -28,13 +148,13 @@ auto
 ::Finalize(vulkan* Vulkan)
   -> void
 {
-  Finalize(&Vulkan->SceneObjectGraphicsState.VertexInputAttributeDescs);
-  Finalize(&Vulkan->SceneObjectGraphicsState.VertexInputBindingDescs);
   Finalize(&Vulkan->PostPresentCommandBuffers);
   Finalize(&Vulkan->PrePresentCommandBuffers);
   Finalize(&Vulkan->DrawCommandBuffers);
   Finalize(&Vulkan->Swapchain);
   Finalize(&Vulkan->SceneObjects);
+  Finalize(&Vulkan->Renderables);
+  Finalize(&Vulkan->DebugGrids);
   Finalize(&Vulkan->Framebuffers);
   Finalize(&Vulkan->Gpu.QueueProperties);
   DestroyShaderManager(Vulkan->ShaderManagerAllocator, Vulkan->ShaderManager);
@@ -1697,127 +1817,100 @@ auto
 #endif
 
 auto
-::VulkanCreateSceneObject(vulkan* Vulkan, allocator_interface* Allocator)
-  -> vulkan_scene_object_handle
-{
-  vulkan_scene_object* TheChosenOne = nullptr;
-  vulkan_scene_object_handle Handle = nullptr;
-
-  // Try to find a scene object that is not in use anymore.
-  auto const NumSceneObjects = Vulkan->SceneObjects.Num;
-  for(size_t Index = 0; Index < NumSceneObjects; ++Index)
-  {
-    auto& SceneObject = Vulkan->SceneObjects[Index];
-
-    if(!SceneObject.IsAllocated)
-    {
-      Handle = Reinterpret<vulkan_scene_object_handle>(Index + 1);
-      TheChosenOne = &SceneObject;
-      break;
-    }
-  }
-
-  // If no free scene object was found, create a new one.
-  if(TheChosenOne == nullptr)
-  {
-    if(Vulkan->NumExternalSceneObjectPtrs > 0)
-    {
-      LogError("Attempt to create a new scene object while there externally "
-               "exists a raw pointer to an existing scene object. Aborted this "
-               "operation because external pointers would be corrupted by it.");
-      return nullptr;
-    }
-
-    Handle = Reinterpret<vulkan_scene_object_handle>(Vulkan->SceneObjects.Num + 1);
-    TheChosenOne = &Expand(&Vulkan->SceneObjects);
-    *TheChosenOne = {};
-  }
-
-  // Note: There's no need for `*TheChosenOne = {}` because
-  // `VulkanDestroyAndDeallocateSceneObject` already does that.
-  TheChosenOne->IsAllocated = true;
-  Init(&TheChosenOne->Texture, Allocator);
-
-  return Handle;
-}
-
-static size_t
-TranslateHandleToIndex(vulkan_scene_object_handle Handle)
-{
-  return Reinterpret<size_t>(Handle) - 1;
-}
-
-auto
-::VulkanDestroyAndDeallocateSceneObject(vulkan* Vulkan, vulkan_scene_object_handle SceneObjectHandle)
-  -> void
-{
-  if(SceneObjectHandle == nullptr)
-  {
-    LogWarning("Ignoring a null handle in VulkanDestroyAndDeallocateSceneObject.");
-    return;
-  }
-
-  auto SceneObjectIndex = TranslateHandleToIndex(SceneObjectHandle);
-  auto SceneObject = &Vulkan->SceneObjects[SceneObjectIndex];
-
-  if(SceneObject->IsAllocated)
-  {
-    LogError("Trying to destroy a scene object that is already destroyed. (Ignored)");
-    return;
-  }
-
-  if(SceneObject->NumExternalReferences > 0)
-  {
-    LogError("Cannot destroy a scene object that is still externally referenced.");
-    return;
-  }
-
-  Finalize(&SceneObject->Texture);
-
-  auto const Device = &Vulkan->Device;
-  auto const DeviceHandle = Device->DeviceHandle;
-
-  Device->vkDestroyBuffer(DeviceHandle, SceneObject->Indices.Buffer, nullptr);
-  Device->vkFreeMemory(DeviceHandle, SceneObject->Indices.Memory, nullptr);
-
-  Device->vkDestroyBuffer(DeviceHandle, SceneObject->Vertices.Buffer, nullptr);
-  Device->vkFreeMemory(DeviceHandle, SceneObject->Vertices.Memory, nullptr);
-
-  Device->vkDestroySampler(DeviceHandle,   SceneObject->Texture.SamplerHandle, nullptr);
-  Device->vkDestroyImageView(DeviceHandle, SceneObject->Texture.ImageViewHandle, nullptr);
-  Device->vkDestroyImage(DeviceHandle,     SceneObject->Texture.ImageHandle, nullptr);
-  Device->vkFreeMemory(DeviceHandle,       SceneObject->Texture.MemoryHandle, nullptr);
-
-  // TODO: Free DescriptorSet and friends
-
-  // Note: This sets IsAllocated to false.
-  *SceneObject = {};
-  Assert(SceneObject->IsAllocated == false);
-}
-
-auto
-::VulkanBeginAccess(vulkan* Vulkan, vulkan_scene_object_handle SceneObjectHandle)
+::VulkanCreateSceneObject(vulkan* Vulkan, slice<char const> Name)
   -> vulkan_scene_object*
 {
-  if(SceneObjectHandle == nullptr)
-    return nullptr;
+  auto Allocator = Vulkan->RenderableAllocator;
 
-  auto SceneObjectIndex = TranslateHandleToIndex(SceneObjectHandle);
-  auto SceneObject = &Vulkan->SceneObjects[SceneObjectIndex];
-  ++SceneObject->NumExternalReferences;
-  ++Vulkan->NumExternalSceneObjectPtrs;
+  auto SceneObject = Allocate<vulkan_scene_object>(Allocator);
+  MemDefaultConstruct(1, SceneObject);
+  SceneObject->IsDirty = true;
+  SceneObject->Name = Name;
+  Init(&SceneObject->Texture, Allocator);
+
+  SceneObject->Foo = &Vulkan->SceneObjectsFoo;
+
+  Expand(&Vulkan->SceneObjects) = SceneObject;
+  Expand(&Vulkan->Renderables) = SceneObject;
+
   return SceneObject;
 }
 
 auto
-::VulkanEndAccess(vulkan* Vulkan, vulkan_scene_object* SceneObject)
+::VulkanDestroySceneObject(vulkan* Vulkan, vulkan_scene_object* SceneObjectHandle)
   -> void
 {
-  Assert(SceneObject->NumExternalReferences > 0);
-  --SceneObject->NumExternalReferences;
+  // TODO:
 
-  Assert(Vulkan->NumExternalSceneObjectPtrs > 0);
-  --Vulkan->NumExternalSceneObjectPtrs;
+  // if(SceneObjectHandle == nullptr)
+  // {
+  //   LogWarning("Ignoring a null handle in VulkanDestroyAndDeallocateSceneObject.");
+  //   return;
+  // }
+
+  // auto SceneObjectIndex = TranslateHandleToIndex(SceneObjectHandle);
+  // auto SceneObject = &Vulkan->SceneObjects[SceneObjectIndex];
+
+  // if(SceneObject->IsAllocated)
+  // {
+  //   LogError("Trying to destroy a scene object that is already destroyed. (Ignored)");
+  //   return;
+  // }
+
+  // if(SceneObject->NumExternalReferences > 0)
+  // {
+  //   LogError("Cannot destroy a scene object that is still externally referenced.");
+  //   return;
+  // }
+
+  // Finalize(&SceneObject->Texture);
+
+  // auto const Device = &Vulkan->Device;
+  // auto const DeviceHandle = Device->DeviceHandle;
+
+  // Device->vkDestroyBuffer(DeviceHandle, SceneObject->Indices.Buffer, nullptr);
+  // Device->vkFreeMemory(DeviceHandle, SceneObject->Indices.Memory, nullptr);
+
+  // Device->vkDestroyBuffer(DeviceHandle, SceneObject->Vertices.Buffer, nullptr);
+  // Device->vkFreeMemory(DeviceHandle, SceneObject->Vertices.Memory, nullptr);
+
+  // Device->vkDestroySampler(DeviceHandle,   SceneObject->Texture.SamplerHandle, nullptr);
+  // Device->vkDestroyImageView(DeviceHandle, SceneObject->Texture.ImageViewHandle, nullptr);
+  // Device->vkDestroyImage(DeviceHandle,     SceneObject->Texture.ImageHandle, nullptr);
+  // Device->vkFreeMemory(DeviceHandle,       SceneObject->Texture.MemoryHandle, nullptr);
+
+  // // TODO: Free DescriptorSet and friends
+
+  // // Note: This sets IsAllocated to false.
+  // *SceneObject = {};
+  // Assert(SceneObject->IsAllocated == false);
+}
+
+auto
+::VulkanCreateDebugGrid(vulkan* Vulkan, slice<char const> Name)
+  -> vulkan_debug_grid*
+{
+  auto Allocator = Vulkan->RenderableAllocator;
+
+  auto DebugGrid = Allocate<vulkan_debug_grid>(Allocator);
+  MemDefaultConstruct(1, DebugGrid);
+  DebugGrid->IsDirty = true;
+  DebugGrid->Name = Name;
+
+  DebugGrid->Foo = &Vulkan->DebugGridsFoo;
+
+  Expand(&Vulkan->DebugGrids) = DebugGrid;
+  Expand(&Vulkan->Renderables) = DebugGrid;
+
+  return DebugGrid;
+}
+
+auto
+::VulkanDestroyDebugGrid(vulkan*            Vulkan,
+                         vulkan_debug_grid* SceneObject)
+  -> void
+{
+  // TODO: See VulkanDestroySceneObject
 }
 
 auto
@@ -2040,7 +2133,8 @@ auto
   auto const Device = &Vulkan->Device;
   auto const DeviceHandle = Device->DeviceHandle;
 
-  using vertex = vulkan_scene_object_vertex;
+  // TODO: Make this function more generic?
+  using vertex = vulkan_scene_object::vertex;
 
   vertex const TopLeft     { Vec3( 0.0f,  0.0f,  0.0f) * 1.0f, Vec2(0.0f, 0.0f) };
   vertex const TopRight    { Vec3( 0.0f,  1.0f,  0.0f) * 1.0f, Vec2(1.0f, 0.0f) };
@@ -2057,9 +2151,8 @@ auto
 
   uint32 IndexDataArray[] =
   {
-    0, 2, 1
-    // 0, 2, 3,
-    // 3, 1, 0,
+    0, 2, 3,
+    3, 1, 0,
   };
   auto IndexData = Slice(IndexDataArray);
   Indices->NumIndices = Cast<uint32>(IndexData.Num);
@@ -2071,10 +2164,10 @@ auto
       BufferCreateInfo.size = SliceByteSize(GeometryData);
       BufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     }
-    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &Vertices->Buffer));
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &Vertices->BufferHandle));
 
     VkMemoryRequirements MemoryRequirements;
-    Device->vkGetBufferMemoryRequirements(DeviceHandle, Vertices->Buffer, &MemoryRequirements);
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, Vertices->BufferHandle, &MemoryRequirements);
 
     auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
@@ -2085,19 +2178,19 @@ auto
       Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
     }
 
-    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &Vertices->Memory));
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &Vertices->MemoryHandle));
 
     // Copy data from host to the device.
     {
       void* RawData;
-      VulkanVerify(Device->vkMapMemory(DeviceHandle, Vertices->Memory, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, Vertices->MemoryHandle, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
 
       MemCopy(GeometryData.Num, Reinterpret<vertex*>(RawData), GeometryData.Ptr);
 
-      Device->vkUnmapMemory(DeviceHandle, Vertices->Memory);
+      Device->vkUnmapMemory(DeviceHandle, Vertices->MemoryHandle);
     }
 
-    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Vertices->Buffer, Vertices->Memory, 0));
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Vertices->BufferHandle, Vertices->MemoryHandle, 0));
   }
 
   // Index Buffer Setup
@@ -2107,10 +2200,10 @@ auto
       BufferCreateInfo.size = SliceByteSize(IndexData);
       BufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     }
-    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &Indices->Buffer));
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &Indices->BufferHandle));
 
     VkMemoryRequirements MemoryRequirements;
-    Device->vkGetBufferMemoryRequirements(DeviceHandle, Indices->Buffer, &MemoryRequirements);
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, Indices->BufferHandle, &MemoryRequirements);
 
     auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
@@ -2121,25 +2214,26 @@ auto
       Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
     }
 
-    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &Indices->Memory));
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &Indices->MemoryHandle));
 
     // Copy data from host to the device.
     {
       void* RawData;
-      VulkanVerify(Device->vkMapMemory(DeviceHandle, Indices->Memory, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, Indices->MemoryHandle, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
 
       MemCopy(IndexData.Num, Reinterpret<uint32*>(RawData), IndexData.Ptr);
 
-      Device->vkUnmapMemory(DeviceHandle, Indices->Memory);
+      Device->vkUnmapMemory(DeviceHandle, Indices->MemoryHandle);
     }
 
-    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Indices->Buffer, Indices->Memory, 0));
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Indices->BufferHandle, Indices->MemoryHandle, 0));
   }
 }
 
 auto
 ::VulkanSetDebugGridGeometry(vulkan*        Vulkan,
-                             extent2 const& Extents,
+                             vec3           HalfExtents,
+                             vec3_<uint>    NumSamples,
                              vertex_buffer* VertexBuffer,
                              index_buffer*  IndexBuffer)
   -> void
@@ -2150,21 +2244,76 @@ auto
   auto const Device = &Vulkan->Device;
   auto const DeviceHandle = Device->DeviceHandle;
 
-  scoped_array<vulkan_debug_grid_vertex> Vertices{ Allocator };
+  using vertex = vulkan_debug_grid::vertex;
 
-  for(int Index = -10; Index <= 10; ++Index)
+  scoped_array<vertex> Vertices{ Allocator };
+  size_t const TotalNumVertices = 2 * (NumSamples.X + NumSamples.Y + NumSamples.Z);
+  Reserve(&Vertices, TotalNumVertices);
+
+  // X Axis
+  for(uint Index = 0; Index < NumSamples.X; ++Index)
   {
-    // X Axis
-    Expand(&Vertices) = { Vec3(-10, Convert<float>(Index), 0), color::Red };
-    Expand(&Vertices) = { Vec3( 10, Convert<float>(Index), 0), color::Red };
+    auto Progress = 2 * HalfExtents.X * NormalizeValue<float>(Index, uint(0), NumSamples.X - 1) - HalfExtents.X;
 
-    // Y Axis
-    Expand(&Vertices) = { Vec3(Convert<float>(Index), -10, 0), color::Lime };
-    Expand(&Vertices) = { Vec3(Convert<float>(Index),  10, 0), color::Lime };
+    {
+      auto& Start = Expand(&Vertices);
+      Start.VertexPosition.X = Progress;
+      Start.VertexPosition.Y = -HalfExtents.Y;
+      Start.VertexPosition.Z = 0;
+      Start.VertexColor = color::Red;
+    }
 
-    // Z Axis
-    Expand(&Vertices) = { Vec3(Convert<float>(Index), -10,  0), color::Blue };
-    Expand(&Vertices) = { Vec3(Convert<float>(Index), -10, 10), color::Blue };
+    {
+      auto& End = Expand(&Vertices);
+      End.VertexPosition.X = Progress;
+      End.VertexPosition.Y = HalfExtents.Y;
+      End.VertexPosition.Z = 0;
+      End.VertexColor = color::Red;
+    }
+  }
+
+  // Y Axis
+  for(uint Index = 0; Index < NumSamples.Y; ++Index)
+  {
+    auto Progress = 2 * HalfExtents.Y * NormalizeValue<float>(Index, uint(0), NumSamples.Y - 1) - HalfExtents.Y;
+
+    {
+      auto& Start = Expand(&Vertices);
+      Start.VertexPosition.X = -HalfExtents.X;
+      Start.VertexPosition.Y = Progress;
+      Start.VertexPosition.Z = 0;
+      Start.VertexColor = color::Lime;
+    }
+
+    {
+      auto& End = Expand(&Vertices);
+      End.VertexPosition.X = HalfExtents.X;
+      End.VertexPosition.Y = Progress;
+      End.VertexPosition.Z = 0;
+      End.VertexColor = color::Lime;
+    }
+  }
+
+  // Z Axis
+  for(uint Index = 0; Index < NumSamples.Z; ++Index)
+  {
+    auto Progress = 2 * HalfExtents.X * NormalizeValue<float>(Index, uint(0), NumSamples.X - 1) - HalfExtents.X;
+
+    {
+      auto& Start = Expand(&Vertices);
+      Start.VertexPosition.X = Progress;
+      Start.VertexPosition.Y = -HalfExtents.Y;
+      Start.VertexPosition.Z = 0;
+      Start.VertexColor = color::Blue;
+    }
+
+    {
+      auto& End = Expand(&Vertices);
+      End.VertexPosition.X = Progress;
+      End.VertexPosition.Y = -HalfExtents.Y;
+      End.VertexPosition.Z = 2 * HalfExtents.Z;
+      End.VertexColor = color::Blue;
+    }
   }
 
   VertexBuffer->NumVertices = Cast<uint32>(Vertices.Num);
@@ -2186,10 +2335,10 @@ auto
       BufferCreateInfo.size = SliceByteSize(Slice(&Vertices));
       BufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     }
-    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &VertexBuffer->Buffer));
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &VertexBuffer->BufferHandle));
 
     VkMemoryRequirements MemoryRequirements;
-    Device->vkGetBufferMemoryRequirements(DeviceHandle, VertexBuffer->Buffer, &MemoryRequirements);
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, VertexBuffer->BufferHandle, &MemoryRequirements);
 
     auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
@@ -2200,19 +2349,19 @@ auto
       Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
     }
 
-    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &VertexBuffer->Memory));
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &VertexBuffer->MemoryHandle));
 
     // Copy data from host to the device.
     {
       void* RawData;
-      VulkanVerify(Device->vkMapMemory(DeviceHandle, VertexBuffer->Memory, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, VertexBuffer->MemoryHandle, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
 
-      MemCopy(Vertices.Num, Reinterpret<vulkan_debug_grid_vertex*>(RawData), Vertices.Ptr);
+      MemCopy(Vertices.Num, Reinterpret<vertex*>(RawData), Vertices.Ptr);
 
-      Device->vkUnmapMemory(DeviceHandle, VertexBuffer->Memory);
+      Device->vkUnmapMemory(DeviceHandle, VertexBuffer->MemoryHandle);
     }
 
-    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, VertexBuffer->Buffer, VertexBuffer->Memory, 0));
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, VertexBuffer->BufferHandle, VertexBuffer->MemoryHandle, 0));
   }
 
   // Index Buffer Setup
@@ -2222,10 +2371,10 @@ auto
       BufferCreateInfo.size = SliceByteSize(Slice(&Indices));
       BufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     }
-    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &IndexBuffer->Buffer));
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &IndexBuffer->BufferHandle));
 
     VkMemoryRequirements MemoryRequirements;
-    Device->vkGetBufferMemoryRequirements(DeviceHandle, IndexBuffer->Buffer, &MemoryRequirements);
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, IndexBuffer->BufferHandle, &MemoryRequirements);
 
     auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
@@ -2236,22 +2385,23 @@ auto
       Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
     }
 
-    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &IndexBuffer->Memory));
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &IndexBuffer->MemoryHandle));
 
     // Copy data from host to the device.
     {
       void* RawData;
-      VulkanVerify(Device->vkMapMemory(DeviceHandle, IndexBuffer->Memory, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, IndexBuffer->MemoryHandle, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
 
       MemCopy(Indices.Num, Reinterpret<uint32*>(RawData), Indices.Ptr);
 
-      Device->vkUnmapMemory(DeviceHandle, IndexBuffer->Memory);
+      Device->vkUnmapMemory(DeviceHandle, IndexBuffer->MemoryHandle);
     }
 
-    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, IndexBuffer->Buffer, IndexBuffer->Memory, 0));
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, IndexBuffer->BufferHandle, IndexBuffer->MemoryHandle, 0));
   }
 }
 
+#if 0
 auto
 ::VulkanPrepareSceneObjectForRendering(vulkan const* Vulkan,
                                        vulkan_scene_object* SceneObject)
@@ -2337,6 +2487,7 @@ auto
     Convert<uint32>(DescriptorSetWrites.Num), DescriptorSetWrites.Ptr,
     0, nullptr);
 }
+#endif
 
 auto
 ::Init(vulkan_texture2d* Texture, allocator_interface* Allocator)
@@ -2353,7 +2504,7 @@ auto
 }
 
 auto
-::ImplCreateShaderBuffer(vulkan* Vulkan, vulkan_shader_buffer_header* ShaderBuffer, size_t NumBytesForBuffer, bool IsReadOnlyForShader)
+::ImplVulkanCreateShaderBuffer(vulkan* Vulkan, vulkan_shader_buffer_header* ShaderBuffer, size_t NumBytesForBuffer, bool IsReadOnlyForShader)
   -> void
 {
   auto const& Device = Vulkan->Device;
@@ -2395,4 +2546,32 @@ auto
                                          ShaderBuffer->BufferHandle,
                                          ShaderBuffer->MemoryHandle,
                                          0));
+}
+
+auto
+::VulkanEnsureIsReadyForDrawing(vulkan* Vulkan, vulkan_renderable* Renderable)
+  -> void
+{
+  if(!Renderable->IsDirty)
+    return;
+
+  Renderable->PrepareForDrawing(Vulkan);
+  Renderable->IsDirty = false;
+}
+
+auto
+::ImplVulkanUploadBufferData(vulkan_device const& Device, vulkan_shader_buffer_header const& ShaderBuffer, slice<void const> Data)
+  -> void
+{
+  void* RawTarget;
+  VulkanVerify(Device.vkMapMemory(Device.DeviceHandle,
+                                  ShaderBuffer.MemoryHandle,
+                                  0, // offset
+                                  VK_WHOLE_SIZE,
+                                  0, // flags
+                                  &RawTarget));
+
+  MemCopy(Data.Num, RawTarget, Data.Ptr);
+
+  Device.vkUnmapMemory(Device.DeviceHandle, ShaderBuffer.MemoryHandle);
 }

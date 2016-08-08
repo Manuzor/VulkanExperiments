@@ -664,9 +664,12 @@ struct vulkan_graphics_pipeline_desc
   };
 };
 
-template<typename VertexType>
 static VkPipeline
-VulkanCreateGraphicsPipeline(vulkan* Vulkan, compiled_shader* CompiledShader, vulkan_graphics_pipeline_desc& Desc)
+ImplVulkanCreateGraphicsPipeline(vulkan* Vulkan,
+                             compiled_shader* CompiledShader,
+                             VkPipelineLayout PipelineLayout,
+                             vulkan_graphics_pipeline_desc& Desc,
+                             size_t VertexDataStride)
 {
   if(CompiledShader == nullptr)
   {
@@ -720,7 +723,7 @@ VulkanCreateGraphicsPipeline(vulkan* Vulkan, compiled_shader* CompiledShader, vu
   VkVertexInputBindingDescription VertexInputBinding = InitStruct<VkVertexInputBindingDescription>();
   {
     VertexInputBinding.binding = 0;
-    VertexInputBinding.stride = Cast<uint32>(SizeOf<VertexType>());
+    VertexInputBinding.stride = Convert<uint32>(VertexDataStride);
     VertexInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
   }
 
@@ -774,7 +777,7 @@ VulkanCreateGraphicsPipeline(vulkan* Vulkan, compiled_shader* CompiledShader, vu
     GraphicsPipelineCreateInfo.pDepthStencilState = &Desc.DepthStencilState;
     GraphicsPipelineCreateInfo.pColorBlendState = &ColorBlendState;
     GraphicsPipelineCreateInfo.pDynamicState = &DynamicState;
-    GraphicsPipelineCreateInfo.layout = Vulkan->SceneObjectGraphicsState.PipelineLayout;
+    GraphicsPipelineCreateInfo.layout = PipelineLayout;
     GraphicsPipelineCreateInfo.renderPass = Vulkan->RenderPass;
   }
 
@@ -784,6 +787,90 @@ VulkanCreateGraphicsPipeline(vulkan* Vulkan, compiled_shader* CompiledShader, vu
                                                 nullptr,
                                                 &Pipeline));
   return Pipeline;
+}
+
+template<typename VertexType>
+inline VkPipeline
+VulkanCreateGraphicsPipeline(vulkan* Vulkan,
+                             compiled_shader* CompiledShader,
+                             VkPipelineLayout PipelineLayout,
+                             vulkan_graphics_pipeline_desc& Desc)
+{
+  return ImplVulkanCreateGraphicsPipeline(Vulkan, CompiledShader, PipelineLayout, Desc, SizeOf<VertexType>());
+}
+
+void
+ImplVulkanPrepareRenderableFoo(vulkan* Vulkan, slice<char const> ShaderPath, vulkan_graphics_pipeline_desc PipelineDesc, size_t VertexDataStride, vulkan_renderable_foo* Foo)
+{
+  auto const& Device = Vulkan->Device;
+  auto const DeviceHandle = Device.DeviceHandle;
+
+  temp_allocator TempAllocator;
+  allocator_interface* Allocator = *TempAllocator;
+
+  //
+  // Get compiled shader
+  //
+  Foo->Shader = GetCompiledShader(Vulkan->ShaderManager, ShaderPath, GlobalLog);
+  Assert(Foo->Shader != nullptr);
+
+  //
+  // Prepare Descriptor Set Layout
+  //
+  {
+    LogBeginScope("Preparing descriptor set layout.");
+    Defer [](){ LogEndScope("Finished preparing descriptor set layout."); };
+
+    scoped_array<VkDescriptorSetLayoutBinding> LayoutBindings{ Allocator };
+
+    GetDescriptorSetLayoutBindings(Foo->Shader, &LayoutBindings);
+
+    auto DescriptorSetLayoutCreateInfo = InitStruct<VkDescriptorSetLayoutCreateInfo>();
+    {
+      DescriptorSetLayoutCreateInfo.bindingCount = Cast<uint32>(LayoutBindings.Num);
+      DescriptorSetLayoutCreateInfo.pBindings = LayoutBindings.Ptr;
+    }
+
+    VulkanVerify(Device.vkCreateDescriptorSetLayout(DeviceHandle, &DescriptorSetLayoutCreateInfo, nullptr, &Foo->DescriptorSetLayout));
+
+    auto PipelineLayoutCreateInfo = InitStruct<VkPipelineLayoutCreateInfo>();
+    {
+      PipelineLayoutCreateInfo.setLayoutCount = 1;
+      PipelineLayoutCreateInfo.pSetLayouts = &Foo->DescriptorSetLayout;
+    }
+    VulkanVerify(Device.vkCreatePipelineLayout(DeviceHandle, &PipelineLayoutCreateInfo, nullptr, &Foo->PipelineLayout));
+  }
+
+  //
+  // Create Pipeline Cache (if necessary)
+  //
+  if(Vulkan->PipelineCache == nullptr)
+  {
+    auto PipelineCacheCreateInfo = InitStruct<VkPipelineCacheCreateInfo>();
+    VulkanVerify(Device.vkCreatePipelineCache(DeviceHandle, &PipelineCacheCreateInfo, nullptr, &Vulkan->PipelineCache));
+  }
+
+  //
+  // Create Pipeline
+  //
+  {
+    Foo->Pipeline = ImplVulkanCreateGraphicsPipeline(Vulkan, Foo->Shader, Foo->PipelineLayout, PipelineDesc, VertexDataStride);
+    Assert(Foo->Pipeline);
+  }
+
+  //
+  // Allocate the UBO for Globals
+  //
+  {
+    VulkanCreateShaderBuffer(Vulkan, &Foo->UboGlobals, is_read_only_for_shader::Yes);
+  }
+}
+
+template<typename VertexDataType>
+void
+VulkanPrepareRenderableFoo(vulkan* Vulkan, slice<char const> ShaderPath, vulkan_graphics_pipeline_desc PipelineDesc, vulkan_renderable_foo* Foo)
+{
+  ImplVulkanPrepareRenderableFoo(Vulkan, ShaderPath, PipelineDesc, SizeOf<VertexDataType>(), Foo);
 }
 
 static bool
@@ -797,37 +884,6 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
   temp_allocator TempAllocator;
   allocator_interface* Allocator = *TempAllocator;
 
-  //
-  // Get desired compiled shaders
-  //
-  auto CompiledDebugGridShader = GetCompiledShader(Vulkan->ShaderManager, "Data/Shader/DebugGrid.shader"_S, GlobalLog);
-
-  //
-  // Prepare Descriptor Set Layout
-  //
-  {
-    LogBeginScope("Preparing descriptor set layout.");
-    Defer [](){ LogEndScope("Finished preparing descriptor set layout."); };
-
-    scoped_array<VkDescriptorSetLayoutBinding> LayoutBindings{ Allocator };
-
-    GetDescriptorSetLayoutBindings(CompiledDebugGridShader, &LayoutBindings);
-
-    auto DescriptorSetLayoutCreateInfo = InitStruct<VkDescriptorSetLayoutCreateInfo>();
-    {
-      DescriptorSetLayoutCreateInfo.bindingCount = Cast<uint32>(LayoutBindings.Num);
-      DescriptorSetLayoutCreateInfo.pBindings = LayoutBindings.Ptr;
-    }
-
-    VulkanVerify(Device.vkCreateDescriptorSetLayout(DeviceHandle, &DescriptorSetLayoutCreateInfo, nullptr, &Vulkan->SceneObjectGraphicsState.DescriptorSetLayout));
-
-    auto PipelineLayoutCreateInfo = InitStruct<VkPipelineLayoutCreateInfo>();
-    {
-      PipelineLayoutCreateInfo.setLayoutCount = 1;
-      PipelineLayoutCreateInfo.pSetLayouts = &Vulkan->SceneObjectGraphicsState.DescriptorSetLayout;
-    }
-    VulkanVerify(Device.vkCreatePipelineLayout(DeviceHandle, &PipelineLayoutCreateInfo, nullptr, &Vulkan->SceneObjectGraphicsState.PipelineLayout));
-  }
 
   //
   // Prepare Render Pass
@@ -897,29 +953,31 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     VulkanVerify(Device.vkCreateRenderPass(DeviceHandle, &RenderPassCreateInfo, nullptr, &Vulkan->RenderPass));
   }
 
+
   //
-  // Create Pipeline Cache
+  // Prepare Foos
   //
   {
-    auto CreateInfo = InitStruct<VkPipelineCacheCreateInfo>();
-    VulkanVerify(Device.vkCreatePipelineCache(DeviceHandle, &CreateInfo, nullptr, &Vulkan->PipelineCache));
+    // Debug Grids
+    {
+      auto PipelineDesc = InitStruct<vulkan_graphics_pipeline_desc>();
+      PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
+      PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+      VulkanPrepareRenderableFoo<vulkan_debug_grid::vertex>(Vulkan, "Data/Shader/DebugGrid.shader"_S, PipelineDesc, &Vulkan->DebugGridsFoo);
+    }
+
+    // Scene Objects
+    {
+      auto PipelineDesc = InitStruct<vulkan_graphics_pipeline_desc>();
+      PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
+      PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+      VulkanPrepareRenderableFoo<vulkan_scene_object::vertex>(Vulkan, "Data/Shader/SceneObject.shader"_S, PipelineDesc, &Vulkan->SceneObjectsFoo);
+    }
   }
 
 
   //
-  // Create pipeline per shader
-  //
-  {
-    vulkan_graphics_pipeline_desc PipelineDesc{};
-    PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
-    PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-    auto Pipeline = VulkanCreateGraphicsPipeline<vulkan_debug_grid_vertex>(Vulkan, CompiledDebugGridShader, PipelineDesc);
-    Assert(Pipeline);
-    Vulkan->SceneObjectGraphicsState.Pipeline = Pipeline;
-  }
-
-  //
-  // Prepare Descriptor Pool
+  // Create Descriptor Pool
   //
   {
     LogBeginScope("Preparing descriptor pool.");
@@ -927,7 +985,8 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
 
     // Get descriptor counts
     scoped_dictionary<VkDescriptorType, uint32> DescriptorCounts{ Allocator };
-    GetDescriptorTypeCounts(CompiledDebugGridShader, &DescriptorCounts);
+    GetDescriptorTypeCounts(Vulkan->DebugGridsFoo.Shader, &DescriptorCounts);
+    GetDescriptorTypeCounts(Vulkan->SceneObjectsFoo.Shader, &DescriptorCounts);
 
     // Now collect them in the proper structs.
     scoped_array<VkDescriptorPoolSize> PoolSizes{ Allocator };
@@ -949,44 +1008,6 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
                                                &DescriptorPoolCreateInfo,
                                                nullptr,
                                                &Vulkan->DescriptorPool));
-  }
-
-  //
-  // Allocate the UBO for Globals
-  //
-  if(false)
-  {
-    auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
-    {
-      BufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-      BufferCreateInfo.size = SizeOf<decltype(Vulkan->SceneObjectGraphicsState.GlobalsUBO.Data)>();
-    }
-
-    VulkanVerify(Device.vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr,
-                                       &Vulkan->SceneObjectGraphicsState.GlobalsUBO.BufferHandle));
-
-    VkMemoryRequirements MemoryRequirements;
-    Device.vkGetBufferMemoryRequirements(DeviceHandle, Vulkan->SceneObjectGraphicsState.GlobalsUBO.BufferHandle,
-                                         &MemoryRequirements);
-
-    auto Temp_MemoryAllocationInfo = InitStruct<VkMemoryAllocateInfo>();
-    {
-      Temp_MemoryAllocationInfo.allocationSize = MemoryRequirements.size;
-      Temp_MemoryAllocationInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Device.Gpu->MemoryProperties,
-                                                                                 MemoryRequirements.memoryTypeBits,
-                                                                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-      Assert(Temp_MemoryAllocationInfo.memoryTypeIndex != IntMaxValue<uint32>());
-    }
-
-    VulkanVerify(Device.vkAllocateMemory(DeviceHandle, &Temp_MemoryAllocationInfo, nullptr, &Vulkan->SceneObjectGraphicsState.GlobalsUBO.MemoryHandle));
-
-    VulkanVerify(Device.vkBindBufferMemory(DeviceHandle,
-                                           Vulkan->SceneObjectGraphicsState.GlobalsUBO.BufferHandle,
-                                           Vulkan->SceneObjectGraphicsState.GlobalsUBO.MemoryHandle,
-                                           0));
-  }
-  {
-    CreateShaderBuffer(Vulkan, &Vulkan->SceneObjectGraphicsState.GlobalsUBO, is_read_only_for_shader::Yes);
   }
 
   //
@@ -1022,7 +1043,6 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     }
   }
 
-  // Done preparing swapchain...
   return true;
 }
 
@@ -1192,7 +1212,7 @@ VulkanResize(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight)
 }
 
 static void
-VulkanBuildDrawCommands(vulkan const&          Vulkan,
+VulkanBuildDrawCommands(vulkan&                Vulkan,
                         slice<VkCommandBuffer> DrawCommandBuffers,
                         slice<VkFramebuffer>   Framebuffers,
                         color_linear const&    ClearColor,
@@ -1260,18 +1280,24 @@ VulkanBuildDrawCommands(vulkan const&          Vulkan,
       // Draw scene objects
       VkDeviceSize NoOffset = {};
 
-      for(auto& SceneObject : Slice(&Vulkan.SceneObjects))
+      for(auto Renderable : Slice(&Vulkan.Renderables))
       {
+        VulkanEnsureIsReadyForDrawing(&Vulkan, Renderable);
+
+        auto Shader = Renderable->Foo->Shader;
+        if(Shader == nullptr)
+        {
+          LogError("No shader for renderable: %s", StrPtr(Renderable->Name));
+        }
+
         Device.vkCmdBindDescriptorSets(DrawCommandBuffer,
                                        VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                       Vulkan.SceneObjectGraphicsState.PipelineLayout,
+                                       Renderable->Foo->PipelineLayout,
                                        0, // Descriptor set offset
-                                       1, &SceneObject.DescriptorSet,
+                                       1, &Renderable->DescriptorSet,
                                        0, nullptr); // Dynamic offsets
-        Device.vkCmdBindPipeline(DrawCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, SceneObject.Pipeline);
-        Device.vkCmdBindVertexBuffers(DrawCommandBuffer, 0, 1, &SceneObject.Vertices.Buffer, &NoOffset);
-        Device.vkCmdBindIndexBuffer(DrawCommandBuffer, SceneObject.Indices.Buffer, NoOffset, VK_INDEX_TYPE_UINT32);
-        Device.vkCmdDrawIndexed(DrawCommandBuffer, SceneObject.Indices.NumIndices, 1, 0, 0, 0);
+        Device.vkCmdBindPipeline(DrawCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Renderable->Foo->Pipeline);
+        Renderable->Draw(&Vulkan, DrawCommandBuffer);
       }
     }
     Device.vkCmdEndRenderPass(DrawCommandBuffer);
@@ -1823,53 +1849,67 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
                                             &TextureUploadCommandBuffer);
       };
 
-      auto KittenHandle = VulkanCreateSceneObject(Vulkan, Allocator);
-      auto Kitten = VulkanBeginAccess(Vulkan, KittenHandle);
-      Defer [Vulkan, Kitten](){ VulkanEndAccess(Vulkan, Kitten); };
-
       //
-      // Load image.
+      // Kitten
       //
-      bool const LoadFromFile = true;
-      if(LoadFromFile)
+      if(false)
       {
-        arc_string FileName = "Data/Kitten_DXT1_Mipmaps.dds";
-        auto FileExtension = AsConst(FindFileExtension(Slice(FileName)));
-        auto Factory = GetImageLoaderFactoryByFileExtension(ImageLoaderRegistry, FileExtension);
+        auto Kitten = VulkanCreateSceneObject(Vulkan, "Teh Kitten"_S);
+        // TODO: Cleanup
 
-        if(Factory)
+        //
+        // Load image.
+        //
+        bool const UseImageFromFile = true;
+        if(UseImageFromFile)
         {
-          auto ImageLoader = CreateImageLoader(Factory);
-          Defer [=](){ DestroyImageLoader(Factory, ImageLoader); };
+          arc_string FileName = "Data/Kitten_DXT1_Mipmaps.dds";
+          auto FileExtension = AsConst(FindFileExtension(Slice(FileName)));
+          auto Factory = GetImageLoaderFactoryByFileExtension(ImageLoaderRegistry, FileExtension);
 
-          if(LoadImageFromFile(ImageLoader, &Kitten->Texture.Image, Slice(FileName)))
+          if(Factory)
           {
-            LogInfo("Loaded image file: %s", StrPtr(FileName));
+            auto ImageLoader = CreateImageLoader(Factory);
+            Defer [=](){ DestroyImageLoader(Factory, ImageLoader); };
+
+            if(LoadImageFromFile(ImageLoader, &Kitten->Texture.Image, Slice(FileName)))
+            {
+              LogInfo("Loaded image file: %s", StrPtr(FileName));
+            }
+            else
+            {
+              LogWarning("Failed to load image file: %s", StrPtr(FileName));
+            }
           }
           else
           {
-            LogWarning("Failed to load image file: %s", StrPtr(FileName));
+            LogWarning("Failed to find image loader for: %s", StrPtr(FileName));
           }
         }
         else
         {
-          LogWarning("Failed to find image loader for: %s", StrPtr(FileName));
+          ImageSetAsSolidColor(&Kitten->Texture.Image, color::Red, image_format::R32G32B32A32_FLOAT);
         }
+
+        VulkanUploadTexture(*Vulkan,
+                            TextureUploadCommandBuffer,
+                            &Kitten->Texture,
+                            vulkan_force_linear_tiling::Yes); // TODO: Should be ::No
+
+        VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->VertexBuffer, &Kitten->IndexBuffer);
       }
-      else
+
+      //
+      // Debug grid
+      //
       {
-        ImageSetAsSolidColor(&Kitten->Texture.Image, color::Red, image_format::R32G32B32A32_FLOAT);
+        auto DebugGrid = VulkanCreateDebugGrid(Vulkan, "Grid 1"_S);
+        // TODO: Cleanup
+
+        VulkanSetDebugGridGeometry(Vulkan, { 10, 10, 5 }, { 10, 10, 10 },
+                                   &DebugGrid->VertexBuffer,
+                                   &DebugGrid->IndexBuffer);
       }
-
-      VulkanUploadTexture(*Vulkan,
-                          TextureUploadCommandBuffer,
-                          &Kitten->Texture,
-                          vulkan_force_linear_tiling::Yes); // TODO: Should be ::No
-
-      // VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->Vertices, &Kitten->Indices);
-      VulkanSetDebugGridGeometry(Vulkan, {}, &Kitten->Vertices, &Kitten->Indices);
-
-      VulkanPrepareSceneObjectForRendering(Vulkan, Kitten);
     }
 
     //
@@ -1960,23 +2000,18 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
       auto const ViewProjectionMatrix = CameraViewProjectionMatrix(Cam, Cam.Transform);
 
+
       //
       // Upload shader globals
       //
       {
-        void* RawData;
-        VulkanVerify(Vulkan->Device.vkMapMemory(Vulkan->Device.DeviceHandle,
-                                                Vulkan->SceneObjectGraphicsState.GlobalsUBO.MemoryHandle,
-                                                0, // offset
-                                                VK_WHOLE_SIZE,
-                                                0, // flags
-                                                &RawData));
+        Vulkan->DebugGridsFoo.UboGlobals.Data.ViewProjectionMatrix = ViewProjectionMatrix;
+        VulkanUploadShaderBufferData(Vulkan, Vulkan->DebugGridsFoo.UboGlobals);
 
-        auto const Target = Reinterpret<decltype(vulkan_scene_object_gfx_state::GlobalsUBO.Data)*>(RawData);
-        Target->ViewProjectionMatrix = ViewProjectionMatrix;
-
-        Vulkan->Device.vkUnmapMemory(Vulkan->Device.DeviceHandle, Vulkan->SceneObjectGraphicsState.GlobalsUBO.MemoryHandle);
+        Vulkan->SceneObjectsFoo.UboGlobals.Data.ViewProjectionMatrix = ViewProjectionMatrix;
+        VulkanUploadShaderBufferData(Vulkan, Vulkan->SceneObjectsFoo.UboGlobals);
       }
+
 
       //
       // Handle resize requests

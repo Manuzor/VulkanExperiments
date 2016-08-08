@@ -163,7 +163,32 @@ struct rect_
       extent2_<Type> Extent;
     };
 
-    Type Data[4];
+    Type Data[2 + 2];
+  };
+};
+
+template<typename Type>
+struct box_
+{
+  union
+  {
+    struct
+    {
+      Type X;
+      Type Y;
+      Type Z;
+      Type Width;
+      Type Height;
+      Type Depth;
+    };
+
+    struct
+    {
+      vec3_<Type> Offset;
+      extent3_<Type> Extent;
+    };
+
+    Type Data[3 + 3];
   };
 };
 
@@ -182,6 +207,7 @@ using transform = transform_<float>;
 using extent2 = extent2_<float>;
 using extent3 = extent3_<float>;
 using rect = rect_<float>;
+using box = box_<float>;
 
 static_assert(sizeof(vec2)       ==     2 * sizeof(float), "Incorrect size.");
 static_assert(sizeof(vec3)       ==     3 * sizeof(float), "Incorrect size.");
@@ -191,6 +217,7 @@ static_assert(sizeof(mat4x4)     == 4 * 4 * sizeof(float), "Incorrect size.");
 static_assert(sizeof(extent2)    ==     2 * sizeof(float), "Incorrect size.");
 static_assert(sizeof(extent3)    ==     3 * sizeof(float), "Incorrect size.");
 static_assert(sizeof(rect)       ==     4 * sizeof(float), "Incorrect size.");
+static_assert(sizeof(box)        ==     6 * sizeof(float), "Incorrect size.");
 
 
 //

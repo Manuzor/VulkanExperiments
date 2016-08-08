@@ -5,6 +5,7 @@
 #include <Core/Math.hpp>
 #include <Core/Color.hpp>
 #include <Core/Image.hpp>
+#include <Core/String.hpp>
 
 #include "ShaderManager.hpp"
 
@@ -71,61 +72,105 @@ struct vulkan_texture2d
   image Image;
 };
 
+enum class vulkan_buffer_type
+{
+  Vertex,
+  Index,
+};
+
 struct vertex_buffer
 {
-  VkBuffer Buffer;
-  VkDeviceMemory Memory;
+  VkBuffer BufferHandle;
+  VkDeviceMemory MemoryHandle;
 
   uint32 NumVertices;
 };
 
 struct index_buffer
 {
-  VkBuffer Buffer;
-  VkDeviceMemory Memory;
+  VkBuffer BufferHandle;
+  VkDeviceMemory MemoryHandle;
 
   uint32 NumIndices;
 };
 
-struct vulkan_scene_object_vertex
+struct vulkan_renderable_foo
 {
-  vec3 VertexPosition;
-  vec2 VertexTextureCoordinates;
-};
+  struct ubo_globals_data
+  {
+    mat4x4 ViewProjectionMatrix;
+  };
 
-struct vulkan_debug_grid_vertex
-{
-  vec3 VertexPosition;
-  color_linear VertexColor;
-};
+  using ubo_globals = vulkan_shader_buffer<ubo_globals_data>;
 
-struct vulkan_scene_object_shader_globals
-{
-  mat4x4 ViewProjectionMatrix;
-};
+  compiled_shader* Shader;
 
-struct vulkan_scene_object_gfx_state
-{
-  VkPipeline Pipeline;
-  VkPipelineLayout PipelineLayout;
   VkDescriptorSetLayout DescriptorSetLayout;
-  vulkan_shader_buffer<vulkan_scene_object_shader_globals> GlobalsUBO;
-
-  dynamic_array<VkVertexInputBindingDescription> VertexInputBindingDescs;
-  dynamic_array<VkVertexInputAttributeDescription> VertexInputAttributeDescs;
+  VkPipelineLayout PipelineLayout;
+  VkPipeline Pipeline;
+  ubo_globals UboGlobals;
 };
 
-struct vulkan_scene_object
+struct vulkan_renderable
 {
-  bool IsAllocated;
-  size_t NumExternalReferences;
+  arc_string Name; // Some name to identify this renderable.
+  bool IsDirty = true; // Flag indicating whether the data needs to be (re-) uploaded to the GPU.
 
-  vulkan_texture2d Texture;
-  vertex_buffer Vertices;
-  index_buffer Indices;
+  vulkan_renderable_foo* Foo{};
 
-  VkPipeline Pipeline;
-  VkDescriptorSet DescriptorSet;
+  VkDescriptorSet DescriptorSet{};
+
+  virtual void PrepareForDrawing(struct vulkan* Vulkan);
+
+  virtual void Draw(struct vulkan* Vulkan,
+               VkCommandBuffer CommandBuffer) = 0;
+};
+
+struct vulkan_scene_object : public vulkan_renderable
+{
+  struct ubo_model_data
+  {
+    mat4x4 ModelMatrix;
+  };
+
+  // TODO: Use this UBO type.
+  using ubo_model = vulkan_shader_buffer<ubo_model_data>;
+
+  struct vertex
+  {
+    vec3 VertexPosition;
+    vec2 VertexTextureCoordinates;
+  };
+
+  vertex_buffer VertexBuffer{};
+  index_buffer IndexBuffer{};
+  vulkan_texture2d Texture{};
+
+  virtual void PrepareForDrawing(struct vulkan* Vulkan) override;
+  virtual void Draw(struct vulkan* Vulkan, VkCommandBuffer CommandBuffer) override;
+};
+
+struct vulkan_debug_grid : public vulkan_renderable
+{
+  struct ubo_model_data
+  {
+    // mat4x4 ModelMatrix;
+  };
+
+  // TODO: Use this UBO type?
+  using ubo_model = vulkan_shader_buffer<ubo_model_data>;
+
+  struct vertex
+  {
+    vec3 VertexPosition;
+    color_linear VertexColor;
+  };
+
+  vertex_buffer VertexBuffer{};
+  index_buffer IndexBuffer{};
+
+  virtual void PrepareForDrawing(struct vulkan* Vulkan) override;
+  virtual void Draw(struct vulkan* Vulkan, VkCommandBuffer CommandBuffer) override;
 };
 
 struct vulkan_queue_node
@@ -214,12 +259,16 @@ struct vulkan : public vulkan_instance_functions
 
 
   //
-  // Scene Objects
+  // Renderable objects
   //
-  vulkan_scene_object_gfx_state SceneObjectGraphicsState;
+  allocator_interface* RenderableAllocator;
 
-  dynamic_array<vulkan_scene_object> SceneObjects;
-  size_t NumExternalSceneObjectPtrs;
+  vulkan_renderable_foo SceneObjectsFoo;
+  vulkan_renderable_foo DebugGridsFoo;
+
+  dynamic_array<vulkan_scene_object*> SceneObjects;
+  dynamic_array<vulkan_debug_grid*> DebugGrids;
+  dynamic_array<vulkan_renderable*> Renderables;
 
 
   //
@@ -249,20 +298,19 @@ VulkanLoadDLL(vulkan* Vulkan);
 void
 VulkanLoadInstanceFunctions(vulkan* Vulkan);
 
-DefineOpaqueHandle(vulkan_scene_object_handle);
-
-vulkan_scene_object_handle
-VulkanCreateSceneObject(vulkan* Vulkan, allocator_interface* Allocator);
-
-void
-VulkanDestroyAndDeallocateSceneObject(vulkan*                    Vulkan,
-                                      vulkan_scene_object_handle SceneObject);
-
 vulkan_scene_object*
-VulkanBeginAccess(vulkan* Vulkan, vulkan_scene_object_handle SceneObjectHandle);
+VulkanCreateSceneObject(vulkan* Vulkan, slice<char const> Name);
 
 void
-VulkanEndAccess(vulkan* Vulkan, vulkan_scene_object* SceneObject);
+VulkanDestroySceneObject(vulkan*              Vulkan,
+                         vulkan_scene_object* SceneObject);
+
+vulkan_debug_grid*
+VulkanCreateDebugGrid(vulkan* Vulkan, slice<char const> Name);
+
+void
+VulkanDestroyDebugGrid(vulkan*            Vulkan,
+                       vulkan_debug_grid* SceneObject);
 
 enum class vulkan_force_linear_tiling : bool { No = false, Yes = true };
 
@@ -283,13 +331,16 @@ VulkanSetQuadGeometry(vulkan*        Vulkan,
 
 void
 VulkanSetDebugGridGeometry(vulkan*        Vulkan,
-                           extent2 const& Extents,
+                           vec3           HalfExtents,
+                           vec3_<uint>    NumSamples,
                            vertex_buffer* Vertices,
                            index_buffer*  Indices);
 
+#if 0
 void
 VulkanPrepareSceneObjectForRendering(vulkan const*        Vulkan,
                                      vulkan_scene_object* SceneObject);
+#endif
 
 
 //
@@ -417,13 +468,30 @@ Finalize(vulkan_texture2d* Texture);
 
 
 void
-ImplCreateShaderBuffer(vulkan* Vulkan, vulkan_shader_buffer_header* ShaderBuffer, size_t NumBytesForBuffer, bool IsReadOnlyForShader);
+ImplVulkanCreateShaderBuffer(vulkan* Vulkan, vulkan_shader_buffer_header* ShaderBuffer, size_t NumBytesForBuffer, bool IsReadOnlyForShader);
 
 enum class is_read_only_for_shader : bool { No = false, Yes = true };
 
 template<typename T>
 void
-CreateShaderBuffer(vulkan* Vulkan, vulkan_shader_buffer<T>* ShaderBuffer, is_read_only_for_shader IsReadOnlyForShader)
+VulkanCreateShaderBuffer(vulkan* Vulkan, vulkan_shader_buffer<T>* ShaderBuffer, is_read_only_for_shader IsReadOnlyForShader)
 {
-  ImplCreateShaderBuffer(Vulkan, ShaderBuffer, SizeOf<T>(), IsReadOnlyForShader == is_read_only_for_shader::Yes);
+  ImplVulkanCreateShaderBuffer(Vulkan, ShaderBuffer, SizeOf<T>(), IsReadOnlyForShader == is_read_only_for_shader::Yes);
+}
+
+void
+VulkanEnsureIsReadyForDrawing(vulkan* Vulkan, vulkan_renderable* Renderable);
+
+void
+ImplVulkanUploadBufferData(vulkan_device const& Device, vulkan_shader_buffer_header const& ShaderBuffer, slice<void const> Data);
+
+template<typename Type>
+void
+VulkanUploadShaderBufferData(vulkan* Vulkan, vulkan_shader_buffer<Type> const& ShaderBuffer)
+{
+  auto Data = Slice(1, &ShaderBuffer.Data);
+  auto RawData = SliceReinterpret<void const>(Data);
+  ImplVulkanUploadBufferData(Vulkan->Device,
+                             ShaderBuffer,
+                             RawData);
 }
