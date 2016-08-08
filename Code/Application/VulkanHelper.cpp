@@ -3,6 +3,7 @@
 #include <Core/Log.hpp>
 #include <Core/Image.hpp>
 #include <Core/ImageLoader.hpp>
+#include <Core/Time.hpp>
 
 void
 vulkan_renderable::PrepareForDrawing(struct vulkan* Vulkan)
@@ -1989,7 +1990,149 @@ auto
       auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
       auto MemoryRequirements = InitStruct<VkMemoryRequirements>();
 
-      Assert(0); // Not implemented.
+      // Create a host-visible staging buffer that contains the raw image data
+      VkBuffer StagingBuffer{};
+      VkDeviceMemory StagingMemory{};
+
+      {
+        auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
+        BufferCreateInfo.size = ImageDataSize(&Texture->Image);
+        // This buffer is used as a transfer source for the buffer copy
+        BufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VulkanVerify(Device.vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &StagingBuffer));
+      }
+
+      // Get memory requirements for the staging buffer (alignment, memory type bits)
+      Device.vkGetBufferMemoryRequirements(DeviceHandle, StagingBuffer, &MemoryRequirements);
+
+      MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
+      // Get memory type index for a host visible buffer
+      MemoryAllocateInfo.memoryTypeIndex =
+        VulkanDetermineMemoryTypeIndex(Vulkan.Gpu.MemoryProperties,
+                                       MemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+      VulkanVerify(Device.vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &StagingMemory));
+      VulkanVerify(Device.vkBindBufferMemory(DeviceHandle, StagingBuffer, StagingMemory, 0));
+
+      // Copy texture data into staging buffer
+      {
+        void* RawData{};
+        VulkanVerify(Device.vkMapMemory(DeviceHandle, StagingMemory, 0, MemoryRequirements.size, 0, &RawData));
+
+        MemCopy(ImageDataSize(&Texture->Image),
+                Reinterpret<uint8*>(RawData),
+                ImageDataPointer<uint8 const>(&Texture->Image));
+
+        Device.vkUnmapMemory(DeviceHandle, StagingMemory);
+      }
+
+      // Setup buffer copy regions for each mip level
+      scoped_array<VkBufferImageCopy> BufferCopyRegions{ Allocator };
+
+      {
+        // uint32 Offset{};
+
+        for (uint32 MipLevel = 0; MipLevel < Texture->Image.NumMipLevels; MipLevel++)
+        {
+          VkBufferImageCopy BufferCopyRegion = InitStruct<VkBufferImageCopy>();
+          BufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+          BufferCopyRegion.imageSubresource.mipLevel = MipLevel;
+          BufferCopyRegion.imageSubresource.baseArrayLayer = 0;
+          BufferCopyRegion.imageSubresource.layerCount = 1;
+          BufferCopyRegion.imageExtent.width = ImageWidth(&Texture->Image, MipLevel);
+          BufferCopyRegion.imageExtent.height = ImageHeight(&Texture->Image, MipLevel);
+          BufferCopyRegion.imageExtent.depth = 1;
+          // TODO: Check if this works as intended.
+          BufferCopyRegion.bufferOffset = ImageDataOffSet(&Texture->Image, MipLevel);
+
+          Expand(&BufferCopyRegions) = BufferCopyRegion;
+
+          // Offset += Convert<uint32>(tex2D[i].size());
+        }
+      }
+
+      // Create optimal tiled target image
+      auto ImageCreateInfo = InitStruct<VkImageCreateInfo>();
+      {
+        ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+        ImageCreateInfo.format = Texture->ImageFormat;
+        ImageCreateInfo.mipLevels = Texture->Image.NumMipLevels;
+        ImageCreateInfo.arrayLayers = 1;
+        ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        ImageCreateInfo.extent = { Texture->Image.Width, Texture->Image.Height, 1 };
+        ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | ImageUsageFlags;
+      }
+
+      VulkanVerify(Device.vkCreateImage(DeviceHandle, &ImageCreateInfo, nullptr, &Texture->ImageHandle));
+
+      Device.vkGetImageMemoryRequirements(DeviceHandle, Texture->ImageHandle, &MemoryRequirements);
+
+      MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
+
+      MemoryAllocateInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan.Gpu.MemoryProperties, MemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      VulkanVerify(Device.vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &Texture->MemoryHandle));
+      VulkanVerify(Device.vkBindImageMemory(DeviceHandle, Texture->ImageHandle, Texture->MemoryHandle, 0));
+
+      auto SubresourceRange = InitStruct<VkImageSubresourceRange>();
+      {
+        SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        SubresourceRange.baseMipLevel = 0;
+        SubresourceRange.levelCount = Texture->Image.NumMipLevels;
+        SubresourceRange.layerCount = 1;
+      }
+
+      // Image barrier for optimal image (target)
+      // Optimal image will be used as destination for the copy
+      VulkanSetImageLayout(Device, CommandBuffer,
+                           Texture->ImageHandle,
+                           SubresourceRange,
+                           VK_IMAGE_LAYOUT_UNDEFINED,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+      // Copy mip levels from staging buffer
+      Device.vkCmdCopyBufferToImage(CommandBuffer,
+                                    StagingBuffer,
+                                    Texture->ImageHandle,
+                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                    Convert<uint32>(BufferCopyRegions.Num),
+                                    BufferCopyRegions.Ptr);
+
+      // Change texture image layout to shader read after all mip levels have been copied
+      Texture->ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      VulkanSetImageLayout(Device, CommandBuffer,
+                           Texture->ImageHandle,
+                           SubresourceRange,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           Texture->ImageLayout);
+
+
+      // Submit command buffer containing copy and image layout commands
+      VulkanVerify(Device.vkEndCommandBuffer(CommandBuffer));
+
+      // Create a fence to make sure that the copies have finished before continuing
+      VkFence CopyFence;
+      auto FenceCreateInfo = InitStruct<VkFenceCreateInfo>();
+      VulkanVerify(Device.vkCreateFence(DeviceHandle, &FenceCreateInfo, nullptr, &CopyFence));
+
+      auto SubmitInfo = InitStruct<VkSubmitInfo>();
+      SubmitInfo.commandBufferCount = 1;
+      SubmitInfo.pCommandBuffers = &CommandBuffer;
+
+      VulkanVerify(Device.vkQueueSubmit(Vulkan.Queue, 1, &SubmitInfo, CopyFence));
+
+      auto FenceTimeOut = Seconds(100);
+      VulkanVerify(Device.vkWaitForFences(DeviceHandle, 1, &CopyFence, VK_TRUE, Convert<uint64>(TimeAsNanoseconds(FenceTimeOut))));
+
+      Device.vkDestroyFence(DeviceHandle, CopyFence, nullptr);
+
+      // Clean up staging resources
+      Device.vkFreeMemory(DeviceHandle, StagingMemory, nullptr);
+      Device.vkDestroyBuffer(DeviceHandle, StagingBuffer, nullptr);
     }
     else
     {

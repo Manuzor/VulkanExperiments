@@ -103,7 +103,9 @@ auto
 ::ImageDataSize(image const* Image)
   -> uint32
 {
-  return Cast<uint32>(Max(Cast<int>(Image->Data.Num) - 16, 0));
+  if(Image->Data.Num < 16)
+    return 0;
+  return Convert<uint32>(Image->Data.Num - 16);
 }
 
 auto

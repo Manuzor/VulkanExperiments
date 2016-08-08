@@ -970,6 +970,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     {
       auto PipelineDesc = InitStruct<vulkan_graphics_pipeline_desc>();
       PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
+      // PipelineDesc.RasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
       PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
       VulkanPrepareRenderableFoo<vulkan_scene_object::vertex>(Vulkan, "Data/Shader/SceneObject.shader"_S, PipelineDesc, &Vulkan->SceneObjectsFoo);
     }
@@ -1902,8 +1903,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         Copy(&Kitten->Texture.Image, KittenImage);
         VulkanUploadTexture(*Vulkan,
                             TextureUploadCommandBuffer,
-                            &Kitten->Texture,
-                            vulkan_force_linear_tiling::Yes); // TODO: Should be ::No
+                            &Kitten->Texture);
 
         VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->VertexBuffer, &Kitten->IndexBuffer);
       }
