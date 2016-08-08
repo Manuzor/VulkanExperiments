@@ -36,6 +36,10 @@ void
 Finalize(image* Image);
 
 CORE_API
+void
+Copy(image* Target, image const& Source);
+
+CORE_API
 uint32
 ImageNumBlocksX(image const* Image, uint32 MipLevel = 0);
 

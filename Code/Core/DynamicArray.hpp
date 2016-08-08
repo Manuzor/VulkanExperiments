@@ -103,6 +103,27 @@ Finalize(dynamic_array<T>* Array)
   }
 }
 
+/// \note Only copies the allocator pointer if the target array does not have one yet.
+template<typename T>
+void
+Copy(dynamic_array<T>* TargetArray, dynamic_array<T> const& SourceArray)
+{
+  Assert(TargetArray->Ptr != SourceArray.Ptr);
+
+  if(TargetArray->Ptr == SourceArray.Ptr)
+  {
+    Finalize(TargetArray);
+  }
+
+  if(TargetArray->Allocator == nullptr)
+  {
+    TargetArray->Allocator = SourceArray.Allocator;
+  }
+
+  auto TargetSlice = ExpandBy(TargetArray, SourceArray.Num);
+  SliceCopy(TargetSlice, Slice(&SourceArray));
+}
+
 template<typename T>
 void
 Reserve(dynamic_array<T>* Array, size_t MinBytesToReserve)

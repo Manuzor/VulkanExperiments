@@ -63,6 +63,17 @@ auto
 }
 
 auto
+::Copy(image* Target, image const& Source)
+  -> void
+{
+  // Header is safe to copy completely
+  *Reinterpret<image_header*>(Target) = Source;
+
+  Copy(&Target->InternalSubImages, Source.InternalSubImages);
+  Copy(&Target->Data, Source.Data);
+}
+
+auto
 ::ImageNumBlocksX(image const* Image, uint32 MipLevel)
   -> uint32
 {

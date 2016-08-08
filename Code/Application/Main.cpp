@@ -1849,47 +1849,57 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
                                             &TextureUploadCommandBuffer);
       };
 
+      arc_string KittenImageFilePath = "Data/Kitten_DXT1_Mipmaps.dds";
+      auto KittenImageFileExtension = AsConst(FindFileExtension(Slice(KittenImageFilePath)));
+      auto KittenImageLoaderFactory = GetImageLoaderFactoryByFileExtension(ImageLoaderRegistry, KittenImageFileExtension);
+      image KittenImage{};
+      Init(&KittenImage, Allocator);
+      Defer [&](){ Finalize(&KittenImage); };
+
+
       //
-      // Kitten
+      // Load kitten image.
       //
       {
-        auto Kitten = VulkanCreateSceneObject(Vulkan, "Teh Kitten"_S);
-        // TODO: Cleanup
+        bool UseFallbackImage = false;
 
-        //
-        // Load image.
-        //
-        bool const UseImageFromFile = true;
-        if(UseImageFromFile)
+        if(KittenImageLoaderFactory)
         {
-          arc_string FileName = "Data/Kitten_DXT1_Mipmaps.dds";
-          auto FileExtension = AsConst(FindFileExtension(Slice(FileName)));
-          auto Factory = GetImageLoaderFactoryByFileExtension(ImageLoaderRegistry, FileExtension);
+          auto ImageLoader = CreateImageLoader(KittenImageLoaderFactory);
 
-          if(Factory)
+          if(LoadImageFromFile(ImageLoader, &KittenImage, Slice(KittenImageFilePath)))
           {
-            auto ImageLoader = CreateImageLoader(Factory);
-            Defer [=](){ DestroyImageLoader(Factory, ImageLoader); };
-
-            if(LoadImageFromFile(ImageLoader, &Kitten->Texture.Image, Slice(FileName)))
-            {
-              LogInfo("Loaded image file: %s", StrPtr(FileName));
-            }
-            else
-            {
-              LogWarning("Failed to load image file: %s", StrPtr(FileName));
-            }
+            LogInfo("Loaded image file: %s", StrPtr(KittenImageFilePath));
           }
           else
           {
-            LogWarning("Failed to find image loader for: %s", StrPtr(FileName));
+            LogWarning("Failed to load image file: %s", StrPtr(KittenImageFilePath));
+            UseFallbackImage = true;
           }
+
+          DestroyImageLoader(KittenImageLoaderFactory, ImageLoader);
         }
         else
         {
-          ImageSetAsSolidColor(&Kitten->Texture.Image, color::Red, image_format::R32G32B32A32_FLOAT);
+          LogError("Failed to find image loader for: %s", StrPtr(KittenImageFilePath));
+          UseFallbackImage = true;
         }
 
+        if(UseFallbackImage)
+        {
+          ImageSetAsSolidColor(&KittenImage, color::Pink, image_format::R32G32B32A32_FLOAT);
+        }
+      }
+
+
+      //
+      // Kitten 1
+      //
+      {
+        auto Kitten = VulkanCreateSceneObject(Vulkan, "Kitten 1"_S);
+        // TODO: Cleanup
+
+        Copy(&Kitten->Texture.Image, KittenImage);
         VulkanUploadTexture(*Vulkan,
                             TextureUploadCommandBuffer,
                             &Kitten->Texture,
@@ -1899,10 +1909,10 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       }
 
       //
-      // Debug grid
+      // Debug Grid 1
       //
       {
-        auto DebugGrid = VulkanCreateDebugGrid(Vulkan, "Grid 1"_S);
+        auto DebugGrid = VulkanCreateDebugGrid(Vulkan, "Debug Grid 1"_S);
         // TODO: Cleanup
 
         VulkanSetDebugGridGeometry(Vulkan, { 10, 10, 5 }, { 10, 10, 10 },
