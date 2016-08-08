@@ -2068,26 +2068,19 @@ auto
       // Setup buffer copy regions for each mip level
       scoped_array<VkBufferImageCopy> BufferCopyRegions{ Allocator };
 
+      for (uint32 MipLevel = 0; MipLevel < Texture->Image.NumMipLevels; MipLevel++)
       {
-        // uint32 Offset{};
+        VkBufferImageCopy BufferCopyRegion = InitStruct<VkBufferImageCopy>();
+        BufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        BufferCopyRegion.imageSubresource.mipLevel = MipLevel;
+        BufferCopyRegion.imageSubresource.baseArrayLayer = 0;
+        BufferCopyRegion.imageSubresource.layerCount = 1;
+        BufferCopyRegion.imageExtent.width = ImageWidth(&Texture->Image, MipLevel);
+        BufferCopyRegion.imageExtent.height = ImageHeight(&Texture->Image, MipLevel);
+        BufferCopyRegion.imageExtent.depth = 1;
+        BufferCopyRegion.bufferOffset = ImageDataOffSet(&Texture->Image, MipLevel);
 
-        for (uint32 MipLevel = 0; MipLevel < Texture->Image.NumMipLevels; MipLevel++)
-        {
-          VkBufferImageCopy BufferCopyRegion = InitStruct<VkBufferImageCopy>();
-          BufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-          BufferCopyRegion.imageSubresource.mipLevel = MipLevel;
-          BufferCopyRegion.imageSubresource.baseArrayLayer = 0;
-          BufferCopyRegion.imageSubresource.layerCount = 1;
-          BufferCopyRegion.imageExtent.width = ImageWidth(&Texture->Image, MipLevel);
-          BufferCopyRegion.imageExtent.height = ImageHeight(&Texture->Image, MipLevel);
-          BufferCopyRegion.imageExtent.depth = 1;
-          // TODO: Check if this works as intended.
-          BufferCopyRegion.bufferOffset = ImageDataOffSet(&Texture->Image, MipLevel);
-
-          Expand(&BufferCopyRegions) = BufferCopyRegion;
-
-          // Offset += Convert<uint32>(tex2D[i].size());
-        }
+        Expand(&BufferCopyRegions) = BufferCopyRegion;
       }
 
       // Create optimal tiled target image
@@ -2307,7 +2300,9 @@ auto
 }
 
 auto
-::VulkanSetQuadGeometry(vulkan* Vulkan, extent2 const& Extents, vertex_buffer* Vertices, index_buffer* Indices)
+::VulkanSetQuadGeometry(vulkan* Vulkan,
+                        vertex_buffer* VertexBuffer,
+                        index_buffer* IndexBuffer)
   -> void
 {
   auto const Device = &Vulkan->Device;
@@ -2316,38 +2311,38 @@ auto
   // TODO: Make this function more generic?
   using vertex = vulkan_scene_object::vertex;
 
-  vertex const TopLeft     { Vec3( 0.0f, -0.5f, +0.5f) * 1.0f, Vec2(0.0f, 0.0f) };
-  vertex const TopRight    { Vec3( 0.0f, +0.5f, +0.5f) * 1.0f, Vec2(1.0f, 0.0f) };
-  vertex const BottomLeft  { Vec3( 0.0f, -0.5f, -0.5f) * 1.0f, Vec2(0.0f, 1.0f) };
-  vertex const BottomRight { Vec3( 0.0f, +0.5f, -0.5f) * 1.0f, Vec2(1.0f, 1.0f) };
+  vertex const TopLeft     { Vec3( 0.0f, -0.5f, +0.5f), Vec2(0.0f, 0.0f) };
+  vertex const TopRight    { Vec3( 0.0f, +0.5f, +0.5f), Vec2(1.0f, 0.0f) };
+  vertex const BottomLeft  { Vec3( 0.0f, -0.5f, -0.5f), Vec2(0.0f, 1.0f) };
+  vertex const BottomRight { Vec3( 0.0f, +0.5f, -0.5f), Vec2(1.0f, 1.0f) };
 
-  vertex const GeometryDataArray[] =
+  vertex const VertexArray[] =
   {
     /*0*/TopLeft,    /*1*/TopRight,
     /*2*/BottomLeft, /*3*/BottomRight,
   };
-  auto GeometryData = Slice(GeometryDataArray);
-  Vertices->NumVertices = Cast<uint32>(GeometryData.Num);
+  auto Vertices = Slice(VertexArray);
+  VertexBuffer->NumVertices = Cast<uint32>(Vertices.Num);
 
-  uint32 IndexDataArray[] =
+  uint32 IndexArray[] =
   {
     0, 2, 3,
     0, 3, 1,
   };
-  auto IndexData = Slice(IndexDataArray);
-  Indices->NumIndices = Cast<uint32>(IndexData.Num);
+  auto Indices = Slice(IndexArray);
+  IndexBuffer->NumIndices = Cast<uint32>(Indices.Num);
 
   // Vertex Buffer Setup
   {
     auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
-      BufferCreateInfo.size = SliceByteSize(GeometryData);
+      BufferCreateInfo.size = SliceByteSize(Vertices);
       BufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     }
-    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &Vertices->BufferHandle));
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &VertexBuffer->BufferHandle));
 
     VkMemoryRequirements MemoryRequirements;
-    Device->vkGetBufferMemoryRequirements(DeviceHandle, Vertices->BufferHandle, &MemoryRequirements);
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, VertexBuffer->BufferHandle, &MemoryRequirements);
 
     auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
@@ -2358,32 +2353,32 @@ auto
       Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
     }
 
-    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &Vertices->MemoryHandle));
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &VertexBuffer->MemoryHandle));
 
     // Copy data from host to the device.
     {
       void* RawData;
-      VulkanVerify(Device->vkMapMemory(DeviceHandle, Vertices->MemoryHandle, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, VertexBuffer->MemoryHandle, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
 
-      MemCopy(GeometryData.Num, Reinterpret<vertex*>(RawData), GeometryData.Ptr);
+      MemCopy(Vertices.Num, Reinterpret<vertex*>(RawData), Vertices.Ptr);
 
-      Device->vkUnmapMemory(DeviceHandle, Vertices->MemoryHandle);
+      Device->vkUnmapMemory(DeviceHandle, VertexBuffer->MemoryHandle);
     }
 
-    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Vertices->BufferHandle, Vertices->MemoryHandle, 0));
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, VertexBuffer->BufferHandle, VertexBuffer->MemoryHandle, 0));
   }
 
   // Index Buffer Setup
   {
     auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
-      BufferCreateInfo.size = SliceByteSize(IndexData);
+      BufferCreateInfo.size = SliceByteSize(Indices);
       BufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     }
-    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &Indices->BufferHandle));
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &IndexBuffer->BufferHandle));
 
     VkMemoryRequirements MemoryRequirements;
-    Device->vkGetBufferMemoryRequirements(DeviceHandle, Indices->BufferHandle, &MemoryRequirements);
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, IndexBuffer->BufferHandle, &MemoryRequirements);
 
     auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
     {
@@ -2394,20 +2389,209 @@ auto
       Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
     }
 
-    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &Indices->MemoryHandle));
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &IndexBuffer->MemoryHandle));
 
     // Copy data from host to the device.
     {
       void* RawData;
-      VulkanVerify(Device->vkMapMemory(DeviceHandle, Indices->MemoryHandle, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, IndexBuffer->MemoryHandle, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
 
-      MemCopy(IndexData.Num, Reinterpret<uint32*>(RawData), IndexData.Ptr);
+      MemCopy(Indices.Num, Reinterpret<uint32*>(RawData), Indices.Ptr);
 
-      Device->vkUnmapMemory(DeviceHandle, Indices->MemoryHandle);
+      Device->vkUnmapMemory(DeviceHandle, IndexBuffer->MemoryHandle);
     }
 
-    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, Indices->BufferHandle, Indices->MemoryHandle, 0));
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, IndexBuffer->BufferHandle, IndexBuffer->MemoryHandle, 0));
   }
+}
+
+auto
+::VulkanSetBoxGeometry(vulkan*        Vulkan,
+                       vertex_buffer* VertexBuffer,
+                       index_buffer*  IndexBuffer)
+  -> void
+{
+  auto const Device = &Vulkan->Device;
+  auto const DeviceHandle = Device->DeviceHandle;
+
+  temp_allocator TempAllocator{};
+  allocator_interface* Allocator = *TempAllocator;
+
+  using vertex = vulkan_scene_object::vertex;
+
+  scoped_array<vertex> Vertices{ Allocator };
+  SetNum(&Vertices, 8 * 6);
+
+  scoped_array<uint32> Indices{ Allocator };
+
+  float const P = 0.5f;  // Positive
+  float const N = -0.5f; // Negative
+
+  // Top
+  {
+    Vertices[ 0] = { Vec3(P, N, P), Vec2(0.0f, 0.0f) };
+    Vertices[ 1] = { Vec3(P, P, P), Vec2(1.0f, 0.0f) };
+    Vertices[ 2] = { Vec3(N, N, P), Vec2(0.0f, 1.0f) };
+    Vertices[ 3] = { Vec3(N, P, P), Vec2(1.0f, 1.0f) };
+
+    uint32 const FaceIndices[]
+    {
+      0, 2, 3,
+      0, 3, 1,
+    };
+    Append(&Indices, Slice(FaceIndices));
+  }
+
+  // Bottom
+  {
+    Vertices[ 4] = { Vec3(N, N, N), Vec2(0.0f, 0.0f) };
+    Vertices[ 5] = { Vec3(N, P, N), Vec2(1.0f, 0.0f) };
+    Vertices[ 6] = { Vec3(P, N, N), Vec2(0.0f, 1.0f) };
+    Vertices[ 7] = { Vec3(P, P, N), Vec2(1.0f, 1.0f) };
+
+    uint32 const FaceIndices[]
+    {
+      4, 6, 7,
+      4, 7, 5,
+    };
+    Append(&Indices, Slice(FaceIndices));
+  }
+
+  // Left
+  {
+    Vertices[ 8] = { Vec3(P, N, P), Vec2(0.0f, 0.0f) };
+    Vertices[ 9] = { Vec3(N, N, P), Vec2(1.0f, 0.0f) };
+    Vertices[10] = { Vec3(P, N, N), Vec2(0.0f, 1.0f) };
+    Vertices[11] = { Vec3(N, N, N), Vec2(1.0f, 1.0f) };
+
+    uint32 const FaceIndices[]
+    {
+      8, 10, 11,
+      8, 11, 9,
+    };
+    Append(&Indices, Slice(FaceIndices));
+  }
+
+  // Right
+  {
+    Vertices[12] = { Vec3(N, P, P), Vec2(0.0f, 0.0f) };
+    Vertices[13] = { Vec3(P, P, P), Vec2(1.0f, 0.0f) };
+    Vertices[14] = { Vec3(N, P, N), Vec2(0.0f, 1.0f) };
+    Vertices[15] = { Vec3(P, P, N), Vec2(1.0f, 1.0f) };
+
+    uint32 const FaceIndices[]
+    {
+      12, 14, 15,
+      12, 15, 13,
+    };
+    Append(&Indices, Slice(FaceIndices));
+  }
+
+  // Front
+  {
+    Vertices[16] = { Vec3(N, N, P), Vec2(0.0f, 0.0f) };
+    Vertices[17] = { Vec3(N, P, P), Vec2(1.0f, 0.0f) };
+    Vertices[18] = { Vec3(N, N, N), Vec2(0.0f, 1.0f) };
+    Vertices[19] = { Vec3(N, P, N), Vec2(1.0f, 1.0f) };
+
+    uint32 const FaceIndices[]
+    {
+      16, 18, 19,
+      16, 19, 17,
+    };
+    Append(&Indices, Slice(FaceIndices));
+  }
+
+  // Back
+  {
+    Vertices[20] = { Vec3(P, P, P), Vec2(0.0f, 0.0f) };
+    Vertices[21] = { Vec3(P, N, P), Vec2(1.0f, 0.0f) };
+    Vertices[22] = { Vec3(P, P, N), Vec2(0.0f, 1.0f) };
+    Vertices[23] = { Vec3(P, N, N), Vec2(1.0f, 1.0f) };
+
+    uint32 const FaceIndices[]
+    {
+      20, 22, 23,
+      20, 23, 21,
+    };
+    Append(&Indices, Slice(FaceIndices));
+  }
+
+  VertexBuffer->NumVertices = Cast<uint32>(Vertices.Num);
+  IndexBuffer->NumIndices = Cast<uint32>(Indices.Num);
+
+  // Vertex Buffer Setup
+  {
+    auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
+    {
+      BufferCreateInfo.size = SliceByteSize(Slice(&Vertices));
+      BufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    }
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &VertexBuffer->BufferHandle));
+
+    VkMemoryRequirements MemoryRequirements;
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, VertexBuffer->BufferHandle, &MemoryRequirements);
+
+    auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
+    {
+      MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
+      MemoryAllocateInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Gpu.MemoryProperties,
+                                                                          MemoryRequirements.memoryTypeBits,
+                                                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+      Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
+    }
+
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &VertexBuffer->MemoryHandle));
+
+    // Copy data from host to the device.
+    {
+      void* RawData;
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, VertexBuffer->MemoryHandle, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+
+      MemCopy(Vertices.Num, Reinterpret<vertex*>(RawData), Vertices.Ptr);
+
+      Device->vkUnmapMemory(DeviceHandle, VertexBuffer->MemoryHandle);
+    }
+
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, VertexBuffer->BufferHandle, VertexBuffer->MemoryHandle, 0));
+  }
+
+  // Index Buffer Setup
+  {
+    auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
+    {
+      BufferCreateInfo.size = SliceByteSize(Slice(&Indices));
+      BufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    }
+    VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &IndexBuffer->BufferHandle));
+
+    VkMemoryRequirements MemoryRequirements;
+    Device->vkGetBufferMemoryRequirements(DeviceHandle, IndexBuffer->BufferHandle, &MemoryRequirements);
+
+    auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
+    {
+      MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
+      MemoryAllocateInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan->Gpu.MemoryProperties,
+                                                                          MemoryRequirements.memoryTypeBits,
+                                                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+      Assert(MemoryAllocateInfo.memoryTypeIndex != IntMaxValue<uint32>());
+    }
+
+    VulkanVerify(Device->vkAllocateMemory(DeviceHandle, &MemoryAllocateInfo, nullptr, &IndexBuffer->MemoryHandle));
+
+    // Copy data from host to the device.
+    {
+      void* RawData;
+      VulkanVerify(Device->vkMapMemory(DeviceHandle, IndexBuffer->MemoryHandle, 0, MemoryAllocateInfo.allocationSize, 0, &RawData));
+
+      MemCopy(Indices.Num, Reinterpret<uint32*>(RawData), Indices.Ptr);
+
+      Device->vkUnmapMemory(DeviceHandle, IndexBuffer->MemoryHandle);
+    }
+
+    VulkanVerify(Device->vkBindBufferMemory(DeviceHandle, IndexBuffer->BufferHandle, IndexBuffer->MemoryHandle, 0));
+  }
+
 }
 
 auto

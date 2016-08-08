@@ -320,16 +320,20 @@ VulkanUploadTexture(
 
 void
 VulkanSetQuadGeometry(vulkan*        Vulkan,
-                      extent2 const& Extents,
-                      vertex_buffer* Vertices,
-                      index_buffer*  Indices);
+                      vertex_buffer* VertexBuffer,
+                      index_buffer*  IndexBuffer);
+
+void
+VulkanSetBoxGeometry(vulkan*        Vulkan,
+                     vertex_buffer* VertexBuffer,
+                     index_buffer*  IndexBuffer);
 
 void
 VulkanSetDebugGridGeometry(vulkan*        Vulkan,
                            vec3           HalfExtents,
                            vec3_<uint>    NumSamples,
-                           vertex_buffer* Vertices,
-                           index_buffer*  Indices);
+                           vertex_buffer* VertexBuffer,
+                           index_buffer*  IndexBuffer);
 
 #if 0
 void

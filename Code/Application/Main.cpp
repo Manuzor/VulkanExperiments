@@ -970,7 +970,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     {
       auto PipelineDesc = InitStruct<vulkan_graphics_pipeline_desc>();
       PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
-      // PipelineDesc.RasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
+      PipelineDesc.RasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
       PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
       VulkanPrepareRenderableFoo<vulkan_scene_object::vertex>(Vulkan, "Data/Shader/SceneObject.shader"_S, PipelineDesc, &Vulkan->SceneObjectsFoo);
     }
@@ -1909,7 +1909,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
                             TextureUploadCommandBuffer,
                             &Kitten->Texture);
 
-        VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->VertexBuffer, &Kitten->IndexBuffer);
+        VulkanSetQuadGeometry(Vulkan, &Kitten->VertexBuffer, &Kitten->IndexBuffer);
       }
 
 
@@ -1927,7 +1927,27 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
                             TextureUploadCommandBuffer,
                             &Kitten->Texture);
 
-        VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->VertexBuffer, &Kitten->IndexBuffer);
+        VulkanSetBoxGeometry(Vulkan, &Kitten->VertexBuffer, &Kitten->IndexBuffer);
+      }
+
+
+      //
+      // Kitten 3
+      //
+      {
+        auto Kitten = VulkanCreateSceneObject(Vulkan, "Kitten 3"_S);
+        // TODO: Cleanup
+
+        Kitten->Transform.Translation = Vec3(-1, -4, 1);
+        Kitten->Transform.Scale = Vec3(2, 2, 2);
+        Kitten->Transform.Rotation = Quaternion(UpVector3, Degrees(30)) * Quaternion(RightVector3, Degrees(45));
+
+        Copy(&Kitten->Texture.Image, KittenImage);
+        VulkanUploadTexture(*Vulkan,
+                            TextureUploadCommandBuffer,
+                            &Kitten->Texture);
+
+        VulkanSetBoxGeometry(Vulkan, &Kitten->VertexBuffer, &Kitten->IndexBuffer);
       }
 
       //
