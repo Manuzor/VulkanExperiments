@@ -989,18 +989,20 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     GetDescriptorTypeCounts(Vulkan->DebugGridsFoo.Shader, &DescriptorCounts);
     GetDescriptorTypeCounts(Vulkan->SceneObjectsFoo.Shader, &DescriptorCounts);
 
+    uint32 const MaxNumInstances = 50;
+
     // Now collect them in the proper structs.
     scoped_array<VkDescriptorPoolSize> PoolSizes{ Allocator };
     for(auto Key : Keys(&DescriptorCounts))
     {
       auto& Size = Expand(&PoolSizes);
       Size.type = Key;
-      Size.descriptorCount = *Get(&DescriptorCounts, Key);
+      Size.descriptorCount = MaxNumInstances * *Get(&DescriptorCounts, Key);
     }
 
     auto DescriptorPoolCreateInfo = InitStruct<VkDescriptorPoolCreateInfo>();
     {
-      DescriptorPoolCreateInfo.maxSets = 2;
+      DescriptorPoolCreateInfo.maxSets = MaxNumInstances;
       DescriptorPoolCreateInfo.poolSizeCount = Cast<uint32>(PoolSizes.Num);
       DescriptorPoolCreateInfo.pPoolSizes = PoolSizes.Ptr;
     }
@@ -1901,6 +1903,24 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         // TODO: Cleanup
 
         Kitten->Transform.Translation = Vec3(0, 0, 2);
+
+        Copy(&Kitten->Texture.Image, KittenImage);
+        VulkanUploadTexture(*Vulkan,
+                            TextureUploadCommandBuffer,
+                            &Kitten->Texture);
+
+        VulkanSetQuadGeometry(Vulkan, { 1, 1 }, &Kitten->VertexBuffer, &Kitten->IndexBuffer);
+      }
+
+
+      //
+      // Kitten 2
+      //
+      {
+        auto Kitten = VulkanCreateSceneObject(Vulkan, "Kitten 2"_S);
+        // TODO: Cleanup
+
+        Kitten->Transform.Translation = Vec3(0.5f, 2, 1);
 
         Copy(&Kitten->Texture.Image, KittenImage);
         VulkanUploadTexture(*Vulkan,
