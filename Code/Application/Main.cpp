@@ -999,7 +999,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
 
     auto DescriptorPoolCreateInfo = InitStruct<VkDescriptorPoolCreateInfo>();
     {
-      DescriptorPoolCreateInfo.maxSets = 1;
+      DescriptorPoolCreateInfo.maxSets = 2;
       DescriptorPoolCreateInfo.poolSizeCount = Cast<uint32>(PoolSizes.Num);
       DescriptorPoolCreateInfo.pPoolSizes = PoolSizes.Ptr;
     }
@@ -1852,7 +1852,6 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       //
       // Kitten
       //
-      if(false)
       {
         auto Kitten = VulkanCreateSceneObject(Vulkan, "Teh Kitten"_S);
         // TODO: Cleanup

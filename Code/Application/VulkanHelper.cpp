@@ -2136,10 +2136,10 @@ auto
   // TODO: Make this function more generic?
   using vertex = vulkan_scene_object::vertex;
 
-  vertex const TopLeft     { Vec3( 0.0f,  0.0f,  0.0f) * 1.0f, Vec2(0.0f, 0.0f) };
-  vertex const TopRight    { Vec3( 0.0f,  1.0f,  0.0f) * 1.0f, Vec2(1.0f, 0.0f) };
-  vertex const BottomLeft  { Vec3( 0.0f,  1.0f,  1.0f) * 1.0f, Vec2(0.0f, 1.0f) };
-  vertex const BottomRight { Vec3( 0.0f,  1.0f,  1.0f) * 1.0f, Vec2(1.0f, 1.0f) };
+  vertex const TopLeft     { Vec3( 0.0f, -0.5f, +0.5f) * 1.0f, Vec2(0.0f, 0.0f) };
+  vertex const TopRight    { Vec3( 0.0f, +0.5f, +0.5f) * 1.0f, Vec2(1.0f, 0.0f) };
+  vertex const BottomLeft  { Vec3( 0.0f, -0.5f, -0.5f) * 1.0f, Vec2(0.0f, 1.0f) };
+  vertex const BottomRight { Vec3( 0.0f, +0.5f, -0.5f) * 1.0f, Vec2(1.0f, 1.0f) };
 
   vertex const GeometryDataArray[] =
   {
@@ -2152,7 +2152,7 @@ auto
   uint32 IndexDataArray[] =
   {
     0, 2, 3,
-    3, 1, 0,
+    0, 3, 1,
   };
   auto IndexData = Slice(IndexDataArray);
   Indices->NumIndices = Cast<uint32>(IndexData.Num);
