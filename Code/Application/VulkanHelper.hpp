@@ -181,19 +181,20 @@ struct vulkan_surface
   vulkan_queue_node PresentNode;
 };
 
+enum class vsync : bool { Off = false, On = true };
+
 struct vulkan_swapchain
 {
   VkSwapchainKHR SwapchainHandle;
   vulkan_device* Device;
   vulkan_surface* Surface;
   extent2_<uint32> Extent;
+  vsync VSync;
 
   uint32 ImageCount; // TODO: Rename => NumImages
   dynamic_array<VkImage> Images;
   dynamic_array<VkImageView> ImageViews;
 };
-
-enum class vsync : bool { Off = false, On = true };
 
 struct vulkan_swapchain_image
 {

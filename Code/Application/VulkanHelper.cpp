@@ -428,6 +428,9 @@ auto
     }
   }
 
+  // Save VSync setting.
+  Swapchain->VSync = VSync;
+
 
   //
   // Determine the number of swapchain images

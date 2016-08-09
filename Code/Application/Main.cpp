@@ -27,8 +27,7 @@
 
 static bool GlobalRunning = false;
 static bool GlobalIsResizeRequested = false;
-static int GlobalResizeRequest_Width = 0;
-static int GlobalResizeRequest_Height = 0;
+static extent2_<uint32> GlobalResizeRequest_Extent{};
 
 static LRESULT WINAPI
 Win32MainWindowCallback(HWND WindowHandle, UINT Message,
@@ -1007,40 +1006,49 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
                                                &Vulkan->DescriptorPool));
   }
 
-  //
-  // Prepare Framebuffers
-  //
+  return true;
+}
+
+static void VulkanCreateFramebuffers(vulkan* Vulkan)
+{
+  LogBeginScope("Creating framebuffers.");
+  Defer [](){ LogEndScope("Finished creating framebuffers."); };
+
+  fixed_block<2, VkImageView> Attachments = {};
+  Attachments[1] = Vulkan->Depth.View;
+
+  auto FramebufferCreateInfo = InitStruct<VkFramebufferCreateInfo>();
   {
-    LogBeginScope("Preparing framebuffers.");
-    Defer [](){ LogEndScope("Finished preparing framebuffers."); };
-
-    fixed_block<2, VkImageView> Attachments = {};
-    Attachments[1] = Vulkan->Depth.View;
-
-    auto FramebufferCreateInfo = InitStruct<VkFramebufferCreateInfo>();
-    {
-      FramebufferCreateInfo.renderPass = Vulkan->RenderPass;
-      FramebufferCreateInfo.attachmentCount = Cast<uint32>(Attachments.Num);
-      FramebufferCreateInfo.pAttachments = &Attachments[0];
-      FramebufferCreateInfo.width = Vulkan->Swapchain.Extent.Width;
-      FramebufferCreateInfo.height = Vulkan->Swapchain.Extent.Height;
-      FramebufferCreateInfo.layers = 1;
-    }
-
-    SetNum(&Vulkan->Framebuffers, Vulkan->Swapchain.ImageCount);
-
-    auto const ImageCount = Vulkan->Swapchain.ImageCount;
-    for(uint32 Index = 0; Index < ImageCount; ++Index)
-    {
-      Attachments[0] = Vulkan->Swapchain.ImageViews[Index];
-      VulkanVerify(Device.vkCreateFramebuffer(DeviceHandle,
-                                              &FramebufferCreateInfo,
-                                              nullptr,
-                                              &Vulkan->Framebuffers[Index]));
-    }
+    FramebufferCreateInfo.renderPass = Vulkan->RenderPass;
+    FramebufferCreateInfo.attachmentCount = Cast<uint32>(Attachments.Num);
+    FramebufferCreateInfo.pAttachments = &Attachments[0];
+    FramebufferCreateInfo.width = Vulkan->Swapchain.Extent.Width;
+    FramebufferCreateInfo.height = Vulkan->Swapchain.Extent.Height;
+    FramebufferCreateInfo.layers = 1;
   }
 
-  return true;
+  SetNum(&Vulkan->Framebuffers, Vulkan->Swapchain.ImageCount);
+
+  auto const ImageCount = Vulkan->Swapchain.ImageCount;
+  for(uint32 Index = 0; Index < ImageCount; ++Index)
+  {
+    Attachments[0] = Vulkan->Swapchain.ImageViews[Index];
+    VulkanVerify(Vulkan->Device.vkCreateFramebuffer(Vulkan->Device.DeviceHandle,
+                                                    &FramebufferCreateInfo,
+                                                    nullptr,
+                                                    &Vulkan->Framebuffers[Index]));
+  }
+}
+
+static void VulkanDestroyFramebuffers(vulkan* Vulkan)
+{
+  auto const ImageCount = Vulkan->Swapchain.ImageCount;
+  for(uint32 Index = 0; Index < ImageCount; ++Index)
+  {
+    Vulkan->Device.vkDestroyFramebuffer(Vulkan->Device.DeviceHandle,
+                                                     Vulkan->Framebuffers[Index],
+                                                     nullptr);
+  }
 }
 
 static void
@@ -1186,25 +1194,39 @@ VulkanCleanup(vulkan* Vulkan)
 }
 
 static void
-VulkanResize(vulkan* Vulkan, uint32 NewWidth, uint32 NewHeight)
+VulkanResize(vulkan* Vulkan, extent2_<uint32> NewExtent)
 {
-  // TODO
+  LogError("Resizing is not implemented yet!");
+  return;
 
   #if 0
-  // Don't react to resize until after first initialization.
-  if(!Vulkan->IsPrepared) return;
 
-  LogInfo("Resizing to %ux%u.", NewWidth, NewHeight);
+  // Don't react to resize until after first initialization.
+  if(!Vulkan->IsPrepared)
+    return;
+
+  LogInfo("Resizing to %ux%u.", NewExtent.Width, NewExtent.Height);
 
   // In order to properly resize the window, we must re-create the swapchain
   // AND redo the command buffers, etc.
 
-  // First, perform part of the VulkanCleanup() function:
-  VulkanDestroySwapchain(Vulkan);
+  //
+  // Perform some cleanup
+  //
+  VulkanCleanupDepth(*Vulkan, &Vulkan->Depth);
+  VulkanDestroyCommandBuffers(Vulkan, Vulkan->CommandPool);
+  VulkanDestroyFramebuffers(Vulkan);
 
-  // Second, re-perform the Prepare() function, which will re-create the
-  // swapchain:
-  Vulkan->IsPrepared = VulkanPrepareSwapchain(Vulkan, NewWidth, NewHeight, TempAllocator);
+  //
+  // Re-create the swapchain
+  //
+  VulkanPrepareSetupCommandBuffer(Vulkan);
+  VulkanPrepareSwapchain(*Vulkan, &Vulkan->Swapchain, NewExtent, Vulkan->Swapchain.VSync);
+  VulkanPrepareDepth(Vulkan, &Vulkan->Depth, Vulkan->Swapchain.Extent);
+  VulkanCreateFramebuffers(Vulkan);
+  VulkanCreateCommandBuffers(Vulkan, Vulkan->CommandPool, Vulkan->Swapchain.ImageCount);
+  VulkanCleanupSetupCommandBuffer(Vulkan, flush_command_buffer::Yes);
+
   #endif
 }
 
@@ -1415,7 +1437,7 @@ VulkanDraw(vulkan* Vulkan)
       {
         // Swapchain is out of date (e.g. the window was resized) and must be
         // recreated:
-        VulkanResize(Vulkan, Vulkan->Swapchain.Extent.Width, Vulkan->Swapchain.Extent.Height);
+        VulkanResize(Vulkan, Vulkan->Swapchain.Extent);
         VulkanDraw(Vulkan);
       } break;
       case VK_SUBOPTIMAL_KHR:
@@ -1488,7 +1510,7 @@ VulkanDraw(vulkan* Vulkan)
       {
         // Swapchain is out of date (e.g. the window was resized) and must be
         // recreated:
-        VulkanResize(Vulkan, Vulkan->Swapchain.Extent.Width, Vulkan->Swapchain.Extent.Height);
+        VulkanResize(Vulkan, Vulkan->Swapchain.Extent);
         VulkanDraw(Vulkan);
       } break;
       case VK_SUBOPTIMAL_KHR:
@@ -1710,6 +1732,14 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       VulkanPrepareRenderPass(Vulkan);
     }
     Defer [Vulkan](){ VulkanCleanupRenderPass(Vulkan); };
+
+    //
+    // Create framebuffers
+    //
+    {
+      VulkanCreateFramebuffers(Vulkan);
+    }
+    Defer [Vulkan](){ VulkanDestroyFramebuffers(Vulkan); };
 
     // Flush the setup command once now to finalize initialization but prepare it for further use also.
     VulkanCleanupSetupCommandBuffer(Vulkan, flush_command_buffer::Yes);
@@ -2071,7 +2101,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       if(::GlobalIsResizeRequested)
       {
         LogBeginScope("Resizing swapchain");
-        VulkanResize(Vulkan, ::GlobalResizeRequest_Width, ::GlobalResizeRequest_Height);
+        VulkanResize(Vulkan, ::GlobalResizeRequest_Extent);
         ::GlobalIsResizeRequested = false;
         LogEndScope("Finished resizing swapchain");
       }
@@ -2123,8 +2153,8 @@ Win32MainWindowCallback(HWND WindowHandle, UINT Message,
     if(Vulkan && WParam != SIZE_MINIMIZED)
     {
       ::GlobalIsResizeRequested = true;
-      ::GlobalResizeRequest_Width = LParam & 0xffff;
-      ::GlobalResizeRequest_Height = (LParam & 0xffff0000) >> 16;
+      ::GlobalResizeRequest_Extent.Width = Convert<uint32>(LParam & 0xffff);
+      ::GlobalResizeRequest_Extent.Height = Convert<uint32>((LParam & 0xffff0000) >> 16);
     }
   }
   else if(Message == WM_PAINT)
