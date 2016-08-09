@@ -1568,6 +1568,95 @@ struct
   } Camera;
 } MyInputSlots;
 
+struct frame_time_sample
+{
+  time CPU;
+  time GPU;
+  time Total;
+};
+
+struct frame_time_stats
+{
+  struct sample
+  {
+    time CpuTime;
+    time GpuTime;
+    time FrameTime;
+  };
+
+  sample MinSample{};
+  sample MaxSample{};
+  scoped_array<sample> Samples;
+
+  size_t MaxNumSamples{};
+  size_t NumSamples{};
+  size_t SampleIndex{};
+
+  frame_time_stats(allocator_interface* Allocator)
+    : Samples{ Allocator }
+  {
+  }
+};
+
+static void
+PrintFrameTimeStats(frame_time_stats const& FrameTimeStats, log_data* Log)
+{
+  frame_time_stats::sample MinSample{ Seconds(1e20f), Seconds(1e20f), Seconds(1e20f) };
+  frame_time_stats::sample MaxSample{};
+  frame_time_stats::sample AverageSample{};
+
+  for(auto& Sample : Slice(&FrameTimeStats.Samples))
+  {
+    AverageSample.CpuTime += Sample.CpuTime;
+    AverageSample.GpuTime += Sample.GpuTime;
+    AverageSample.FrameTime += Sample.FrameTime;
+
+    MinSample.CpuTime = Min(Sample.CpuTime, MinSample.CpuTime);
+    MinSample.GpuTime = Min(Sample.GpuTime, MinSample.GpuTime);
+    MinSample.FrameTime = Min(Sample.FrameTime, MinSample.FrameTime);
+    MaxSample.CpuTime = Max(Sample.CpuTime, MaxSample.CpuTime);
+    MaxSample.GpuTime = Max(Sample.GpuTime, MaxSample.GpuTime);
+    MaxSample.FrameTime = Max(Sample.FrameTime, MaxSample.FrameTime);
+  }
+
+  AverageSample.CpuTime /= Convert<double>(FrameTimeStats.Samples.Num);
+  AverageSample.GpuTime /= Convert<double>(FrameTimeStats.Samples.Num);
+  AverageSample.FrameTime /= Convert<double>(FrameTimeStats.Samples.Num);
+
+  LogBeginScope("Frame Time Stats (%u samples)", FrameTimeStats.Samples.Num);
+  {
+    LogInfo(Log, "Min     Frame|CPU|GPU: %f|%f|%f",
+            TimeAsSeconds(MinSample.FrameTime),
+            TimeAsSeconds(MinSample.CpuTime),
+            TimeAsSeconds(MinSample.GpuTime));
+
+    LogInfo(Log, "Max     Frame|CPU|GPU: %f|%f|%f",
+            TimeAsSeconds(MaxSample.FrameTime),
+            TimeAsSeconds(MaxSample.CpuTime),
+            TimeAsSeconds(MaxSample.GpuTime));
+
+    LogInfo(Log, "Average Frame|CPU|GPU: %f|%f|%f",
+            TimeAsSeconds(AverageSample.FrameTime),
+            TimeAsSeconds(AverageSample.CpuTime),
+            TimeAsSeconds(AverageSample.GpuTime));
+  }
+  LogEndScope("Frame Time Stats");
+}
+
+static void
+AddFrameTimeSample(frame_time_stats& Stats, frame_time_stats::sample Sample)
+{
+  auto const RequiredNumArrayElements = Stats.SampleIndex + 1;
+  if(RequiredNumArrayElements > Stats.Samples.Num)
+  {
+    ExpandBy(&Stats.Samples, RequiredNumArrayElements - Stats.Samples.Num);
+  }
+
+  Stats.Samples[Stats.SampleIndex] = Sample;
+  Stats.SampleIndex = Wrap(Stats.SampleIndex + 1, 0, Stats.MaxNumSamples);
+  Stats.NumSamples = Min(Stats.NumSamples + 1, Stats.MaxNumSamples);
+}
+
 int
 WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         LPSTR CommandLine, int ShowCode)
@@ -2013,12 +2102,18 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     ::GlobalRunning = true;
 
     stopwatch FrameTimer = {};
+    stopwatch PerfTimer = {};
 
-    float DeltaSeconds = 0.016f; // Assume 16 milliseconds for the first frame.
+    time CurrentFrameTime = Milliseconds(16); // Assume 16 milliseconds for the first frame.
+    float DeltaSeconds = Convert<float>(TimeAsSeconds(CurrentFrameTime));
+
+    frame_time_stats FrameTimeStats{ Allocator };
+    FrameTimeStats.MaxNumSamples = 256;
 
     while(::GlobalRunning)
     {
       StopwatchStart(&FrameTimer);
+      StopwatchStart(&PerfTimer);
 
       BeginInputFrame(&SystemInput);
       {
@@ -2040,6 +2135,11 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       {
         ::GlobalRunning = false;
         break;
+      }
+
+      if(ButtonIsDown(SystemInput[keyboard::P]))
+      {
+        PrintFrameTimeStats(FrameTimeStats, GlobalLog);
       }
 
       //Vulkan->DepthStencilValue = Clamp(Vulkan->DepthStencilValue + AxisValue(SystemInput[MyInputSlots.Depth]), 0.8f, 1.0f);
@@ -2075,6 +2175,11 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
       auto const ViewProjectionMatrix = CameraViewProjectionMatrix(Cam, Cam.Transform);
 
+      StopwatchStop(&PerfTimer);
+      auto FrameTimeOnCpu = StopwatchTime(&PerfTimer);
+
+      StopwatchStart(&PerfTimer);
+
 
       //
       // Upload shader buffers
@@ -2108,12 +2213,27 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
       RedrawWindow(Window->WindowHandle, nullptr, nullptr, RDW_INTERNALPAINT);
 
+      StopwatchStop(&PerfTimer);
+      auto FrameTimeOnGpu = StopwatchTime(&PerfTimer);
+
       // Update frame timer.
       {
         StopwatchStop(&FrameTimer);
-        DeltaSeconds = Cast<float>(TimeAsSeconds(StopwatchTime(&FrameTimer)));
+        CurrentFrameTime = StopwatchTime(&FrameTimer);
+        DeltaSeconds = Convert<float>(TimeAsSeconds(CurrentFrameTime));
+      }
+
+      // Capture timing data.
+      {
+        frame_time_stats::sample Sample;
+        Sample.CpuTime = FrameTimeOnCpu;
+        Sample.GpuTime = FrameTimeOnGpu;
+        Sample.FrameTime = CurrentFrameTime;
+        AddFrameTimeSample(FrameTimeStats, Sample);
       }
     }
+
+    PrintFrameTimeStats(FrameTimeStats, GlobalLog);
   }
 
   return 0;

@@ -10,6 +10,26 @@ struct time
   double InternalData;
 };
 
+constexpr time operator + (time   A, time   B) { return { A.InternalData + B.InternalData }; }
+inline    void operator +=(time&  A, time   B) { A.InternalData += B.InternalData; }
+constexpr time operator - (time   A, time   B) { return { A.InternalData - B.InternalData }; }
+inline    void operator -=(time&  A, time   B) { A.InternalData -= B.InternalData; }
+constexpr time operator * (time   A, time   B) { return { A.InternalData * B.InternalData }; }
+constexpr time operator * (time   A, double B) { return { A.InternalData * B }; }
+constexpr time operator * (double A, time   B) { return { A * B.InternalData }; }
+inline    void operator *=(time&  A, time   B) { A.InternalData *= B.InternalData; }
+inline    void operator *=(time&  A, double B) { A.InternalData *= B; }
+constexpr time operator / (time   A, time   B) { return { A.InternalData / B.InternalData }; }
+constexpr time operator / (time   A, double B) { return { A.InternalData / B }; }
+inline    void operator /=(time&  A, time   B) { A.InternalData /= B.InternalData; }
+inline    void operator /=(time&  A, double B) { A.InternalData /= B; }
+constexpr bool operator ==(time&  A, time   B) { return A.InternalData == B.InternalData; }
+constexpr bool operator !=(time&  A, time   B) { return A.InternalData != B.InternalData; }
+constexpr bool operator < (time&  A, time   B) { return A.InternalData <  B.InternalData; }
+constexpr bool operator <=(time&  A, time   B) { return A.InternalData <= B.InternalData; }
+constexpr bool operator > (time&  A, time   B) { return A.InternalData >  B.InternalData; }
+constexpr bool operator >=(time&  A, time   B) { return A.InternalData >= B.InternalData; }
+
 struct stopwatch
 {
   uint64 StartTimestamp;
