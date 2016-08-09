@@ -404,7 +404,7 @@ VulkanCleanupSurface(vulkan const&   Vulkan,
 bool
 VulkanPrepareSwapchain(vulkan const&     Vulkan,
                        vulkan_swapchain* Swapchain,
-                       extent2_<uint32>  Extents,
+                       extent2_<uint>    Extents,
                        vsync             VSync);
 
 void

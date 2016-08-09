@@ -38,8 +38,7 @@ struct window_setup
 {
   HINSTANCE ProcessHandle;
   char const* WindowClassName;
-  int ClientWidth;
-  int ClientHeight;
+  extent2_<uint> ClientExtents;
 
   bool HasCustomWindowX;
   int WindowX;
@@ -51,8 +50,7 @@ struct window_setup
 struct window
 {
   HWND WindowHandle;
-  int ClientWidth;
-  int ClientHeight;
+  extent2_<uint32> ClientExtents;
 
   win32_input_context* Input;
   vulkan* Vulkan;
@@ -74,16 +72,13 @@ Win32CreateWindow(allocator_interface* Allocator, window_setup const* Args,
     return nullptr;
   }
 
-  if(Args->ClientWidth == 0)
   {
-    LogError("Need a window client width.");
-    return nullptr;
-  }
-
-  if(Args->ClientHeight == 0)
-  {
-    LogError("Need a window client height.");
-    return nullptr;
+    auto const ClientArea = Args->ClientExtents.Width * Args->ClientExtents.Height;
+    if(ClientArea == 0)
+    {
+      LogError("Invalid client extents.");
+      return nullptr;
+    }
   }
 
   WNDCLASSA WindowClass = {};
@@ -102,8 +97,8 @@ Win32CreateWindow(allocator_interface* Allocator, window_setup const* Args,
   DWORD const WindowStyle = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
 
   RECT WindowRect = {};
-  WindowRect.right = Args->ClientWidth;
-  WindowRect.bottom = Args->ClientHeight;
+  WindowRect.right = Args->ClientExtents.Width;
+  WindowRect.bottom = Args->ClientExtents.Height;
   AdjustWindowRectEx(&WindowRect, WindowStyle, FALSE, WindowStyleEx);
 
   WindowRect.right -= WindowRect.left;
@@ -148,8 +143,7 @@ Win32CreateWindow(allocator_interface* Allocator, window_setup const* Args,
   auto Window = Allocate<window>(Allocator);
   *Window = {};
   Window->WindowHandle = WindowHandle;
-  Window->ClientWidth = Args->ClientWidth;
-  Window->ClientHeight = Args->ClientHeight;
+  Window->ClientExtents = Args->ClientExtents;
 
   SetWindowLongPtr(Window->WindowHandle, GWLP_USERDATA, Reinterpret<LONG_PTR>(Window));
 
@@ -1613,8 +1607,8 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     window_setup WindowSetup = {};
     WindowSetup.ProcessHandle = Instance;
     WindowSetup.WindowClassName = "VulkanExperimentsWindowClass";
-    WindowSetup.ClientWidth = 768;
-    WindowSetup.ClientHeight = 768;
+    WindowSetup.ClientExtents.Width = 1280;
+    WindowSetup.ClientExtents.Height = 720;
     auto Window = Win32CreateWindow(Allocator, &WindowSetup);
 
     ++CurrentExitCode;
@@ -1670,7 +1664,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       LogBeginScope("Preparing swapchain for the first time.");
 
       ++CurrentExitCode;
-      if(!VulkanPrepareSwapchain(*Vulkan, &Vulkan->Swapchain, { 1280, 720 }, vsync::On))
+      if(!VulkanPrepareSwapchain(*Vulkan, &Vulkan->Swapchain, WindowSetup.ClientExtents, vsync::On))
       {
         LogEndScope("Failed to prepare initial swapchain.");
         return CurrentExitCode;
