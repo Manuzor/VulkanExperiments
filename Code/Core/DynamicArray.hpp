@@ -9,6 +9,15 @@
 
 constexpr size_t DynamicArrayMinimumCapacity = 16;
 
+CORE_API
+allocator_interface*
+DynamicArrayDefaultAllocator();
+
+CORE_API
+void
+DynamicArraySetDefaultAllocator(allocator_interface* Allocator);
+
+
 template<typename T>
 struct dynamic_array
 {
@@ -97,7 +106,7 @@ Finalize(dynamic_array<T>* Array)
   Clear(Array);
   if(Array->Capacity > 0)
   {
-    Assert(Array->Allocator);
+    EnsureAllocatorIsSet(Array);
     Array->Allocator->Deallocate(Array->Ptr);
     Array->Capacity = 0;
   }
@@ -126,8 +135,19 @@ Copy(dynamic_array<T>* TargetArray, dynamic_array<T> const& SourceArray)
 
 template<typename T>
 void
+EnsureAllocatorIsSet(dynamic_array<T>* Array)
+{
+  if(Array->Allocator == nullptr)
+  {
+    Array->Allocator = DynamicArrayDefaultAllocator();
+  }
+}
+
+template<typename T>
+void
 Reserve(dynamic_array<T>* Array, size_t MinBytesToReserve)
 {
+  EnsureAllocatorIsSet(Array);
   auto NewAllocatedMemory = ContainerReserve(Array->Allocator,
                                              Array->Ptr, Array->Num,
                                              Array->Capacity,

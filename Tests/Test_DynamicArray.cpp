@@ -34,12 +34,21 @@ TEST_CASE("Dynamic Array Reserve", "[dynamic_array]")
   test_allocator _Allocator;
   allocator_interface* Allocator = &_Allocator;
 
-  dynamic_array<int> Arr = {};
-  Init(&Arr, Allocator);
+  dynamic_array<int> Arr{};
   Defer [&](){ Finalize(&Arr); };
 
-  SECTION("Reserve")
+  SECTION("Reserve without custom allocator")
   {
+    Reserve(&Arr, 10);
+    REQUIRE( Arr.Num == 0 );
+    REQUIRE( Arr.Capacity >= 10 );
+    REQUIRE( Arr.Ptr != nullptr );
+    REQUIRE( Arr.Allocator == DynamicArrayDefaultAllocator() );
+  }
+
+  SECTION("Reserve with custom allocator")
+  {
+    Init(&Arr, Allocator);
     Reserve(&Arr, 10);
     REQUIRE( Arr.Num == 0 );
     REQUIRE( Arr.Capacity >= 10 );
