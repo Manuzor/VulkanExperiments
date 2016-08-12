@@ -1,6 +1,6 @@
 {
   .ProjectName = 'Tests'
-  .ProjectBasePath = '$RepoRoot$/Tests'
+  .SourcePath = '$RepoRoot$/Tests'
 
   VCXProject( '$ProjectName$-Proj' )
   {
@@ -8,7 +8,7 @@
     .OutputDirectory = '$BuildPath$'
 
     .ProjectOutput = 'Workspace/VisualStudio/$ProjectName$.vcxproj'
-    .ProjectInputPaths = { '$ProjectBasePath$' }
+    .ProjectInputPaths = { '$SourcePath$' }
     .LocalDebuggerCommand = '$Output$'
     .LocalDebuggerCommandArguments = '--break'
     .LocalDebuggerWorkingDirectory = '$BuildPath$'
@@ -16,7 +16,6 @@
   }
   ^SolutionProjects + '$ProjectName$-Proj'
 
-  .SourcePath = '$ProjectName$'
 
   ObjectList( '$ProjectName$-Obj' )
   {
