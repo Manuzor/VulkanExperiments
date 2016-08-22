@@ -76,7 +76,6 @@
     .Targets =
     {
       '$ProjectName$-Exe'
-      'Shaders' // Just require all shaders for now.
       'Copy-VulkanFiles-Debug'
     }
   }

@@ -3,7 +3,6 @@
 // convenience.
 .SubFiles =
 {
-  'Data/fbuild.bff'
   'Code/Core/fbuild.bff'
   'Code/Cfg/fbuild.bff'
   'Code/ShaderCompiler/fbuild.bff'
@@ -128,18 +127,23 @@ Alias( 'GlslangLibs' )
 
   Copy( 'Copy-VulkanLoader-Debug' )
   {
-    .Source = { '$MySourceBase$/vulkan-1.dll', '$MySourceBase$/vulkan-1.pdb' }
+    .Source = { '$MySourceBase$/vulkan-1.dll' '$MySourceBase$/vulkan-1.pdb' }
   }
 
   CopyDir( 'Copy-VulkanLayers-Debug' )
   {
     .SourcePaths = '$MySourceBase$/'
-    .SourcePathsPattern = { 'VkLayer_*' }
+    .SourcePathsPattern =
+    {
+      'VkLayer_*.dll'
+      'VkLayer_*.json'
+      'VkLayer_*.pdb'
+    }
   }
 
   Alias( 'Copy-VulkanFiles-Debug' )
   {
-    .Targets = { 'Copy-VulkanLoader-Debug', 'Copy-VulkanLayers-Debug' }
+    .Targets = { 'Copy-VulkanLoader-Debug' 'Copy-VulkanLayers-Debug' }
   }
 }
 
