@@ -14,6 +14,9 @@
 #include "Workspace/System.bff"
 
 .BuildPath = '$RepoRoot$/Build'
+.WorkspacePath = '$RepoRoot$/Workspace'
+.RootBff = '$RepoRoot$/fbuild.bff'
+.FBuild = '$RepoRoot$/Utilities/FASTBuild/FBuild.exe'
 
 .Compiler = '$VS2015Path$/VC/bin/amd64/cl.exe'
 .CompilerOptions = '/c %1 /Fo%2'
@@ -77,10 +80,13 @@
 // Visual Studio Project Generation
 //
 
+.MyVisualStudioFBuildCommand = '"$FBuild$" -ide -config "$RootBff$"'
+
 .Project_Common =
 [
-  .ProjectBuildCommand   = 'cd $RepoRoot$ &amp; fbuild -ide ^$(ProjectName)-^$(Configuration)'
-  .ProjectRebuildCommand = 'cd $RepoRoot$ &amp; fbuild -ide -clean ^$(ProjectName)-^$(Configuration)'
+  .TheBaseCommand = 'py -3 "$RepoRoot$/Utilities/Build.py" --proxy-bff "$WorkspacePath$/VisualStudio.bff" --'
+  .ProjectBuildCommand   = '$TheBaseCommand$ ^$(ProjectName)-^$(Configuration) -ide'
+  .ProjectRebuildCommand = '$TheBaseCommand$ ^$(ProjectName)-^$(Configuration) -ide -clean'
   .OutputDirectory       = '$BuildPath$'
   .IntermediateDirectory = '$BuildPath$'
   .Platform              = 'x64'
@@ -91,9 +97,10 @@
 .Project_x64_Release = [ Using(.Project_Common) .Config = 'x64-Release' ]
 
 .ProjectConfigs = { .Project_x64_Debug, .Project_x64_Release }
-.ProjectAllowedFileExtensions = { '.cpp', '.hpp', '.ipp', '.h', '.inl', }
+.ProjectAllowedFileExtensions = { '.cpp', '.hpp', '.ipp', '.h', '.c', '.inl', }
 .IncludeSearchPath = '$RepoRoot$/Code;'
 .ProjectFiles = { '$RepoRoot$/Utilities/VulkanExperiments.natvis' }
+
 
 //
 // Targets
@@ -138,8 +145,9 @@ Alias( 'GlslangLibs' )
 
 ForEach( .File in .SubFiles )
 {
-  #include "$File$"
+  #include "$RepoRoot$/$File$"
 }
+
 
 //
 // Aliases
@@ -156,10 +164,10 @@ Alias( 'all' )
 
 VSSolution( 'GenerateVisualStudioSolution' )
 {
-  .SolutionOutput = 'Workspace/VisualStudio/VulkanExperiments.sln'
+  .SolutionOutput = '$WorkspacePath$/VisualStudio/VulkanExperiments.sln'
   .SolutionConfigs = .ProjectConfigs
   .SolutionBuildProject = 'Application-Proj'
-  .ExtraFiles = { 'Utilities/VulkanExperiments.natvis' }
+  .ExtraFiles = { '$RepoRoot$/Utilities/VulkanExperiments.natvis' }
 }
 
 Alias( 'vs' )
@@ -174,9 +182,9 @@ Exec( 'GenerateSublimeProject' )
 {
   .ThePythonScript = '$RepoRoot$/Utilities/GenerateSublimeProject.py'
   .ExecExecutable = 'C:\Windows\py.exe'
-  .ExecArguments = '-3 $ThePythonScript$ $BuildPath$/System.bff'
+  .ExecArguments = '-3 "$ThePythonScript$"'
   .ExecInput = '$ThePythonScript$'
-  .ExecOutput = 'VulkanExperiments.sublime-project'
+  .ExecOutput = '$RepoRoot$/VulkanExperiments.sublime-project'
   .ExecWorkingDir = '$RepoRoot$'
   .ExecUseStdOutAsOutput = true
 }

@@ -7,7 +7,7 @@
     .Output = '$BuildPath$/$ProjectName$.exe'
     .OutputDirectory = '$BuildPath$'
 
-    .ProjectOutput = 'Workspace/VisualStudio/$ProjectName$.vcxproj'
+    .ProjectOutput = '$WorkspacePath$/VisualStudio/$ProjectName$.vcxproj'
     .ProjectInputPaths = { '$SourcePath$' }
     .LocalDebuggerCommand = '$Output$'
     .LocalDebuggerCommandArguments = '--break'

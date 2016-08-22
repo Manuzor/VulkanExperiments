@@ -8,12 +8,6 @@ from pathlib import Path
 
 import SystemInfo
 
-ManifestPath = SystemInfo.RepoManifestPath(os.environ)
-Manifest = SystemInfo.LoadRepoManifestPath(ManifestPath)
-if Manifest is None:
-  print("Unable to load repo manifest: ", str(ManifestPath), file=sys.stderr)
-  print("Maybe re-run the init script?", file=sys.stderr)
-
 BuildRules = [
   {
     "Name": "Core",
@@ -53,27 +47,28 @@ BuildRules = [
   },
 ]
 
+BuildCommandTemplate = """\"py", "-3", "{Repo[Path]}/Utilities/Build.py", "--proxy-bff", "{Repo[WorkspacePath]}/SublimeText3.bff", "--", "-ide\""""
+
 FileTemplate = """{{
   "build_systems":
   [
     {{
       "cmd":
       [
-        "${{folder}}/Utilities/FASTBuild/FBuild.exe",
-        "-ide"
+        {BuildCommand}
       ],
+      "working_dir": "{SublWorkingDir}",
       "file_regex": "([A-z]:.*?)\\\\(([0-9]+)(?:,\\\\s*[0-9]+)?\\\\)",
       "name": "VulkanExperiments",
       "variants":
       [{BuildRules}
-      ],
-      "working_dir": "${{folder}}"
+      ]
     }}
   ],
   "folders":
   [
     {{
-      "path": "."
+      "path": "{Repo[Path]}"
     }},
     {{
       "path": "{Windows10SDK[Path]}/Include/{Windows10SDK[Version]}",
@@ -94,22 +89,43 @@ FileTemplate = """{{
   ]
 }}"""
 
-#
-# Print The Result
-#
-FormattedBuildRules = ""
-for Rule in BuildRules:
-  Template = """
-        {{
-          "cmd":
-          [
-            "${{folder}}/Utilities/FASTBuild/FBuild.exe",
-            "-ide",
-            "{Arg}"
-          ],
-          "name": "{Name}"
-        }},"""
-  FormattedBuildRules += Template.format(**Rule)
+BuildRuleTemplate = """
+          {{
+            "cmd":
+            [
+              {BuildCommand},
+              "{Arg}"
+            ],
+            "name": "{Name}"
+          }},"""
 
-Formatted = FileTemplate.format(BuildRules=FormattedBuildRules, **Manifest)
-print(Formatted, end='\n')
+
+def Main():
+  ManifestPath = SystemInfo.RepoManifestPath(os.environ)
+  Manifest = SystemInfo.LoadRepoManifest(ManifestPath)
+  if Manifest is None:
+    print("Unable to load repo manifest: ", str(ManifestPath), file=sys.stderr)
+    print("Maybe re-run the init script?", file=sys.stderr)
+
+  BuildCommand = BuildCommandTemplate.format(**Manifest)
+  SublWorkingDir = SystemInfo.SublimeText3WorkingDir(os.environ)
+
+  #
+  # Print The Result
+  #
+  FormattedBuildRules = ""
+  for Rule in BuildRules:
+    FormattedBuildRules += BuildRuleTemplate.format(BuildCommand=BuildCommand, **Rule)
+
+  Formatted = FileTemplate.format(BuildCommand=BuildCommand, SublWorkingDir=SublWorkingDir.as_posix(), BuildRules=FormattedBuildRules, **Manifest)
+  print(Formatted, end='\n')
+
+  #
+  # Make sure the working directory exists
+  #
+  if not SublWorkingDir.exists():
+    SublWorkingDir.mkdir(parents=True)
+
+
+if __name__ == '__main__':
+  Main()
