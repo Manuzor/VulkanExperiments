@@ -5,7 +5,7 @@ auto
 ::CameraProjectionMatrix(common_camera_data const& Cam)
   -> mat4x4
 {
-  return Mat4x4PerspectiveProjection(Cam.FieldOfView,
+  return Mat4x4PerspectiveProjection(Cam.VerticalFieldOfView,
                                      Cam.Width / Cam.Height,
                                      Cam.NearPlane,
                                      Cam.FarPlane);

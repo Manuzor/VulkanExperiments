@@ -1927,7 +1927,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     //
     free_horizon_camera Cam = {};
     {
-      Cam.FieldOfView = Degrees(90);
+      Cam.VerticalFieldOfView = Degrees(60);
       Cam.Width = 1280;
       Cam.Height = 720;
       Cam.NearPlane = 0.1f;

@@ -8,7 +8,7 @@ struct common_camera_data
 {
   transform Transform;
 
-  angle FieldOfView;
+  angle VerticalFieldOfView;
   float Width;
   float Height;
   float NearPlane;
