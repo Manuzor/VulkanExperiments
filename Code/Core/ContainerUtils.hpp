@@ -14,7 +14,11 @@ ContainerReserve(allocator_interface* Allocator,
                  size_t MinBytesToReserve,
                  size_t MinimumCapacity)
 {
-  auto BytesToReserve = Max(MinBytesToReserve, MinimumCapacity);
+  // TODO: Replace with something like NextMultipleOf(Max(MinBytesToReserve, MinimumCapacity), MinimumCapacity)
+  size_t BytesToReserve = MinimumCapacity;
+  while(BytesToReserve < MinBytesToReserve)
+    BytesToReserve *= 2;
+
   if(CurrentCapacity >= BytesToReserve)
     return Slice(CurrentCapacity, Ptr);
 

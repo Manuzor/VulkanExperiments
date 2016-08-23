@@ -291,8 +291,9 @@ auto
   StrEnsureZeroTerminated(String);
 }
 
-void
-StrReset(arc_string& String)
+auto
+::StrReset(arc_string& String)
+  -> void
 {
   if(!StrIsInitialized(String))
     return;
