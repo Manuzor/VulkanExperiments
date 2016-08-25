@@ -197,15 +197,12 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
   Assert(Vulkan->vkEnumerateInstanceLayerProperties);
   Assert(Vulkan->vkEnumerateInstanceExtensionProperties);
 
-  temp_allocator TempAllocator;
-  allocator_interface* Allocator = *TempAllocator;
-
   //
   // Instance Layers
   //
-  array<char const*> LayerNames{ Allocator };
+  array<char const*> LayerNames;
   {
-    array<char const*> DesiredLayerNames{ Allocator };
+    array<char const*> DesiredLayerNames;
 
     if(EnableValidation == vulkan_enable_validation::Yes)
     {
@@ -215,7 +212,7 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
     uint32 LayerCount;
     VulkanVerify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
 
-    array<VkLayerProperties> LayerProperties{ Allocator };
+    array<VkLayerProperties> LayerProperties;
     ExpandBy(LayerProperties, LayerCount);
     VulkanVerify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, LayerProperties.Ptr));
 
@@ -248,7 +245,7 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
   //
   // Instance Extensions
   //
-  array<char const*> ExtensionNames{ Allocator };
+  array<char const*> ExtensionNames;
   {
     // Required extensions:
     bool SurfaceExtensionFound = false;
@@ -257,7 +254,7 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
     uint32 ExtensionCount;
     VulkanVerify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
-    array<VkExtensionProperties> ExtensionProperties = { Allocator };
+    array<VkExtensionProperties> ExtensionProperties;
     ExpandBy(ExtensionProperties, ExtensionCount);
     VulkanVerify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, ExtensionProperties.Ptr));
 
