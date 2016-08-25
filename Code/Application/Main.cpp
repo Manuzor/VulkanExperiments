@@ -29,6 +29,37 @@ static bool GlobalRunning = false;
 static bool GlobalIsResizeRequested = false;
 static extent2_<uint32> GlobalResizeRequest_Extent{};
 
+static slice<char const>
+ThisExeDir()
+{
+  static arc_string Buffer;
+  if(StrIsEmpty(Buffer))
+  {
+    // TODO: Use GetModuleFileNameW and convert to UTF-8
+    fixed_block<256, char> RawBuffer;
+
+    // TODO: Handle return value
+    DWORD Result = GetModuleFileNameA(nullptr, &RawBuffer[0], RawBuffer.Num);
+    auto FullPath = SliceFromString(&RawBuffer[0]);
+
+    slice<char const> Directory;
+    ExtractPathDirectoryAndFileName(FullPath, &Directory, nullptr);
+
+    Buffer = Directory;
+  }
+  return Slice(Buffer);
+}
+
+static arc_string
+DataPath(arc_string const& RelativePath)
+{
+  arc_string AbsolutePath;
+  AbsolutePath += ThisExeDir();
+  AbsolutePath += "/../Data/";
+  AbsolutePath += Slice(RelativePath);
+  return AbsolutePath;
+}
+
 static LRESULT WINAPI
 Win32MainWindowCallback(HWND WindowHandle, UINT Message,
                         WPARAM WParam, LPARAM LParam);
@@ -793,7 +824,7 @@ VulkanCreateGraphicsPipeline(vulkan* Vulkan,
 }
 
 void
-ImplVulkanPrepareRenderableFoo(vulkan* Vulkan, slice<char const> ShaderPath, vulkan_graphics_pipeline_desc PipelineDesc, size_t VertexDataStride, vulkan_renderable_foo* Foo)
+ImplVulkanPrepareRenderableFoo(vulkan* Vulkan, arc_string const& ShaderPath, vulkan_graphics_pipeline_desc PipelineDesc, size_t VertexDataStride, vulkan_renderable_foo* Foo)
 {
   auto const& Device = Vulkan->Device;
   auto const DeviceHandle = Device.DeviceHandle;
@@ -804,7 +835,7 @@ ImplVulkanPrepareRenderableFoo(vulkan* Vulkan, slice<char const> ShaderPath, vul
   //
   // Get compiled shader
   //
-  Foo->Shader = GetCompiledShader(Vulkan->ShaderManager, ShaderPath, GlobalLog);
+  Foo->Shader = GetCompiledShader(Vulkan->ShaderManager, Slice(ShaderPath), GlobalLog);
   Assert(Foo->Shader != nullptr);
 
   //
@@ -861,7 +892,7 @@ ImplVulkanPrepareRenderableFoo(vulkan* Vulkan, slice<char const> ShaderPath, vul
 
 template<typename VertexDataType>
 void
-VulkanPrepareRenderableFoo(vulkan* Vulkan, slice<char const> ShaderPath, vulkan_graphics_pipeline_desc PipelineDesc, vulkan_renderable_foo* Foo)
+VulkanPrepareRenderableFoo(vulkan* Vulkan, arc_string const& ShaderPath, vulkan_graphics_pipeline_desc PipelineDesc, vulkan_renderable_foo* Foo)
 {
   ImplVulkanPrepareRenderableFoo(Vulkan, ShaderPath, PipelineDesc, SizeOf<VertexDataType>(), Foo);
 }
@@ -956,7 +987,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       auto PipelineDesc = InitStruct<vulkan_graphics_pipeline_desc>();
       PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
       PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-      VulkanPrepareRenderableFoo<vulkan_debug_grid::vertex>(Vulkan, "Data/Shader/DebugGrid.shader"_S, PipelineDesc, &Vulkan->DebugGridsFoo);
+      VulkanPrepareRenderableFoo<vulkan_debug_grid::vertex>(Vulkan, DataPath("Shader/DebugGrid.shader"), PipelineDesc, &Vulkan->DebugGridsFoo);
     }
 
     // Scene Objects
@@ -965,7 +996,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
       PipelineDesc.RasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
       PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-      VulkanPrepareRenderableFoo<vulkan_scene_object::vertex>(Vulkan, "Data/Shader/SceneObject.shader"_S, PipelineDesc, &Vulkan->SceneObjectsFoo);
+      VulkanPrepareRenderableFoo<vulkan_scene_object::vertex>(Vulkan, DataPath("Shader/SceneObject.shader"), PipelineDesc, &Vulkan->SceneObjectsFoo);
     }
   }
 

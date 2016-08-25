@@ -3,6 +3,8 @@
 #include "CoreAPI.hpp"
 #include "Array.hpp"
 
+RESERVE_PREFIX(Str);
+
 
 /// \note If no allocator is supplied to this string, the default string
 /// \allocator will be used.
@@ -117,11 +119,14 @@ CORE_API
 void
 StrReset(arc_string& String);
 
+/// \see arc_string::operator=()
 CORE_API
 void
 StrSet(arc_string& String, slice<char const> Content);
 
 /// Appends some data to the given string.
+///
+/// \see operator+=(arc_string&,slice<char const>)
 CORE_API
 void
 StrAppend(arc_string& String, slice<char const> More);
@@ -130,6 +135,13 @@ inline void operator +=(arc_string& String, char const* StringPtr)     { StrAppe
 inline void operator +=(arc_string& String, slice<char const> Content) { StrAppend(String, Content); }
 inline void operator +=(arc_string& String, slice<char> Content)       { StrAppend(String, AsConst(Content)); }
 
+/// Prepends some data to the given string.
+/// \see operator+=(slice<char const>,arc_string&)
+CORE_API
+void
+StrPrepend(arc_string& String, slice<char const> More);
+
+/// \see operator+(arc_string&,slice<char const>)
 CORE_API
 arc_string
 StrConcat(arc_string const& String, slice<char const> More);
@@ -137,3 +149,12 @@ StrConcat(arc_string const& String, slice<char const> More);
 inline arc_string operator +(arc_string const& String, char const* StringPtr)     { return StrConcat(String, SliceFromString(StringPtr)); }
 inline arc_string operator +(arc_string const& String, slice<char const> Content) { return StrConcat(String, Content); }
 inline arc_string operator +(arc_string const& String, slice<char> Content)       { return StrConcat(String, AsConst(Content)); }
+
+/// \see operator+(slice<char const>,arc_string&)
+CORE_API
+arc_string
+StrConcat(slice<char const> More, arc_string const& String);
+
+inline arc_string operator +(char const* StringPtr, arc_string const& String)     { return StrConcat(SliceFromString(StringPtr), String); }
+inline arc_string operator +(slice<char const> Content, arc_string const& String) { return StrConcat(Content, String); }
+inline arc_string operator +(slice<char> Content, arc_string const& String)       { return StrConcat(AsConst(Content), String); }

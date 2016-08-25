@@ -322,10 +322,39 @@ auto
 }
 
 auto
+::StrPrepend(arc_string& String, slice<char const> More)
+  -> void
+{
+  // TODO: Validate `More` for proper encoding?
+  StrEnsureUnique(String);
+
+  ExpandBy(String.Internal->Data, More.Num);
+  auto Data = Slice(String.Internal->Data);
+  auto OriginalData = Slice(Data, 0, Data.Num - More.Num);
+  auto MovedOriginalData = Slice(OriginalData.Num, OriginalData.Ptr + More.Num);
+
+  SliceMove(MovedOriginalData, OriginalData);
+
+  auto NewData = Slice(Data, 0, More.Num);
+  SliceCopy(NewData, More);
+
+  StrEnsureZeroTerminated(String);
+}
+
+auto
 ::StrConcat(arc_string const& String, slice<char const> More)
   -> arc_string
 {
   auto Copy = String;
   StrAppend(Copy, More);
+  return Copy;
+}
+
+auto
+::StrConcat(slice<char const> More, arc_string const& String)
+  -> arc_string
+{
+  auto Copy = String;
+  StrPrepend(Copy, More);
   return Copy;
 }
