@@ -8,8 +8,8 @@ auto
   -> void
 {
   Document->Allocator = Allocator;
-  Init(&Document->Nodes, Allocator);
-  Reserve(&Document->Nodes, 32);
+  Document->Nodes.Allocator = Allocator;
+  Reserve(Document->Nodes, 32);
   Document->Root = CfgCreateNode(Document);
 }
 
@@ -17,11 +17,11 @@ auto
 ::Finalize(cfg_document* Document)
   -> void
 {
-  for(auto Node : Slice(&Document->Nodes))
+  for(auto Node : Slice(Document->Nodes))
   {
     CfgDestroyNode(Document, Node);
   }
-  Finalize(&Document->Nodes);
+  Reset(Document->Nodes);
 }
 
 auto
@@ -40,11 +40,11 @@ auto
   -> cfg_node*
 {
   auto Node = Allocate<cfg_node>(Document->Allocator);
-  *Node = {};
+  MemConstruct(1, Node);
   Node->Document = Document;
-  Init(&Node->Values, Document->Allocator);
-  Init(&Node->Attributes, Document->Allocator);
-  Expand(&Document->Nodes) = Node;
+  Node->Values.Allocator = Document->Allocator;
+  Node->Attributes.Allocator = Document->Allocator;
+  Document->Nodes += Node;
   return Node;
 }
 
@@ -55,10 +55,9 @@ auto
   if(Node == nullptr)
     return;
 
-  if(RemoveFirst(&Document->Nodes, Node))
+  if(RemoveFirst(Document->Nodes, Node))
   {
-    Finalize(&Node->Values);
-    Finalize(&Node->Attributes);
+    MemDestruct(1, Node);
     Deallocate(Document->Allocator, Node);
   }
   else

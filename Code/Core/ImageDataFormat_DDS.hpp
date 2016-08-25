@@ -2,13 +2,14 @@
 
 #include "CoreAPI.hpp"
 #include "ImageLoader.hpp"
+#include "Array.hpp"
 
 
 class image_loader_dds : public image_loader_interface
 {
 public:
   virtual bool LoadImageFromData(slice<void const> RawImageData, image* ResultImage) override;
-  virtual bool WriteImageToArray(image* Image, dynamic_array<uint8> const* RawImageData) override;
+  virtual bool WriteImageToArray(image* Image, array<uint8>* RawImageData) override;
 };
 
 using PFN_CreateImageLoader = image_loader_interface* (*)(allocator_interface* Allocator);

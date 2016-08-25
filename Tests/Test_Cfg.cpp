@@ -246,8 +246,8 @@ TEST_CASE("Cfg: Parse document from file", "[Cfg]")
 
   auto FileName = "../Tests/TestData/Full.cfg";
 
-  scoped_array<uint8> FileContent{ &Allocator };
-  if(!ReadFileContentIntoArray(&FileContent, FileName))
+  array<uint8> FileContent{ &Allocator };
+  if(!ReadFileContentIntoArray(FileContent, FileName))
   {
     FAIL( FileName << ": Unable to find file. Wrong working directory?" );
   }
@@ -258,7 +258,7 @@ TEST_CASE("Cfg: Parse document from file", "[Cfg]")
   Init(&Document, &Allocator);
   Defer [&](){ Finalize(&Document); };
 
-  CfgDocumentParseFromString(&Document, SliceReinterpret<char const>(Slice(&FileContent)), &Context);
+  CfgDocumentParseFromString(&Document, SliceReinterpret<char const>(Slice(FileContent)), &Context);
 
   //
   // The actual test

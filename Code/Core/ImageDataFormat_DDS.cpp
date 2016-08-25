@@ -313,7 +313,7 @@ image_loader_dds::LoadImageFromData(slice<void const> RawImageData, image* Resul
 }
 
 auto
-image_loader_dds::WriteImageToArray(image* Image, dynamic_array<uint8> const* RawImageData)
+image_loader_dds::WriteImageToArray(image* Image, array<uint8>* RawImageData)
   -> bool
 {
   return false;
@@ -324,7 +324,7 @@ auto
   -> image_loader_interface*
 {
   auto Loader = Allocate<image_loader_dds>(Allocator);
-  MemDefaultConstruct(1, Loader);
+  MemConstruct(1, Loader);
   return Loader;
 }
 

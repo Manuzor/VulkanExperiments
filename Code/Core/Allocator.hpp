@@ -55,6 +55,23 @@ Deallocate(allocator_interface* Allocator, T* Object)
   Allocator->Deallocate(Object);
 }
 
+template<typename T, typename... ArgTypes>
+inline T*
+New(allocator_interface* Allocator, ArgTypes&&... Args)
+{
+  auto Ptr = Allocate<T>(Allocator);
+  MemConstruct(1, Ptr, Forward<U>(Args)...);
+  return Ptr;
+}
+
+template<typename T>
+inline void
+Delete(allocator_interface* Allocator, T* Ptr)
+{
+  MemDestruct(1, Ptr);
+  Deallocate(Allocator, Ptr);
+}
+
 /// An allocator wrapper that is intended to be used only for a short period
 /// of time in the scope it was created.
 ///

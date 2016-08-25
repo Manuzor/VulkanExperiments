@@ -3,6 +3,7 @@
 #include "CoreAPI.hpp"
 #include <Backbone.hpp>
 
+#include "Array.hpp"
 #include "Dictionary.hpp"
 #include "Event.hpp"
 
@@ -85,29 +86,33 @@ SetDeadZones(input_value_properties* Properties, float BothValues);
 // Sample signature: void Listener(input_id SlotId, input_slot Slot)
 using input_event = event<input_id, input_slot*>;
 
+/// Used internally by input_context
+struct input_slot_mapping
+{
+  input_id SourceSlotId; // When this slots' value is changed, the TargetSlotId will be changed.
+  input_id TargetSlotId; // This is the slot which value will be changed if SourceSlotId's value changes.
+  float Scale;           // A factor used when mapping slots.
+};
+
+CORE_TEMPLATE_EXPORT(struct, array<input_slot_mapping>);
+
 // TODO(Manu): Implement ActionEvent so that users can listen to a specific action.
 class CORE_API input_context
 {
 public:
-  struct slot_mapping
-  {
-    input_id SourceSlotId; // When this slots' value is changed, the TargetSlotId will be changed.
-    input_id TargetSlotId; // This is the slot which value will be changed if SourceSlotId's value changes.
-    float Scale;           // A factor used when mapping slots.
-  };
-
   input_context* Parent;
   int UserIndex = -1; // -1 for no associated user, >= 0 for a specific user.
-  slice<char> Name; // Mostly for debugging.
+  slice<char> Name; // Mostly for debugging. TODO: Use arc_string
 
   dictionary<input_id, input_slot> Slots;
   dictionary<input_id, input_value_properties> ValueProperties;
-  dynamic_array<slot_mapping> SlotMappings;
+  array<input_slot_mapping> SlotMappings;
   input_event ChangeEvent;
 
   uint64 CurrentFrame;
 
-  dynamic_array<char> CharacterBuffer;
+  // TODO: Use arc_string here.
+  array<char> CharacterBuffer;
 
   // Convenient indexing operator that returns nullptr or the ptr to the
   // input_slot that corresponds to SlotId.

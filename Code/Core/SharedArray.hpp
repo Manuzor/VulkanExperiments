@@ -240,7 +240,7 @@ ExpandBy(shared_array<T>& Array, size_t Amount)
   Array.Num() += Amount;
   const auto EndIndex = Array.Num();
   auto Result = Slice(AllocatedMemory(Array), BeginIndex, EndIndex);
-  SliceDefaultConstruct(Result);
+  SliceConstruct(Result);
   return Result;
 }
 

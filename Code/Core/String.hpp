@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreAPI.hpp"
-#include "DynamicArray.hpp"
+#include "Array.hpp"
 
 
 /// \note If no allocator is supplied to this string, the default string
@@ -13,7 +13,7 @@ public:
 
   struct internal
   {
-    dynamic_array<char> Data;
+    array<char> Data;
     int RefCount;
   };
 

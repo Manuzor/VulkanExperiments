@@ -145,7 +145,7 @@ GetOrCreate(dictionary<K, V>* Dict, IndexType KeyIndex)
   MemConstruct(1, NewKeyPtr, KeyIndex);
 
   auto NewValuePtr = Dict->ValuesPtr + ArrayIndex;
-  MemDefaultConstruct(1, NewValuePtr);
+  MemConstruct(1, NewValuePtr);
 
   return NewValuePtr;
 }

@@ -2,7 +2,7 @@
 
 #include "CoreAPI.hpp"
 #include "Allocator.hpp"
-#include "DynamicArray.hpp"
+#include "Array.hpp"
 
 #include <Backbone.hpp>
 
@@ -12,7 +12,7 @@ class image_loader_interface
 {
 public:
   virtual bool LoadImageFromData(slice<void const> RawImageData, image* ResultImage) = 0;
-  virtual bool WriteImageToArray(image* Image, dynamic_array<uint8> const* RawImageData) = 0;
+  virtual bool WriteImageToArray(image* Image, array<uint8>* RawImageData) = 0;
 };
 
 using PFN_CreateImageLoader = image_loader_interface* (*)(allocator_interface* Allocator);

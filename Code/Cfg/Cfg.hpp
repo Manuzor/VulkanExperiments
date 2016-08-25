@@ -3,7 +3,7 @@
 #include "CfgAPI.hpp"
 
 #include <Core/Allocator.hpp>
-#include <Core/DynamicArray.hpp>
+#include <Core/Array.hpp>
 
 
 struct cfg_document;
@@ -58,8 +58,8 @@ struct cfg_node
 
   cfg_identifier Name;
 
-  dynamic_array<cfg_literal> Values;
-  dynamic_array<cfg_attribute> Attributes;
+  array<cfg_literal> Values;
+  array<cfg_attribute> Attributes;
 };
 
 // TODO: Memory management overhaul in cfg_documents.
@@ -70,7 +70,7 @@ struct cfg_document
   /// Array of node pointers.
   ///
   /// Will be automatically destoryed when the document gets finalized.
-  dynamic_array<cfg_node*> Nodes;
+  array<cfg_node*> Nodes;
 
   /// The root node of this document.
   ///

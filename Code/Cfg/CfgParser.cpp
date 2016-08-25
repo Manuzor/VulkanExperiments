@@ -415,7 +415,7 @@ auto
     if(!CfgDocumentParseLiteral(Document, &Source, Context, &Value))
       break;
 
-    Expand(&Node->Values) = Value;
+    Node->Values += Value;
   }
 
   //
@@ -431,7 +431,7 @@ auto
       break;
     }
 
-    Expand(&Node->Attributes) = Attribute;
+    Node->Attributes += Attribute;
   }
 
   // Check for validity by trying to parse a literal here. If it succeeds, the

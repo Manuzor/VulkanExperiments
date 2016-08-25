@@ -117,18 +117,18 @@ auto
 {
   Init(&Context->Slots,           Allocator);
   Init(&Context->ValueProperties, Allocator);
-  Init(&Context->SlotMappings,    Allocator);
+  Context->SlotMappings.Allocator = Allocator;
   Init(&Context->ChangeEvent,     Allocator);
-  Init(&Context->CharacterBuffer, Allocator);
+  Context->CharacterBuffer.Allocator = Allocator;
 }
 
 auto
 ::Finalize(input_context* Context)
   -> void
 {
-  Finalize(&Context->CharacterBuffer);
+  Reset(Context->CharacterBuffer);
   Finalize(&Context->ChangeEvent);
-  Finalize(&Context->SlotMappings);
+  Reset(Context->SlotMappings);
   Finalize(&Context->ValueProperties);
   Finalize(&Context->Slots);
 }
@@ -148,7 +148,7 @@ auto
   -> bool
 {
   // TODO(Manu): Eliminate duplicates.
-  auto NewSlotMapping = &Expand(&Context->SlotMappings);
+  auto NewSlotMapping = &Expand(Context->SlotMappings);
   NewSlotMapping->SourceSlotId = SourceSlotId;
   NewSlotMapping->TargetSlotId = TargetSlotId;
   NewSlotMapping->Scale = Scale;
@@ -193,7 +193,7 @@ auto
   // Apply input mapping
   //
 
-  for(auto& Mapping : Slice(&Context->SlotMappings))
+  for(auto& Mapping : Slice(Context->SlotMappings))
   {
     if(Mapping.SourceSlotId == TriggeringSlotId)
     {
@@ -246,7 +246,7 @@ auto
   Assert(Context->CurrentFrame < IntMaxValue<decltype(Context->CurrentFrame)>());
   Context->CurrentFrame++;
 
-  Clear(&Context->CharacterBuffer);
+  Clear(Context->CharacterBuffer);
 }
 
 auto

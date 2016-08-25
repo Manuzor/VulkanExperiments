@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreAPI.hpp"
-#include "DynamicArray.hpp"
+#include "Array.hpp"
 
 #include <functional>
 
@@ -21,13 +21,13 @@ struct event
     listener Callback;
   };
 
-  dynamic_array<registered_listener> Listeners;
+  array<registered_listener> Listeners;
   id NewId;
 
   void
   operator()(ArgTypes... Args)
   {
-    for(auto& Listener : Slice(&Listeners))
+    for(auto& Listener : Slice(Listeners))
     {
       if(Listener.Callback)
         Listener.Callback(Forward<ArgTypes>(Args)...);
@@ -39,21 +39,21 @@ template<typename... ArgTypes>
 void
 Init(event<ArgTypes...>* Event, allocator_interface* Allocator)
 {
-  Init(&Event->Listeners, Allocator);
+  Event->Listeners.Allocator = Allocator;
 }
 
 template<typename... ArgTypes>
 void
 Finalize(event<ArgTypes...>* Event)
 {
-  Finalize(&Event->Listeners);
+  Reset(Event->Listeners);
 }
 
 template<typename... ArgTypes>
 typename event<ArgTypes...>::id
 AddListener(event<ArgTypes...>* Event, typename event<ArgTypes...>::listener Callback)
 {
-  auto& Entry = Expand(&Event->Listeners);
+  auto& Entry = Expand(Event->Listeners);
   Entry.Id = Event->NewId;
   Entry.Callback = Move(Callback);
   ++Event->NewId.Value;
@@ -67,7 +67,7 @@ RemoveListener(event<ArgTypes...>* Event, typename event<ArgTypes...>::id Listen
   using registered_listener = typename event<ArgTypes...>::registered_listener;
   using id = typename event<ArgTypes...>::id;
 
-  size_t ListenerIndex = SliceCountUntil(AsConst(Slice(&Event->Listeners)),
+  size_t ListenerIndex = SliceCountUntil(AsConst(Slice(Event->Listeners)),
                                          ListenerId,
                                          [](registered_listener const& Listener, id Id)
                                          {
@@ -75,6 +75,6 @@ RemoveListener(event<ArgTypes...>* Event, typename event<ArgTypes...>::id Listen
                                          });
   if(ListenerIndex == INVALID_INDEX)
     return false;
-  RemoveAt(&Event->Listeners, ListenerIndex);
+  RemoveAt(Event->Listeners, ListenerIndex);
   return true;
 }

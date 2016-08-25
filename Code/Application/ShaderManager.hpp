@@ -3,7 +3,7 @@
 #include <Backbone.hpp>
 
 #include <Core/Allocator.hpp>
-#include <Core/DynamicArray.hpp>
+#include <Core/Array.hpp>
 #include <Core/Dictionary.hpp>
 
 
@@ -56,7 +56,7 @@ GetSpirvShader(compiled_shader* CompiledShader, shader_stage Stage);
 void
 GenerateVertexInputDescriptions(compiled_shader* CompiledShader,
                                 VkVertexInputBindingDescription const& Binding,
-                                dynamic_array<VkVertexInputAttributeDescription>* InputAttributes);
+                                array<VkVertexInputAttributeDescription>& InputAttributes);
 
 shader_stage
 ShaderStageFromName(slice<char const> ShaderStageName);
@@ -70,4 +70,4 @@ GetDescriptorTypeCounts(compiled_shader* CompiledShader,
 
 void
 GetDescriptorSetLayoutBindings(compiled_shader* CompiledShader,
-                               dynamic_array<VkDescriptorSetLayoutBinding>* LayoutBindings);
+                               array<VkDescriptorSetLayoutBinding>* LayoutBindings);

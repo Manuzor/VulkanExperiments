@@ -50,16 +50,16 @@ auto
 ::Init(image* Image, allocator_interface* Allocator)
   -> void
 {
-  Init(&Image->InternalSubImages, Allocator);
-  Init(&Image->Data, Allocator);
+  Image->InternalSubImages.Allocator = Allocator;
+  Image->Data.Allocator = Allocator;
 }
 
 auto
 ::Finalize(image* Image)
   -> void
 {
-  Finalize(&Image->Data);
-  Finalize(&Image->InternalSubImages);
+  Reset(Image->Data);
+  Reset(Image->InternalSubImages);
 }
 
 auto
@@ -67,10 +67,13 @@ auto
   -> void
 {
   // Header is safe to copy completely
-  *Reinterpret<image_header*>(Target) = Source;
+  *Cast<image_header*>(Target) = Source;
 
-  Copy(&Target->InternalSubImages, Source.InternalSubImages);
-  Copy(&Target->Data, Source.Data);
+  Clear(Target->InternalSubImages);
+  Clear(Target->Data);
+
+  Target->InternalSubImages += Slice(Source.InternalSubImages);
+  Target->Data += Slice(Source.Data);
 }
 
 auto
@@ -113,7 +116,7 @@ auto
   -> void
 {
   const auto NumSubImages = Image->NumMipLevels * Image->NumFaces * Image->NumArrayIndices;
-  SetNum(&Image->InternalSubImages, NumSubImages);
+  SetNum(Image->InternalSubImages, NumSubImages);
 
   int DataSize = 0;
 
@@ -147,7 +150,7 @@ auto
     }
   }
 
-  SetNum(&Image->Data, DataSize + 16);
+  SetNum(Image->Data, DataSize + 16);
 }
 
 auto

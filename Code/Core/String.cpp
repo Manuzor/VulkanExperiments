@@ -15,8 +15,8 @@ CreateInternal(allocator_interface* Allocator)
 {
   auto Internal = Allocate<arc_string::internal>(Allocator);
   Assert(Internal);
-  *Internal = {};
-  Init(&Internal->Data, Allocator);
+  MemConstruct(1, Internal);
+  Internal->Data.Allocator = Allocator;
   Internal->RefCount = 1;
 
   return Internal;
@@ -25,7 +25,7 @@ CreateInternal(allocator_interface* Allocator)
 static void
 DestroyInternal(allocator_interface* Allocator, arc_string::internal* Internal)
 {
-  Finalize(&Internal->Data);
+  MemDestruct(1, Internal);
   if(Allocator)
     Deallocate(Allocator, Internal);
 }
@@ -191,8 +191,8 @@ auto
     auto NewInternal = CreateInternal(Allocator);
 
     // Copy the old content over.
-    SliceCopy(ExpandBy(&NewInternal->Data, OldInternal->Data.Num),
-              AsConst(Slice(&OldInternal->Data)));
+    SliceCopy(ExpandBy(NewInternal->Data, OldInternal->Data.Num),
+              AsConst(Slice(OldInternal->Data)));
 
     // Apply the new Internal instance.
     String.Internal = NewInternal;
@@ -207,8 +207,8 @@ auto
 
   // Note: We don't consider the zero to be actual data, it is intentionally
   // outside of the data boundary.
-  Reserve(&String.Internal->Data, String.Internal->Data.Num + 1);
-  auto const OnePastLastCharPtr = OnePastLast(Slice(&String.Internal->Data));
+  Reserve(String.Internal->Data, String.Internal->Data.Num + 1);
+  auto const OnePastLastCharPtr = OnePastLast(Slice(String.Internal->Data));
   if(*OnePastLastCharPtr != '\0')
     *OnePastLastCharPtr = '\0';
 }
@@ -266,7 +266,7 @@ auto
   if(!StrIsInitialized(String))
     return SliceFromString(MutableEmptyString);
 
-  return Slice(&String.Internal->Data);
+  return Slice(String.Internal->Data);
 }
 
 auto
@@ -276,7 +276,7 @@ auto
   if(!StrIsInitialized(String))
     return ""_S;
 
-  return AsConst(Slice(&String.Internal->Data));
+  return AsConst(Slice(String.Internal->Data));
 }
 
 auto
@@ -287,7 +287,7 @@ auto
     return;
 
   StrEnsureUnique(String);
-  Clear(&String.Internal->Data);
+  Clear(String.Internal->Data);
   StrEnsureZeroTerminated(String);
 }
 
@@ -316,7 +316,7 @@ auto
 {
   // TODO: Validate `More` for proper encoding?
   StrEnsureUnique(String);
-  auto const NewRegion = ExpandBy(&String.Internal->Data, More.Num);
+  auto const NewRegion = ExpandBy(String.Internal->Data, More.Num);
   SliceCopy(NewRegion, More);
   StrEnsureZeroTerminated(String);
 }

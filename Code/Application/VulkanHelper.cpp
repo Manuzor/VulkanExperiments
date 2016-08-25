@@ -78,7 +78,7 @@ vulkan_scene_object::PrepareForDrawing(struct vulkan* Vulkan)
     VulkanCreateShaderBuffer(Vulkan, &this->UboModel, is_read_only_for_shader::Yes);
   }
 
-  scoped_array<VkWriteDescriptorSet> DescriptorSetWrites{ Allocator };
+  array<VkWriteDescriptorSet> DescriptorSetWrites{ Allocator };
 
   //
   // Associate UboModel with the DescriptorSet
@@ -99,7 +99,7 @@ vulkan_scene_object::PrepareForDrawing(struct vulkan* Vulkan)
     UboModelUpdateInfo.descriptorCount = 1;
     UboModelUpdateInfo.pBufferInfo = &DescriptorBufferInfo;
 
-    Expand(&DescriptorSetWrites) = UboModelUpdateInfo;
+    Expand(DescriptorSetWrites) = UboModelUpdateInfo;
   }
 
   //
@@ -121,7 +121,7 @@ vulkan_scene_object::PrepareForDrawing(struct vulkan* Vulkan)
     TextureAndSamplerUpdateInfo.descriptorCount = 1;
     TextureAndSamplerUpdateInfo.pImageInfo = &TextureDescriptor;
 
-    Expand(&DescriptorSetWrites) = TextureAndSamplerUpdateInfo;
+    Expand(DescriptorSetWrites) = TextureAndSamplerUpdateInfo;
   }
 
 
@@ -161,23 +161,27 @@ vulkan_debug_grid::Draw(vulkan* Vulkan, VkCommandBuffer CommandBuffer)
   Device.vkCmdDrawIndexed(CommandBuffer, this->IndexBuffer.NumIndices, 1, 0, 0, 0);
 }
 
+vulkan::vulkan(allocator_interface* Allocator)
+  : Framebuffers(Allocator)
+  , SceneObjects(Allocator)
+  , DebugGrids(Allocator)
+  , Renderables(Allocator)
+  , DrawCommandBuffers(Allocator)
+  , PrePresentCommandBuffers(Allocator)
+  , PostPresentCommandBuffers(Allocator)
+{
+}
+
 auto
 ::Init(vulkan* Vulkan,
        allocator_interface* Allocator)
   -> void
 {
+  Vulkan->Gpu.QueueProperties.Allocator = Allocator;
   Vulkan->RenderableAllocator = Allocator;
   Vulkan->ShaderManagerAllocator = Allocator;
   Vulkan->ShaderManager = CreateShaderManager(Vulkan->ShaderManagerAllocator);
-  Init(&Vulkan->Gpu.QueueProperties, Allocator);
-  Init(&Vulkan->Framebuffers, Allocator);
-  Init(&Vulkan->SceneObjects, Allocator);
-  Init(&Vulkan->DebugGrids, Allocator);
-  Init(&Vulkan->Renderables, Allocator);
   Init(&Vulkan->Swapchain, &Vulkan->Device, Allocator);
-  Init(&Vulkan->DrawCommandBuffers, Allocator);
-  Init(&Vulkan->PrePresentCommandBuffers, Allocator);
-  Init(&Vulkan->PostPresentCommandBuffers, Allocator);
   Vulkan->Gpu.Vulkan = Vulkan;
   Vulkan->Device.Gpu = &Vulkan->Gpu;
 }
@@ -186,15 +190,15 @@ auto
 ::Finalize(vulkan* Vulkan)
   -> void
 {
-  Finalize(&Vulkan->PostPresentCommandBuffers);
-  Finalize(&Vulkan->PrePresentCommandBuffers);
-  Finalize(&Vulkan->DrawCommandBuffers);
+  Reset(Vulkan->PostPresentCommandBuffers);
+  Reset(Vulkan->PrePresentCommandBuffers);
+  Reset(Vulkan->DrawCommandBuffers);
   Finalize(&Vulkan->Swapchain);
-  Finalize(&Vulkan->SceneObjects);
-  Finalize(&Vulkan->Renderables);
-  Finalize(&Vulkan->DebugGrids);
-  Finalize(&Vulkan->Framebuffers);
-  Finalize(&Vulkan->Gpu.QueueProperties);
+  Reset(Vulkan->SceneObjects);
+  Reset(Vulkan->Renderables);
+  Reset(Vulkan->DebugGrids);
+  Reset(Vulkan->Framebuffers);
+  Reset(Vulkan->Gpu.QueueProperties);
   DestroyShaderManager(Vulkan->ShaderManagerAllocator, Vulkan->ShaderManager);
 }
 
@@ -202,8 +206,8 @@ auto
 ::Init(vulkan_swapchain* Swapchain, vulkan_device* Device, allocator_interface* Allocator)
   -> void
 {
-  Init(&Swapchain->Images, Allocator);
-  Init(&Swapchain->ImageViews, Allocator);
+  Swapchain->Images.Allocator = Allocator;
+  Swapchain->ImageViews.Allocator = Allocator;
   Swapchain->Device = Device;
 }
 
@@ -211,8 +215,8 @@ auto
 ::Finalize(vulkan_swapchain* Swapchain)
   -> void
 {
-  Finalize(&Swapchain->ImageViews);
-  Finalize(&Swapchain->Images);
+  Reset(Swapchain->ImageViews);
+  Reset(Swapchain->Images);
 }
 
 auto
@@ -307,8 +311,8 @@ auto
     Assert(FormatCount > 0);
 
     temp_allocator TempAllocator;
-    scoped_array<VkSurfaceFormatKHR> SurfaceFormats(*TempAllocator);
-    ExpandBy(&SurfaceFormats, FormatCount);
+    array<VkSurfaceFormatKHR> SurfaceFormats(*TempAllocator);
+    ExpandBy(SurfaceFormats, FormatCount);
 
     VulkanVerify(Vulkan.vkGetPhysicalDeviceSurfaceFormatsKHR(Vulkan.Gpu.GpuHandle, Surface->SurfaceHandle, &FormatCount, SurfaceFormats.Ptr));
 
@@ -406,13 +410,13 @@ auto
     VulkanVerify(Vulkan.vkGetPhysicalDeviceSurfacePresentModesKHR(Vulkan.Gpu.GpuHandle, SurfaceHandle, &PresentModeCount, nullptr));
 
     temp_allocator TempAllocator;
-    scoped_array<VkPresentModeKHR> PresentModes(*TempAllocator);
-    ExpandBy(&PresentModes, PresentModeCount);
+    array<VkPresentModeKHR> PresentModes(*TempAllocator);
+    ExpandBy(PresentModes, PresentModeCount);
 
     VulkanVerify(Vulkan.vkGetPhysicalDeviceSurfacePresentModesKHR(Vulkan.Gpu.GpuHandle, SurfaceHandle, &PresentModeCount, PresentModes.Ptr));
 
     // Find a mailbox or immediate mode (in that order of preference).
-    for(auto Candidate : Slice(&PresentModes))
+    for(auto Candidate : Slice(PresentModes))
     {
       if(Candidate == VK_PRESENT_MODE_MAILBOX_KHR)
       {
@@ -488,7 +492,7 @@ auto
 
   if(OldSwapchainHandle != VK_NULL_HANDLE)
   {
-    for(auto ViewHandle : Slice(&Swapchain->ImageViews))
+    for(auto ViewHandle : Slice(Swapchain->ImageViews))
     {
       Device.vkDestroyImageView(DeviceHandle, ViewHandle, nullptr);
     }
@@ -502,16 +506,16 @@ auto
 
   VulkanVerify(Device.vkGetSwapchainImagesKHR(DeviceHandle, Swapchain->SwapchainHandle, &Swapchain->ImageCount, nullptr));
 
-  Clear(&Swapchain->Images);
-  ExpandBy(&Swapchain->Images, Swapchain->ImageCount);
+  Clear(Swapchain->Images);
+  ExpandBy(Swapchain->Images, Swapchain->ImageCount);
   VulkanVerify(Device.vkGetSwapchainImagesKHR(DeviceHandle, Swapchain->SwapchainHandle, &Swapchain->ImageCount, Swapchain->Images.Ptr));
 
   //
   // Create views to the swapchain images
   //
 
-  Clear(&Swapchain->ImageViews);
-  for(auto ImageHandle : Slice(&Swapchain->Images))
+  Clear(Swapchain->ImageViews);
+  for(auto ImageHandle : Slice(Swapchain->Images))
   {
     VkImageView ViewHandle = {};
 
@@ -533,7 +537,7 @@ auto
                                           nullptr,
                                           &ViewHandle));
 
-    Expand(&Swapchain->ImageViews) = ViewHandle;
+    Expand(Swapchain->ImageViews) = ViewHandle;
   }
 
   return true;
@@ -546,11 +550,11 @@ auto
   auto const& Device = *Swapchain->Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
-  for(auto View : Slice(&Swapchain->ImageViews))
+  for(auto View : Slice(Swapchain->ImageViews))
   {
     Device.vkDestroyImageView(DeviceHandle, View, nullptr);
   }
-  Clear(&Swapchain->ImageViews);
+  Clear(Swapchain->ImageViews);
 
   Device.vkDestroySwapchainKHR(DeviceHandle, Swapchain->SwapchainHandle, nullptr);
   Swapchain->SwapchainHandle = VK_NULL_HANDLE;
@@ -1822,11 +1826,11 @@ auto
   //
   {
     temp_allocator TempAllocator;
-    scoped_array<VkBufferImageCopy> Regions(*TempAllocator);
+    array<VkBufferImageCopy> Regions(*TempAllocator);
     // TODO(Manu): Upload all MIP levels.
     for(uint32 MipLevel = 0; MipLevel < 1; ++MipLevel)
     {
-      auto Region = &Expand(&Regions);
+      auto Region = &Expand(Regions);
       //Region.bufferOffset = ;
       Region->imageExtent = Image_CreateInfo.extent;
       Region->imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1864,15 +1868,15 @@ auto
   auto Allocator = Vulkan->RenderableAllocator;
 
   auto SceneObject = Allocate<vulkan_scene_object>(Allocator);
-  MemDefaultConstruct(1, SceneObject);
+  MemConstruct(1, SceneObject);
   SceneObject->IsDirty = true;
   SceneObject->Name = Name;
   Init(&SceneObject->Texture, Allocator);
 
   SceneObject->Foo = &Vulkan->SceneObjectsFoo;
 
-  Expand(&Vulkan->SceneObjects) = SceneObject;
-  Expand(&Vulkan->Renderables) = SceneObject;
+  Expand(Vulkan->SceneObjects) = SceneObject;
+  Expand(Vulkan->Renderables) = SceneObject;
 
   return SceneObject;
 }
@@ -1934,14 +1938,14 @@ auto
   auto Allocator = Vulkan->RenderableAllocator;
 
   auto DebugGrid = Allocate<vulkan_debug_grid>(Allocator);
-  MemDefaultConstruct(1, DebugGrid);
+  MemConstruct(1, DebugGrid);
   DebugGrid->IsDirty = true;
   DebugGrid->Name = Name;
 
   DebugGrid->Foo = &Vulkan->DebugGridsFoo;
 
-  Expand(&Vulkan->DebugGrids) = DebugGrid;
-  Expand(&Vulkan->Renderables) = DebugGrid;
+  Expand(Vulkan->DebugGrids) = DebugGrid;
+  Expand(Vulkan->Renderables) = DebugGrid;
 
   return DebugGrid;
 }
@@ -2069,7 +2073,7 @@ auto
       }
 
       // Setup buffer copy regions for each mip level
-      scoped_array<VkBufferImageCopy> BufferCopyRegions{ Allocator };
+      array<VkBufferImageCopy> BufferCopyRegions{ Allocator };
 
       for (uint32 MipLevel = 0; MipLevel < Texture->Image.NumMipLevels; MipLevel++)
       {
@@ -2083,7 +2087,7 @@ auto
         BufferCopyRegion.imageExtent.depth = 1;
         BufferCopyRegion.bufferOffset = ImageDataOffSet(&Texture->Image, MipLevel);
 
-        Expand(&BufferCopyRegions) = BufferCopyRegion;
+        Expand(BufferCopyRegions) = BufferCopyRegion;
       }
 
       // Create optimal tiled target image
@@ -2422,10 +2426,10 @@ auto
 
   using vertex = vulkan_scene_object::vertex;
 
-  scoped_array<vertex> Vertices{ Allocator };
-  SetNum(&Vertices, 8 * 6);
+  array<vertex> Vertices{ Allocator };
+  SetNum(Vertices, 8 * 6);
 
-  scoped_array<uint32> Indices{ Allocator };
+  array<uint32> Indices{ Allocator };
 
   float const P = 0.5f;  // Positive
   float const N = -0.5f; // Negative
@@ -2442,7 +2446,7 @@ auto
       0, 2, 3,
       0, 3, 1,
     };
-    Append(&Indices, Slice(FaceIndices));
+    Indices += Slice(FaceIndices);
   }
 
   // Bottom
@@ -2457,7 +2461,7 @@ auto
       4, 6, 7,
       4, 7, 5,
     };
-    Append(&Indices, Slice(FaceIndices));
+    Indices += Slice(FaceIndices);
   }
 
   // Left
@@ -2472,7 +2476,7 @@ auto
       8, 10, 11,
       8, 11, 9,
     };
-    Append(&Indices, Slice(FaceIndices));
+    Indices += Slice(FaceIndices);
   }
 
   // Right
@@ -2487,7 +2491,7 @@ auto
       12, 14, 15,
       12, 15, 13,
     };
-    Append(&Indices, Slice(FaceIndices));
+    Indices += Slice(FaceIndices);
   }
 
   // Front
@@ -2502,7 +2506,7 @@ auto
       16, 18, 19,
       16, 19, 17,
     };
-    Append(&Indices, Slice(FaceIndices));
+    Indices += Slice(FaceIndices);
   }
 
   // Back
@@ -2517,7 +2521,7 @@ auto
       20, 22, 23,
       20, 23, 21,
     };
-    Append(&Indices, Slice(FaceIndices));
+    Indices += Slice(FaceIndices);
   }
 
   VertexBuffer->NumVertices = Cast<uint32>(Vertices.Num);
@@ -2527,7 +2531,7 @@ auto
   {
     auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
-      BufferCreateInfo.size = SliceByteSize(Slice(&Vertices));
+      BufferCreateInfo.size = SliceByteSize(Slice(Vertices));
       BufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     }
     VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &VertexBuffer->BufferHandle));
@@ -2563,7 +2567,7 @@ auto
   {
     auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
-      BufferCreateInfo.size = SliceByteSize(Slice(&Indices));
+      BufferCreateInfo.size = SliceByteSize(Slice(Indices));
       BufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     }
     VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &IndexBuffer->BufferHandle));
@@ -2613,9 +2617,9 @@ auto
 
   using vertex = vulkan_debug_grid::vertex;
 
-  scoped_array<vertex> Vertices{ Allocator };
+  array<vertex> Vertices{ Allocator };
   size_t const TotalNumVertices = 2 * (NumSamples.X + NumSamples.Y + NumSamples.Z);
-  Reserve(&Vertices, TotalNumVertices);
+  Reserve(Vertices, TotalNumVertices);
 
   // X Axis
   for(uint Index = 0; Index < NumSamples.X; ++Index)
@@ -2623,7 +2627,7 @@ auto
     auto Progress = 2 * HalfExtents.X * NormalizeValue<float>(Index, uint(0), NumSamples.X - 1) - HalfExtents.X;
 
     {
-      auto& Start = Expand(&Vertices);
+      auto& Start = Expand(Vertices);
       Start.VertexPosition.X = Progress;
       Start.VertexPosition.Y = -HalfExtents.Y;
       Start.VertexPosition.Z = 0;
@@ -2631,7 +2635,7 @@ auto
     }
 
     {
-      auto& End = Expand(&Vertices);
+      auto& End = Expand(Vertices);
       End.VertexPosition.X = Progress;
       End.VertexPosition.Y = HalfExtents.Y;
       End.VertexPosition.Z = 0;
@@ -2645,7 +2649,7 @@ auto
     auto Progress = 2 * HalfExtents.Y * NormalizeValue<float>(Index, uint(0), NumSamples.Y - 1) - HalfExtents.Y;
 
     {
-      auto& Start = Expand(&Vertices);
+      auto& Start = Expand(Vertices);
       Start.VertexPosition.X = -HalfExtents.X;
       Start.VertexPosition.Y = Progress;
       Start.VertexPosition.Z = 0;
@@ -2653,7 +2657,7 @@ auto
     }
 
     {
-      auto& End = Expand(&Vertices);
+      auto& End = Expand(Vertices);
       End.VertexPosition.X = HalfExtents.X;
       End.VertexPosition.Y = Progress;
       End.VertexPosition.Z = 0;
@@ -2667,7 +2671,7 @@ auto
     auto Progress = 2 * HalfExtents.X * NormalizeValue<float>(Index, uint(0), NumSamples.X - 1) - HalfExtents.X;
 
     {
-      auto& Start = Expand(&Vertices);
+      auto& Start = Expand(Vertices);
       Start.VertexPosition.X = Progress;
       Start.VertexPosition.Y = -HalfExtents.Y;
       Start.VertexPosition.Z = 0;
@@ -2675,7 +2679,7 @@ auto
     }
 
     {
-      auto& End = Expand(&Vertices);
+      auto& End = Expand(Vertices);
       End.VertexPosition.X = Progress;
       End.VertexPosition.Y = -HalfExtents.Y;
       End.VertexPosition.Z = 2 * HalfExtents.Z;
@@ -2685,8 +2689,8 @@ auto
 
   VertexBuffer->NumVertices = Cast<uint32>(Vertices.Num);
 
-  scoped_array<uint32> Indices{ Allocator };
-  SetNum(&Indices, Vertices.Num);
+  array<uint32> Indices{ Allocator };
+  SetNum(Indices, Vertices.Num);
 
   for(uint32 Index = 0; Index < Indices.Num; ++Index)
   {
@@ -2699,7 +2703,7 @@ auto
   {
     auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
-      BufferCreateInfo.size = SliceByteSize(Slice(&Vertices));
+      BufferCreateInfo.size = SliceByteSize(Slice(Vertices));
       BufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     }
     VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &VertexBuffer->BufferHandle));
@@ -2735,7 +2739,7 @@ auto
   {
     auto BufferCreateInfo = InitStruct<VkBufferCreateInfo>();
     {
-      BufferCreateInfo.size = SliceByteSize(Slice(&Indices));
+      BufferCreateInfo.size = SliceByteSize(Slice(Indices));
       BufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     }
     VulkanVerify(Device->vkCreateBuffer(DeviceHandle, &BufferCreateInfo, nullptr, &IndexBuffer->BufferHandle));

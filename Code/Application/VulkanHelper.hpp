@@ -1,7 +1,7 @@
 
 #include <Backbone.hpp>
 
-#include <Core/DynamicArray.hpp>
+#include <Core/Array.hpp>
 #include <Core/Math.hpp>
 #include <Core/Color.hpp>
 #include <Core/Image.hpp>
@@ -26,7 +26,7 @@ struct vulkan_gpu
   VkPhysicalDeviceMemoryProperties MemoryProperties;
   VkPhysicalDeviceFeatures Features;
 
-  dynamic_array<VkQueueFamilyProperties> QueueProperties;
+  array<VkQueueFamilyProperties> QueueProperties;
 };
 
 struct vulkan_device : public vulkan_device_functions
@@ -192,8 +192,8 @@ struct vulkan_swapchain
   vsync VSync;
 
   uint32 ImageCount; // TODO: Rename => NumImages
-  dynamic_array<VkImage> Images;
-  dynamic_array<VkImageView> ImageViews;
+  array<VkImage> Images;
+  array<VkImageView> ImageViews;
 };
 
 struct vulkan_swapchain_image
@@ -234,7 +234,7 @@ struct vulkan : public vulkan_instance_functions
 
   VkRenderPass RenderPass;
 
-  dynamic_array<VkFramebuffer> Framebuffers;
+  array<VkFramebuffer> Framebuffers;
 
 
   //
@@ -242,9 +242,9 @@ struct vulkan : public vulkan_instance_functions
   //
   VkCommandBuffer SetupCommandBuffer;
   // TODO Combine arrays into one and assign slices instead.
-  dynamic_array<VkCommandBuffer> DrawCommandBuffers;
-  dynamic_array<VkCommandBuffer> PrePresentCommandBuffers;
-  dynamic_array<VkCommandBuffer> PostPresentCommandBuffers;
+  array<VkCommandBuffer> DrawCommandBuffers;
+  array<VkCommandBuffer> PrePresentCommandBuffers;
+  array<VkCommandBuffer> PostPresentCommandBuffers;
 
 
   //
@@ -262,9 +262,9 @@ struct vulkan : public vulkan_instance_functions
   vulkan_renderable_foo SceneObjectsFoo;
   vulkan_renderable_foo DebugGridsFoo;
 
-  dynamic_array<vulkan_scene_object*> SceneObjects;
-  dynamic_array<vulkan_debug_grid*> DebugGrids;
-  dynamic_array<vulkan_renderable*> Renderables;
+  array<vulkan_scene_object*> SceneObjects;
+  array<vulkan_debug_grid*> DebugGrids;
+  array<vulkan_renderable*> Renderables;
 
 
   //
@@ -272,6 +272,12 @@ struct vulkan : public vulkan_instance_functions
   //
 
   float DepthStencilValue = 1.0f;
+
+  //
+  // Construction
+  //
+  vulkan() = default;
+  vulkan(allocator_interface* Allocator);
 };
 
 

@@ -113,6 +113,35 @@ DefineArrayTypes(uint16);
 DefineArrayTypes(uint32);
 DefineArrayTypes(uint64);
 
+
+//
+// ================
+//
+
+/// Used to generate compile-time errors when the same name prefix is used in
+/// different locations.
+///
+/// Usage:
+/// \code
+/// RESERVE_PREFIX(Mem);
+///
+/// // Use the "Mem" prefix here without having to worry too much about others
+/// // using the same prefix.
+// / void MemCopy( /* ... */ ) { /* ... */ }
+///
+/// // By convention, this should also be safe.
+/// struct mem_thing { /* ... */ };
+///
+/// // The following would trigger a compile-time error.
+/// // RESERVE_PREFIX(Mem);
+///
+/// \endcode
+///
+/// Note that this is not a fool-proof system, it's just a tool to help you
+/// keep your code clean.
+#define RESERVE_PREFIX(Prefix) struct reserved_prefix_##Prefix {}
+
+
 //
 // ================
 //
@@ -135,6 +164,7 @@ constexpr uint64 SetBit(uint64 Bits, uint64 Position) { return Bits | (uint64(1)
 constexpr uint64 UnsetBit(uint64 Bits, uint64 Position) { return Bits & ~(uint64(1) << Position); }
 constexpr bool IsBitSet(uint64 Bits, uint64 Position) { return !!(Bits & (uint64(1) << Position)); }
 
+
 //
 // ================
 //
@@ -146,6 +176,7 @@ Pi() { return (T)3.14159265359; }
 template<typename T = float>
 constexpr T
 E() { return (T)2.71828182845; }
+
 
 //
 // ================
@@ -648,13 +679,36 @@ struct impl_defer
 // === Source: Backbone/Memory.hpp ===
 // ===================================
 
-//
-// Untyped / Raw Memory Functions
-//
 
+/// \defgroup Memory manipulation functions
+///
+/// Provides functions to work on chunks of memory.
+///
+/// Unlike C standard functions such as memcpy and memset, these functions
+/// respect the type of the input objects. Refer to the table below to find
+/// which C standard functionality is covered by which of the functions
+/// defined here.
+///
+/// C Standard Function | Untyped/Bytes                   | Typed
+/// ------------------- | ------------------------------- | -----
+/// memcopy, memmove    | MemCopyBytes                    | MemCopy, MemCopyConstruct, MemMove, MemMoveConstruct
+/// memset              | MemSetBytes                     | MemSet, MemConstruct
+/// memcmp              | MemCompareBytes, MemEqualBytes  | -
+///
+///
+/// All functions are optimized for POD types.
+///
+/// @{
+
+RESERVE_PREFIX(Mem);
+
+/// Copy NumBytes from Source to Destination.
+///
+/// Destination and Source may overlap.
 void
 MemCopyBytes(size_t NumBytes, void* Destination, void const* Source);
 
+/// Fill NumBytes in Destination with the value
 void
 MemSetBytes(size_t NumBytes, void* Destination, int Value);
 
@@ -664,151 +718,87 @@ MemEqualBytes(size_t NumBytes, void const* A, void const* B);
 int
 MemCompareBytes(size_t NumBytes, void const* A, void const* B);
 
-//
-// Typed Copy
-//
+bool
+MemAreOverlapping(size_t NumBytesA, void const* A, size_t NumBytesB, void const* B);
 
-template<typename T, bool IsPlainOldData = false>
-struct impl_mem_copy
-{
-  static void Do(size_t Num, T* Destination, T const* Source)
-  {
-    for(size_t Index = 0; Index < Num; ++Index)
-    {
-      Destination[Index] = Source[Index];
-    }
-  }
-};
 
-template<typename T>
-struct impl_mem_copy<T, true>
-{
-  static constexpr void Do(size_t Num, T* Destination, T const* Source)
-  {
-    MemCopyBytes(Num * SizeOf<T>(), Reinterpret<void*>(Destination), Reinterpret<void const*>(Source));
-  }
-};
+/// Calls the constructor of all elements in Destination with Args.
+///
+/// Args may be empty in which case all elements get default-initialized.
+template<typename T, typename... ArgTypes>
+void
+MemConstruct(size_t Num, T* Destination, ArgTypes&&... Args);
 
-template<typename T>
-constexpr void
-MemCopy(size_t Num, T* Destination, T const* Source)
-{
-  impl_mem_copy<T, IsPOD<T>()>::Do(Num, Destination, Source);
-}
-
-//
-// Typed Move
-//
-
-template<typename T, bool IsPlainOldData = false>
-struct impl_mem_move
-{
-  static void Do(size_t Num, T* Destination, T const* Source)
-  {
-    for(size_t Index = 0; Index < Num; ++Index)
-    {
-      Destination[Index] = Source[Index];
-    }
-  }
-};
-
-template<typename T>
-struct impl_mem_move<T, false>
-{
-  static constexpr void Do(size_t Num, T* Destination, T const* Source)
-  {
-    MemCopyBytes(Num * sizeof(T), Reinterpret<void*>(Destination), Reinterpret<void const*>(Source));
-  }
-};
-
-template<typename T>
-constexpr void
-MemMove(size_t Num, T* Destination, T const* Source)
-{
-  impl_mem_move<T, IsPOD<T>()>::Do(Num, Destination, Source);
-}
-
-//
-// Typed Set
-//
-
-template<typename T, bool IsPlainOldData = false>
-struct impl_mem_set
-{
-  static void Do(size_t Num, T* Destination, T Value)
-  {
-    for(size_t Index = 0; Index < Num; ++Index)
-    {
-      Destination[Index] = Value;
-    }
-  }
-};
-
-template<typename T>
-struct impl_mem_set<T, false>
-{
-  static constexpr void Do(size_t Num, T* Destination, T Value)
-  {
-    for(size_t Index = 0; Index < Num; ++Index)
-    {
-      MemCopyBytes(Destination + Index, &Value, sizeof(T));
-    }
-  }
-};
-
+/// Destructs all elements in Destination.
 template<typename T>
 void
-MemSet(size_t Num, T* Destination, T Value)
+MemDestruct(size_t Num, T* Destination);
+
+/// Copy all elements from Source to Destination.
+///
+/// Destination and Source may overlap.
+template<typename T>
+void
+MemCopy(size_t Num, T* Destination, T const* Source);
+
+/// Copy all elements from Source to Destination using T's constructor.
+///
+/// Destination and Source may NOT overlap. Destination is assumed to be
+/// uninitialized.
+template<typename T>
+void
+MemCopyConstruct(size_t Num, T* Destination, T const* Source);
+
+/// Move all elements from Source to Destination using T's constructor.
+///
+/// Destination and Source may overlap.
+template<typename T>
+void
+MemMove(size_t Num, T* Destination, T* Source);
+
+/// Move all elements from Source to Destination using T's constructor and destruct Source afterwards.
+///
+/// Destination and Source may NOT overlap. Destination is assumed to be
+/// uninitialized.
+template<typename T>
+void
+MemMoveConstruct(size_t Num, T* Destination, T* Source);
+
+/// Assign the default value of T to all elements in Destination.
+template<typename T>
+void
+MemSet(size_t Num, T* Destination);
+
+/// Assign Item to all elements in Destination.
+template<typename T>
+void
+MemSet(size_t Num, T* Destination, T const& Item);
+
+template<typename TA, typename TB>
+bool
+MemAreOverlapping(size_t NumA, TA const* A, size_t NumB, TB const* B)
 {
-  impl_mem_set<T, IsPOD<T>()>::Do(Num, Destination, Move(Value));
+  return ::MemAreOverlapping(NumA * SizeOf<TA>(), Reinterpret<void const*>(A),
+                             NumB * SizeOf<TB>(), Reinterpret<void const*>(B));
 }
 
 
 //
-// Typed Default Construction
+// Implementation Details
 //
 
-template<typename T, bool IsPOD = false>
-struct impl_mem_default_construct
-{
-  static void Do(size_t Num, T* Elements)
-  {
-    for(size_t Index = 0; Index < Num; ++Index)
-    {
-      new (Elements + Index) T;
-    }
-  }
-};
+// MemConstruct
 
-template<typename T>
-struct impl_mem_default_construct<T, true>
-{
-  static void Do(size_t Num, T* Elements)
-  {
-    MemSetBytes(Num * sizeof(T), Elements, 0);
-  }
-};
-
-template<typename T>
-constexpr void
-MemDefaultConstruct(size_t Num, T* Elements)
-{
-  impl_mem_default_construct<T, IsPOD<T>()>::Do(Num, Elements);
-}
-
-//
-// Typed Construction With Arguments
-//
-
-template<typename T, bool IsPOD = false>
+template<typename T, bool TIsPlainOldData = false>
 struct impl_mem_construct
 {
   template<typename... ArgTypes>
-  static void Do(T* Ptr, size_t Num, ArgTypes&&... Args)
+  inline static void
+  Do(size_t Num, T* Destination, ArgTypes&&... Args)
   {
     for(size_t Index = 0; Index < Num; ++Index)
     {
-      new (Ptr + Index) T(Forward<ArgTypes>(Args)...);
+      new (&Destination[Index]) T(Forward<ArgTypes>(Args)...);
     }
   }
 };
@@ -816,31 +806,43 @@ struct impl_mem_construct
 template<typename T>
 struct impl_mem_construct<T, true>
 {
-  static void Do(size_t Num, T* Ptr, T Value)
+  inline static void
+  Do(size_t Num, T* Destination)
   {
-    MemSet(Num, Ptr, Move(Value));
+    MemSetBytes(Num * SizeOf<T>(), Destination, 0);
+  }
+
+  inline static void
+  Do(size_t Num, T* Destination, T const& Item)
+  {
+    // Blit Item over each element of Destination.
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      MemCopyBytes(SizeOf<T>(), &Destination[Index], &Item);
+    }
   }
 };
 
 template<typename T, typename... ArgTypes>
-constexpr void
-MemConstruct(size_t Num, T* Elements, ArgTypes&&... Args)
+inline auto
+MemConstruct(size_t Num, T* Destination, ArgTypes&&... Args)
+  -> void
 {
-  impl_mem_construct<T, IsPOD<T>()>::Do(Num, Elements, Forward<ArgTypes>(Args)...);
+  impl_mem_construct<T, IsPOD<T>()>::Do(Num, Destination, Forward<ArgTypes>(Args)...);
 }
 
-//
-// Typed Destruction
-//
 
-template<typename T, bool IsPOD = false>
+// MemDestruct
+
+template<typename T, bool TIsPlainOldData = false>
 struct impl_mem_destruct
 {
-  static void Do(size_t Num, T* Elements)
+  inline static void
+  Do(size_t Num, T* Destination)
   {
     for(size_t Index = 0; Index < Num; ++Index)
     {
-      Elements[Index].~T();
+      Destination[Index].~T();
     }
   }
 };
@@ -848,22 +850,269 @@ struct impl_mem_destruct
 template<typename T>
 struct impl_mem_destruct<T, true>
 {
-  static void Do(size_t Num, T* Elements)
+  inline static void
+  Do(size_t Num, T* Destination)
   {
-    // Nothing to do for PODs
+    // Nothing to do for POD types.
   }
 };
 
 template<typename T>
-constexpr void
-MemDestruct(size_t Num, T* Elements)
+inline auto
+MemDestruct(size_t Num, T* Destination)
+  -> void
 {
-  impl_mem_destruct<T, IsPOD<T>()>::Do(Num, Elements);
+  impl_mem_destruct<T, IsPOD<T>()>::Do(Num, Destination);
 }
 
+
+// MemCopy
+
+template<typename T, bool TIsPlainOldData = false>
+struct impl_mem_copy
+{
+  inline static void
+  Do(size_t Num, T* Destination, T const* Source)
+  {
+    if(Destination == Source)
+      return;
+
+    if(MemAreOverlapping(Num, Destination, Num, Source) && Destination < Source)
+    {
+      // Copy backwards.
+      for(size_t Index = Num; Index > 0;)
+      {
+        --Index;
+        Destination[Index] = Source[Index];
+      }
+    }
+    else
+    {
+      // Copy forwards.
+      for(size_t Index = 0; Index < Num; ++Index)
+      {
+        Destination[Index] = Source[Index];
+      }
+    }
+  }
+};
+
+template<typename T>
+struct impl_mem_copy<T, true>
+{
+  inline static void
+  Do(size_t Num, T* Destination, T const* Source)
+  {
+    MemCopyBytes(SizeOf<T>() * Num, Destination, Source);
+  }
+};
+
+template<typename T>
+inline auto
+MemCopy(size_t Num, T* Destination, T const* Source)
+  -> void
+{
+  impl_mem_copy<T, IsPOD<T>()>::Do(Num, Destination, Source);
+}
+
+
+// MemCopyConstruct
+
+template<typename T, bool TIsPlainOldData = false>
+struct impl_mem_copy_construct
+{
+  inline static void
+  Do(size_t Num, T* Destination, T const* Source)
+  {
+    // When using the constructor, overlapping is not allowed.
+    Assert(!MemAreOverlapping(Num, Destination, Num, Source));
+
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      new (&Destination[Index]) T(Source[Index]);
+    }
+  }
+};
+
+template<typename T>
+struct impl_mem_copy_construct<T, true>
+{
+  inline static void
+  Do(size_t Num, T* Destination, T const* Source)
+  {
+    // When using the constructor, overlapping is not allowed. Even though in
+    // the POD case here it doesn't make a difference, it might help to catch
+    // bugs since this can't be intentional.
+    Assert(!MemAreOverlapping(Num, Destination, Num, Source));
+
+    MemCopy(Num, Destination, Source);
+  }
+};
+
+template<typename T>
+inline auto
+MemCopyConstruct(size_t Num, T* Destination, T const* Source)
+  -> void
+{
+  impl_mem_copy_construct<T, IsPOD<T>()>::Do(Num, Destination, Source);
+}
+
+
+// MemMove
+
+template<typename T, bool TIsPlainOldData = false>
+struct impl_mem_move
+{
+  inline static void
+  Do(size_t Num, T* Destination, T* Source)
+  {
+    if(Destination == Source)
+      return;
+
+    if(MemAreOverlapping(Num, Destination, Num, Source))
+    {
+      if(Destination < Source)
+      {
+        // Move forward
+        for(size_t Index = 0; Index < Num; ++Index)
+        {
+          Destination[Index] = Move(Source[Index]);
+        }
+
+        // Destroy the remaining elements in the back.
+        size_t const NumToDestruct = Source - Destination;
+        MemDestruct(NumToDestruct, MemAddOffset(Source, Num - NumToDestruct));
+      }
+      else
+      {
+        // Move backward
+        for(size_t Index = Num; Index > 0;)
+        {
+          --Index;
+          Destination[Index] = Move(Source[Index]);
+        }
+
+        // Destroy the remaining elements in the front.
+        size_t const NumToDestruct = Destination - Source;
+        MemDestruct(NumToDestruct, Source);
+      }
+    }
+    else
+    {
+      // Straight forward: Move one by one, then destruct all in Source.
+      for(size_t Index = 0; Index < Num; ++Index)
+      {
+        Destination[Index] = Move(Source[Index]);
+      }
+      MemDestruct(Num, Source);
+    }
+  }
+};
+
+template<typename T>
+struct impl_mem_move<T, true> : public impl_mem_copy<T, true> {};
+
+template<typename T>
+inline auto
+MemMove(size_t Num, T* Destination, T* Source)
+  -> void
+{
+  impl_mem_move<T, IsPOD<T>()>::Do(Num, Destination, Source);
+}
+
+
+// MemMoveConstruct
+
+template<typename T, bool TIsPlainOldData = false>
+struct impl_mem_move_construct
+{
+  inline static void
+  Do(size_t Num, T* Destination, T* Source)
+  {
+    // When using the constructor, overlapping is not allowed.
+    Assert(!MemAreOverlapping(Num, Destination, Num, Source));
+
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      new (&Destination[Index]) T(Move(Source[Index]));
+    }
+    MemDestruct(Num, Source);
+  }
+};
+
+template<typename T>
+struct impl_mem_move_construct<T, true>
+{
+  inline static void
+  Do(size_t Num, T* Destination, T const* Source)
+  {
+    // When using the constructor, overlapping is not allowed. Even though in
+    // the POD case here it doesn't make a difference, it might help to catch
+    // bugs since this can't be intentional.
+    Assert(!MemAreOverlapping(Num, Destination, Num, Source));
+
+    MemCopy(Num, Destination, Source);
+  }
+};
+
+template<typename T>
+inline auto
+MemMoveConstruct(size_t Num, T* Destination, T* Source)
+  -> void
+{
+  impl_mem_move_construct<T, IsPOD<T>()>::Do(Num, Destination, Source);
+}
+
+
+// MemSet
+
+template<typename T, bool TIsPlainOldData = false>
+struct impl_mem_set
+{
+  inline static void
+  Do(size_t Num, T* Destination)
+  {
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      Destination[Index] = {};
+    }
+  }
+
+  inline static void
+  Do(size_t Num, T* Destination, T const& Item)
+  {
+    for(size_t Index = 0; Index < Num; ++Index)
+    {
+      Destination[Index] = Item;
+    }
+  }
+};
+
+template<typename T>
+struct impl_mem_set<T, true> : public impl_mem_construct<T, true> {};
+
+template<typename T>
+inline auto
+MemSet(size_t Num, T* Destination)
+  -> void
+{
+  impl_mem_set<T, IsPOD<T>()>::Do(Num, Destination);
+}
+
+template<typename T>
+inline auto
+MemSet(size_t Num, T* Destination, T const& Item)
+  -> void
+{
+  impl_mem_set<T, IsPOD<T>()>::Do(Num, Destination, Item);
+}
+
+/// @}
 // ==================================
 // === Source: Backbone/Slice.hpp ===
 // ==================================
+
+RESERVE_PREFIX(Slice);
 
 constexpr size_t INVALID_INDEX = (size_t)-1;
 
@@ -880,14 +1129,14 @@ struct slice
   /// A slice is considered valid if it does not point to null and contains at
   /// least one element. If `Num` is 0 or `Ptr` is `nullptr`, the slice is
   /// considered invalid (`false`).
-  operator bool() const { return Num && Ptr; }
+  inline operator bool() const { return Num && Ptr; }
 
   /// Implicit conversion to const version.
-  operator slice<ElementType const>() const { return { Num, Ptr }; }
+  inline operator slice<ElementType const>() const { return { Num, Ptr }; }
 
   /// Index operator to access elements of the slice.
   template<typename IndexType>
-  auto
+  inline auto
   operator[](IndexType Index) const
     -> decltype(Ptr[Index])
   {
@@ -908,7 +1157,7 @@ struct slice<void const>
   ///
   /// A slice is considered valid if it does not point to null and contains at
   /// least one element.
-  operator bool() const { return Num && Ptr; }
+  inline operator bool() const { return Num && Ptr; }
 };
 
 template<>
@@ -923,10 +1172,10 @@ struct slice<void>
   ///
   /// A slice is considered valid if it does not point to null and contains at
   /// least one element.
-  operator bool() const { return Num && Ptr; }
+  inline operator bool() const { return Num && Ptr; }
 
   /// Implicit conversion to const version.
-  operator slice<void const>() const { return { Num, Ptr }; }
+  inline operator slice<void const>() const { return { Num, Ptr }; }
 };
 
 template<typename T>
@@ -1013,7 +1262,6 @@ constexpr slice<ElementType>
 SliceUnion(slice<ElementType> SliceA, slice<ElementType> SliceB)
 {
   // A union only makes sense when both slices are overlapping.
-  Assert(SlicesAreOverlapping(SliceA, SliceB));
   return { Min(First(SliceA), First(SliceB)), Max(OnePastLast(SliceA), OnePastLast(SliceB)) };
 }
 
@@ -1137,70 +1385,61 @@ SliceTrimBack(slice<ElementType> SomeSlice, AmountType Amount)
   };
 }
 
-/// Copies the contents of one slice into another.
-///
-/// If the number of elements don't match, the minimum of both is used.
-template<typename T>
-size_t
-SliceCopy(slice<T> Target, slice<T const> Source)
+template<typename T, typename... ArgTypes>
+inline void
+SliceConstruct(slice<T> Destination, ArgTypes&&... Args)
 {
-  size_t Amount = Min(Target.Num, Source.Num);
-  MemCopy(Amount, Target.Ptr, Source.Ptr);
-  return Amount;
-}
-
-/// Set each element of Target to Value.
-template<typename T>
-void
-SliceSet(slice<T> Target, T const Value)
-{
-  MemSet(Target.Num, Target.Ptr, Forward<T const>(Value));
+  MemConstruct(Destination.Num, Destination.Ptr, Forward<ArgTypes>(Args)...);
 }
 
 template<typename T>
-size_t
-SliceMove(slice<T> Target, slice<T const> Source)
+inline void
+SliceDestruct(slice<T> Destination)
 {
-  // TODO Optimize for PODs
+  MemDestruct(Destination.Num, Destination.Ptr);
+}
 
-  size_t Amount = Min(Target.Num, Source.Num);
-  for(size_t Index = 0; Index < Amount; ++Index)
-  {
-    Target.Ptr[Index] = Move(Source.Ptr[Index]);
-  }
+template<typename T>
+inline size_t
+SliceCopy(slice<T> Destination, slice<T const> Source)
+{
+  size_t const Amount = Min(Destination.Num, Source.Num);
+  MemCopy(Amount, Destination.Ptr, Source.Ptr);
   return Amount;
 }
 
 template<typename T>
-void
-SliceDefaultConstruct(slice<T> Target)
+inline size_t
+SliceCopyConstruct(slice<T> Destination, slice<T const> Source)
 {
-  MemDefaultConstruct(Target.Num, Target.Ptr);
-}
-
-template<typename T>
-size_t
-SliceCopyConstruct(slice<T> Target, slice<T const> Source)
-{
-  size_t Amount = Min(Target.Num, Source.Num);
-  MemCopy(Amount, Target.Ptr, SourcePtr);
+  size_t const Amount = Min(Destination.Num, Source.Num);
+  MemCopyConstruct(Amount, Destination.Ptr, Source.Ptr);
   return Amount;
 }
 
 template<typename T>
-size_t
-SliceMoveConstruct(slice<T> Target, slice<T const> Source)
+inline size_t
+SliceMove(slice<T> Destination, slice<T> Source)
 {
-  size_t Amount = Min(Target.Num, Source.Num);
-  MemMove(Amount, Target.Ptr, SourcePtr);
+  size_t const Amount = Min(Destination.Num, Source.Num);
+  MemMove(Amount, Destination.Ptr, Source.Ptr);
   return Amount;
 }
 
 template<typename T>
-void
-SliceDestruct(slice<T> Target)
+inline size_t
+SliceMoveConstruct(slice<T> Destination, slice<T> Source)
 {
-  MemDestruct(Target.Num, Target.Ptr);
+  size_t const Amount = Min(Destination.Num, Source.Num);
+  MemMoveConstruct(Amount, Destination.Ptr, Source.Ptr);
+  return Amount;
+}
+
+template<typename T, typename U>
+inline void
+SliceSet(slice<T> Destination, U&& Item)
+{
+  MemSet(Destination.Num, Destination.Ptr, Forward<U>(Item));
 }
 
 template<typename T, typename NeedleType>

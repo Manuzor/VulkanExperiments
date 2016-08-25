@@ -30,14 +30,14 @@ auto
 Init(spirv_shader& SpirvShader, allocator_interface* Allocator)
   -> void
 {
-  Init(&SpirvShader.Code, Allocator);
+  SpirvShader.Code.Allocator = Allocator;
 }
 
 auto
 Finalize(spirv_shader& SpirvShader)
   -> void
 {
-  Finalize(&SpirvShader.Code);
+  Reset(SpirvShader.Code);
 }
 
 int GlobalShaderCompilerCount = 0;
@@ -108,12 +108,12 @@ namespace
 
   struct buffer : public declaration
   {
-    dynamic_array<declaration> InnerDeclarations = {};
+    array<declaration> InnerDeclarations{};
   };
 }
 
 static void
-GetDeclarations(cfg_node const* FirstSibling, dynamic_array<declaration>* OutDeclarations)
+GetDeclarations(cfg_node const* FirstSibling, array<declaration>& OutDeclarations)
 {
   auto Node = FirstSibling;
   while(Node)
@@ -148,7 +148,7 @@ GetDeclarations(cfg_node const* FirstSibling, dynamic_array<declaration>* OutDec
     // TODO: What to do with the other values?
     Declaration.Identifier = Convert<slice<char const>>(Node->Values[0]);
 
-    for(auto& Attribute : Slice(&Node->Attributes))
+    for(auto& Attribute : Slice(Node->Attributes))
     {
       if(Attribute.Name == "Location"_S)
       {
@@ -163,12 +163,12 @@ GetDeclarations(cfg_node const* FirstSibling, dynamic_array<declaration>* OutDec
 static void
 GetShaderData(cfg_node const* ShaderNode,
               allocator_interface* Allocator,
-              dynamic_array<declaration>* MiscGlobals,        // Out
-              dynamic_array<buffer>* Buffers,                 // Out
-              dynamic_array<declaration>* InputDeclarations,  // Out
-              dynamic_array<declaration>* OutputDeclarations, // Out
-              arc_string* EntryPoint,                         // Out
-              dynamic_array<slice<char const>>* Code)         // Out
+              array<declaration>& MiscGlobals,        // Out
+              array<buffer>& Buffers,                 // Out
+              array<declaration>& InputDeclarations,  // Out
+              array<declaration>& OutputDeclarations, // Out
+              arc_string* EntryPoint,                 // Out
+              array<slice<char const>>& Code)         // Out
 {
   if(ShaderNode->FirstChild == nullptr)
     return;
@@ -195,13 +195,13 @@ GetShaderData(cfg_node const* ShaderNode,
           continue;
         }
 
-        for(auto& Line : Slice(&LineNode->Values))
+        for(auto& Line : Slice(LineNode->Values))
         {
           Expand(Code) = Convert<slice<char const>>(Line);
         }
       }
 
-      for(auto& Attribute : Slice(&Node->Attributes))
+      for(auto& Attribute : Slice(Node->Attributes))
       {
         if(Attribute.Name == "Entry"_S)
         {
@@ -224,7 +224,7 @@ GetShaderData(cfg_node const* ShaderNode,
 
         Buffer.Identifier = Convert<slice<char const>>(Node->Values[0]);
 
-        for(auto& Attribute : Slice(&Node->Attributes))
+        for(auto& Attribute : Slice(Node->Attributes))
         {
           if(Attribute.Name == "Binding"_S)
           {
@@ -232,8 +232,8 @@ GetShaderData(cfg_node const* ShaderNode,
           }
         }
 
-        Init(&Buffer.InnerDeclarations, Allocator);
-        GetDeclarations(Node->FirstChild, &Buffer.InnerDeclarations);
+        Buffer.InnerDeclarations.Allocator = Allocator;
+        GetDeclarations(Node->FirstChild, Buffer.InnerDeclarations);
     }
     else if(Node->Name == "sampler2D"_S)
     {
@@ -249,7 +249,7 @@ GetShaderData(cfg_node const* ShaderNode,
 
       Sampler2D.Identifier = Convert<slice<char const>>(Node->Values[0]);
 
-      for(auto& Attribute : Slice(&Node->Attributes))
+      for(auto& Attribute : Slice(Node->Attributes))
       {
         if(Attribute.Name == "Binding"_S)
         {
@@ -330,28 +330,21 @@ auto
   StrClear(GlslShader->EntryPoint);
   StrClear(GlslShader->Code);
 
-  scoped_array<declaration> MiscGlobals{ Allocator };
-  scoped_array<declaration> InputDeclarations{ Allocator };
-  scoped_array<declaration> OutputDeclarations{ Allocator };
+  array<declaration> MiscGlobals{ Allocator };
+  array<declaration> InputDeclarations{ Allocator };
+  array<declaration> OutputDeclarations{ Allocator };
   slice<char const> EntryPoint{};
-  scoped_array<slice<char const>> ExtraCode{ Allocator };
-  scoped_array<buffer> Buffers{ Allocator };
-  Defer [&Buffers]()
-  {
-    for(auto& Buffer : Slice(&Buffers))
-    {
-      Finalize(&Buffer.InnerDeclarations);
-    }
-  };
+  array<slice<char const>> ExtraCode{ Allocator };
+  array<buffer> Buffers{ Allocator };
 
   GetShaderData(ShaderRoot,
                 Allocator,
-                &MiscGlobals,
-                &Buffers,
-                &InputDeclarations,
-                &OutputDeclarations,
+                MiscGlobals,
+                Buffers,
+                InputDeclarations,
+                OutputDeclarations,
                 &GlslShader->EntryPoint,
-                &ExtraCode);
+                ExtraCode);
 
   // TODO: Support reading #version and #extension values from cfg?
   // Add default version and extensions.
@@ -362,7 +355,7 @@ auto
   if(MiscGlobals.Num > 0)
   {
     GlslShader->Code += "\n";
-    for(auto& Decl : Slice(&MiscGlobals))
+    for(auto& Decl : Slice(MiscGlobals))
     {
       WriteDeclaration("uniform"_S, Decl, GlslShader->Code, true);
     }
@@ -375,12 +368,12 @@ auto
                         "//\n"
                         "// Buffers\n"
                         "//\n";
-    for(auto& Buffer : Slice(&Buffers))
+    for(auto& Buffer : Slice(Buffers))
     {
       WriteDeclaration({}, Buffer, GlslShader->Code, true, false);
 
       GlslShader->Code += "{\n";
-      for(auto& Decl : Slice(&Buffer.InnerDeclarations))
+      for(auto& Decl : Slice(Buffer.InnerDeclarations))
       {
         if(Decl.Location != -1)
         {
@@ -407,7 +400,7 @@ auto
                         "// Input\n"
                         "//\n";
 
-    for(auto& Decl : Slice(&InputDeclarations))
+    for(auto& Decl : Slice(InputDeclarations))
     {
       WriteDeclaration("in"_S, Decl, GlslShader->Code, true);
     }
@@ -421,7 +414,7 @@ auto
                         "// Output\n"
                         "//\n";
 
-    for(auto& Decl : Slice(&OutputDeclarations))
+    for(auto& Decl : Slice(OutputDeclarations))
     {
       WriteDeclaration("out"_S, Decl, GlslShader->Code, true);
     }
@@ -435,7 +428,7 @@ auto
                         "// Code\n"
                         "//\n";
 
-    for(auto& Line : Slice(&ExtraCode))
+    for(auto& Line : Slice(ExtraCode))
     {
       GlslShader->Code += Line;
       GlslShader->Code += "\n";
@@ -534,8 +527,8 @@ auto
       }
 
       // Copy over the result.
-      SetNum(&SpirvShader->Code, SpirvCodeVector.size());
-      SliceCopy(Slice(&SpirvShader->Code),
+      SetNum(SpirvShader->Code, SpirvCodeVector.size());
+      SliceCopy(Slice(SpirvShader->Code),
                 AsConst(Slice(SpirvCodeVector.size(), SpirvCodeVector.data())));
     }
   }

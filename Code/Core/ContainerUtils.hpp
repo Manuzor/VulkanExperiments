@@ -30,7 +30,7 @@ ContainerReserve(allocator_interface* Allocator,
   Assert(NewAllocatedMemory.Num == BytesToReserve);
 
   // Move from the old memory.
-  SliceMove(NewUsedMemory, AsConst(OldUsedMemory));
+  SliceMoveConstruct(NewUsedMemory, OldUsedMemory);
 
   // Destruct and free the old memory.
   SliceDestruct(OldUsedMemory);
@@ -39,22 +39,22 @@ ContainerReserve(allocator_interface* Allocator,
   return NewAllocatedMemory;
 }
 
-/// \return The updated slice (for convenience).
+/// \return The updated slice.
 template<typename T>
 slice<T>
 ContainerRemoveAt(slice<T> Data, size_t Index, size_t CountToRemove = 1)
 {
-  BoundsCheck(CountToRemove >= 0);
-  BoundsCheck(Index >= 0);
+  if(CountToRemove == 0)
+    return {};
+
   BoundsCheck(Index + CountToRemove <= Data.Num);
 
-  const size_t EndIndex = Index + CountToRemove;
-  auto Hole = Slice(Data, Index, EndIndex);
-  SliceDestruct(Hole);
+  // Move the entire remaining chunk in the back forward to remove the requests data.
+  // SliceMove will take care of destructing the leftovers.
+  auto DataToMove = Slice(Data, Index + CountToRemove, Data.Num);
+  auto DataToOverwrite = Slice(Data, Index, Data.Num - CountToRemove);
+  SliceMove(DataToOverwrite, DataToMove);
 
-  auto From = Slice(Data, EndIndex, Data.Num);
-  auto To   = Slice(Data, Index, Data.Num - CountToRemove);
-  SliceMove(To, AsConst(From));
   Data.Num -= CountToRemove;
 
   return Data;

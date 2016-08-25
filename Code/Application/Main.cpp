@@ -1,6 +1,6 @@
 #include "VulkanHelper.hpp"
 
-#include <Core/DynamicArray.hpp>
+#include <Core/Array.hpp>
 #include <Core/Log.hpp>
 #include <Core/Input.hpp>
 #include <Core/Win32_Input.hpp>
@@ -172,20 +172,20 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
   //
   // Instance Layers
   //
-  scoped_array<char const*> LayerNames{ Allocator };
+  array<char const*> LayerNames{ Allocator };
   {
-    scoped_array<char const*> DesiredLayerNames{ Allocator };
+    array<char const*> DesiredLayerNames{ Allocator };
 
     if(EnableValidation == vulkan_enable_validation::Yes)
     {
-      Expand(&DesiredLayerNames) = "VK_LAYER_LUNARG_standard_validation";
+      DesiredLayerNames += "VK_LAYER_LUNARG_standard_validation";
     }
 
     uint32 LayerCount;
     VulkanVerify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
 
-    scoped_array<VkLayerProperties> LayerProperties = { Allocator };
-    ExpandBy(&LayerProperties, LayerCount);
+    array<VkLayerProperties> LayerProperties{ Allocator };
+    ExpandBy(LayerProperties, LayerCount);
     VulkanVerify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, LayerProperties.Ptr));
 
     LogBeginScope("Explicitly enabled instance layers:");
@@ -194,16 +194,16 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
       // Check for its existance.
 
     }
-    for(auto& Property : Slice(&LayerProperties))
+    for(auto& Property : Slice(LayerProperties))
     {
       auto LayerName = SliceFromString(Property.layerName);
       bool WasAdded = false;
 
-      for(auto DesiredLayerName : Slice(&DesiredLayerNames))
+      for(auto DesiredLayerName : Slice(DesiredLayerNames))
       {
         if(LayerName == SliceFromString(DesiredLayerName))
         {
-          Expand(&LayerNames) = DesiredLayerName;
+          LayerNames += DesiredLayerName;
           WasAdded = true;
           break;
         }
@@ -217,7 +217,7 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
   //
   // Instance Extensions
   //
-  scoped_array<char const*> ExtensionNames{ Allocator };
+  array<char const*> ExtensionNames{ Allocator };
   {
     // Required extensions:
     bool SurfaceExtensionFound = false;
@@ -226,29 +226,29 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
     uint32 ExtensionCount;
     VulkanVerify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
-    scoped_array<VkExtensionProperties> ExtensionProperties = { Allocator };
-    ExpandBy(&ExtensionProperties, ExtensionCount);
+    array<VkExtensionProperties> ExtensionProperties = { Allocator };
+    ExpandBy(ExtensionProperties, ExtensionCount);
     VulkanVerify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, ExtensionProperties.Ptr));
 
     LogBeginScope("Explicitly enabled instance extensions:");
     Defer [](){ LogEndScope("=========="); };
 
-    for(auto& Property : Slice(&ExtensionProperties))
+    for(auto& Property : Slice(ExtensionProperties))
     {
       auto ExtensionName = SliceFromString(Property.extensionName);
       if(ExtensionName == SliceFromString(VK_KHR_SURFACE_EXTENSION_NAME))
       {
-        Expand(&ExtensionNames) = VK_KHR_SURFACE_EXTENSION_NAME;
+        ExtensionNames += VK_KHR_SURFACE_EXTENSION_NAME;
         SurfaceExtensionFound = true;
       }
       else if(ExtensionName == SliceFromString(VK_KHR_WIN32_SURFACE_EXTENSION_NAME))
       {
-        Expand(&ExtensionNames) = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
+        ExtensionNames += VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
         PlatformSurfaceExtensionFound = true;
       }
       else if(ExtensionName == SliceFromString(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
       {
-        Expand(&ExtensionNames) = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+        ExtensionNames += VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
       }
       else
       {
@@ -401,8 +401,8 @@ VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAll
 
   LogInfo("Found %u physical device(s).", GpuCount);
 
-  scoped_array<VkPhysicalDevice> Gpus{ TempAllocator };
-  ExpandBy(&Gpus, GpuCount);
+  array<VkPhysicalDevice> Gpus{ TempAllocator };
+  ExpandBy(Gpus, GpuCount);
 
   VulkanVerify(Vulkan->vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
                                             &GpuCount, Gpus.Ptr));
@@ -424,7 +424,7 @@ VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAll
 
     uint32 QueueCount;
     Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, nullptr);
-    SetNum(&Vulkan->Gpu.QueueProperties, QueueCount);
+    SetNum(Vulkan->Gpu.QueueProperties, QueueCount);
     Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, Vulkan->Gpu.QueueProperties.Ptr);
   }
 
@@ -444,7 +444,7 @@ VulkanInitializeGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHan
     //
     // Device Extensions
     //
-    scoped_array<char const*> ExtensionNames(TempAllocator);
+    array<char const*> ExtensionNames(TempAllocator);
     {
       // Required extensions:
       bool SwapchainExtensionFound = {};
@@ -452,18 +452,18 @@ VulkanInitializeGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHan
       uint ExtensionCount;
       VulkanVerify(Vulkan->vkEnumerateDeviceExtensionProperties(Vulkan->Gpu.GpuHandle, nullptr, &ExtensionCount, nullptr));
 
-      scoped_array<VkExtensionProperties> ExtensionProperties(TempAllocator);
-      ExpandBy(&ExtensionProperties, ExtensionCount);
+      array<VkExtensionProperties> ExtensionProperties(TempAllocator);
+      ExpandBy(ExtensionProperties, ExtensionCount);
       VulkanVerify(Vulkan->vkEnumerateDeviceExtensionProperties(Vulkan->Gpu.GpuHandle, nullptr, &ExtensionCount, ExtensionProperties.Ptr));
 
       LogBeginScope("Explicitly enabled device extensions:");
       Defer [](){ LogEndScope("=========="); };
-      for(auto& Property : Slice(&ExtensionProperties))
+      for(auto& Property : Slice(ExtensionProperties))
       {
         auto ExtensionName = Property.extensionName;
         if(SliceFromString(ExtensionName) == SliceFromString(VK_KHR_SWAPCHAIN_EXTENSION_NAME))
         {
-          Expand(&ExtensionNames) = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+          ExtensionNames += VK_KHR_SWAPCHAIN_EXTENSION_NAME;
           SwapchainExtensionFound = true;
         }
         else
@@ -680,8 +680,8 @@ ImplVulkanCreateGraphicsPipeline(vulkan* Vulkan,
   Defer [](){ LogEndScope("Finished creating graphics pipeline."); };
 
   auto const MaxNumShaderStages = (Cast<size_t>(shader_stage::Fragment) - Cast<size_t>(shader_stage::Vertex)) + 1;
-  scoped_array<VkPipelineShaderStageCreateInfo> PipelineShaderStageInfos{ Allocator };
-  Reserve(&PipelineShaderStageInfos, MaxNumShaderStages);
+  array<VkPipelineShaderStageCreateInfo> PipelineShaderStageInfos{ Allocator };
+  Reserve(PipelineShaderStageInfos, MaxNumShaderStages);
 
   for(size_t StageIndex = 0; StageIndex < MaxNumShaderStages; ++StageIndex)
   {
@@ -689,7 +689,7 @@ ImplVulkanCreateGraphicsPipeline(vulkan* Vulkan,
     if(!HasShaderStage(CompiledShader, Stage))
       continue;
 
-    auto& StageInfo = Expand(&PipelineShaderStageInfos);
+    auto& StageInfo = Expand(PipelineShaderStageInfos);
     StageInfo = InitStruct<VkPipelineShaderStageCreateInfo>();
     StageInfo.stage = ShaderStageToVulkan(Stage);
     StageInfo.pName = StrPtr(GetGlslShader(CompiledShader, Stage)->EntryPoint);
@@ -698,7 +698,7 @@ ImplVulkanCreateGraphicsPipeline(vulkan* Vulkan,
     Assert(SpirvShader);
 
     auto ShaderModuleCreateInfo = InitStruct<VkShaderModuleCreateInfo>();
-    ShaderModuleCreateInfo.codeSize = SliceByteSize(Slice(&SpirvShader->Code)); // In bytes, regardless of the fact that decltype(*pCode) == uint.
+    ShaderModuleCreateInfo.codeSize = SliceByteSize(Slice(SpirvShader->Code)); // In bytes, regardless of the fact that decltype(*pCode) == uint.
     ShaderModuleCreateInfo.pCode = SpirvShader->Code.Ptr;
 
     VulkanVerify(Device.vkCreateShaderModule(DeviceHandle, &ShaderModuleCreateInfo, nullptr, &StageInfo.module));
@@ -707,7 +707,7 @@ ImplVulkanCreateGraphicsPipeline(vulkan* Vulkan,
   // Note(Manu): Can safely destroy the shader modules on our side once the pipeline was created.
   Defer [&]()
   {
-    for(auto& StageInfo : Slice(&PipelineShaderStageInfos))
+    for(auto& StageInfo : Slice(PipelineShaderStageInfos))
     {
       Device.vkDestroyShaderModule(DeviceHandle, StageInfo.module, nullptr);
     }
@@ -720,8 +720,8 @@ ImplVulkanCreateGraphicsPipeline(vulkan* Vulkan,
     VertexInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
   }
 
-  scoped_array<VkVertexInputAttributeDescription> VertexInputAttributeDescs{ Allocator };
-  GenerateVertexInputDescriptions(CompiledShader, VertexInputBinding, &VertexInputAttributeDescs);
+  array<VkVertexInputAttributeDescription> VertexInputAttributeDescs{ Allocator };
+  GenerateVertexInputDescriptions(CompiledShader, VertexInputBinding, VertexInputAttributeDescs);
 
   auto VertexInputState = InitStruct<VkPipelineVertexInputStateCreateInfo>();
   {
@@ -814,7 +814,7 @@ ImplVulkanPrepareRenderableFoo(vulkan* Vulkan, slice<char const> ShaderPath, vul
     LogBeginScope("Preparing descriptor set layout.");
     Defer [](){ LogEndScope("Finished preparing descriptor set layout."); };
 
-    scoped_array<VkDescriptorSetLayoutBinding> LayoutBindings{ Allocator };
+    array<VkDescriptorSetLayoutBinding> LayoutBindings{ Allocator };
 
     GetDescriptorSetLayoutBindings(Foo->Shader, &LayoutBindings);
 
@@ -985,10 +985,10 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     uint32 const MaxNumInstances = 50;
 
     // Now collect them in the proper structs.
-    scoped_array<VkDescriptorPoolSize> PoolSizes{ Allocator };
+    array<VkDescriptorPoolSize> PoolSizes{ Allocator };
     for(auto Key : Keys(&DescriptorCounts))
     {
-      auto& Size = Expand(&PoolSizes);
+      auto& Size = Expand(PoolSizes);
       Size.type = Key;
       Size.descriptorCount = MaxNumInstances * *Get(&DescriptorCounts, Key);
     }
@@ -1027,7 +1027,7 @@ static void VulkanCreateFramebuffers(vulkan* Vulkan)
     FramebufferCreateInfo.layers = 1;
   }
 
-  SetNum(&Vulkan->Framebuffers, Vulkan->Swapchain.ImageCount);
+  SetNum(Vulkan->Framebuffers, Vulkan->Swapchain.ImageCount);
 
   auto const ImageCount = Vulkan->Swapchain.ImageCount;
   for(uint32 Index = 0; Index < ImageCount; ++Index)
@@ -1061,11 +1061,11 @@ VulkanCleanupRenderPass(vulkan* Vulkan)
   auto const DeviceHandle = Device.DeviceHandle;
 
   // Framebuffers
-  for(auto Framebuffer : Slice(&Vulkan->Framebuffers))
+  for(auto Framebuffer : Slice(Vulkan->Framebuffers))
   {
     Device.vkDestroyFramebuffer(DeviceHandle, Framebuffer, nullptr);
   }
-  Clear(&Vulkan->Framebuffers);
+  Clear(Vulkan->Framebuffers);
 
   // UBOs
   Device.vkFreeMemory(DeviceHandle, Vulkan->SceneObjectGraphicsState.GlobalsUBO.MemoryHandle, nullptr);
@@ -1110,9 +1110,9 @@ VulkanCreateCommandBuffers(vulkan* Vulkan, VkCommandPool CommandPool, uint32 Num
     AllocateInfo.commandBufferCount = Num;
   }
 
-  SetNum(&Vulkan->DrawCommandBuffers, Num);
-  SetNum(&Vulkan->PrePresentCommandBuffers, Num);
-  SetNum(&Vulkan->PostPresentCommandBuffers, Num);
+  SetNum(Vulkan->DrawCommandBuffers, Num);
+  SetNum(Vulkan->PrePresentCommandBuffers, Num);
+  SetNum(Vulkan->PostPresentCommandBuffers, Num);
 
   VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->DrawCommandBuffers.Ptr));
   VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->PrePresentCommandBuffers.Ptr));
@@ -1128,9 +1128,9 @@ static void VulkanDestroyCommandBuffers(vulkan* Vulkan, VkCommandPool CommandPoo
   Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->PrePresentCommandBuffers.Num), Vulkan->PrePresentCommandBuffers.Ptr);
   Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->DrawCommandBuffers.Num), Vulkan->DrawCommandBuffers.Ptr);
 
-  Clear(&Vulkan->DrawCommandBuffers);
-  Clear(&Vulkan->PrePresentCommandBuffers);
-  Clear(&Vulkan->PostPresentCommandBuffers);
+  Clear(Vulkan->DrawCommandBuffers);
+  Clear(Vulkan->PrePresentCommandBuffers);
+  Clear(Vulkan->PostPresentCommandBuffers);
 }
 
 // TODO
@@ -1159,7 +1159,7 @@ VulkanDestroySwapchain(vulkan* Vulkan)
   Device.vkDestroyPipelineLayout(DeviceHandle, Vulkan->PipelineLayout, nullptr);
   Device.vkDestroyDescriptorSetLayout(DeviceHandle, Vulkan->DescriptorSetLayout, nullptr);
 
-  for(auto& SceneObject : Slice(&Vulkan->SceneObjects))
+  for(auto& SceneObject : Slice(Vulkan->SceneObjects))
   {
     VulkanDestroyAndDeallocateSceneObject(Vulkan, &SceneObject);
   }
@@ -1189,7 +1189,7 @@ VulkanCleanup(vulkan* Vulkan)
   Vulkan->vkDestroySurfaceKHR(Vulkan->InstanceHandle, Vulkan->Surface.SurfaceHandle, nullptr);
   Vulkan->vkDestroyInstance(Vulkan->InstanceHandle, nullptr);
 
-  Clear(&Vulkan->Gpu.QueueProperties);
+  Clear(Vulkan->Gpu.QueueProperties);
   #endif
 }
 
@@ -1299,7 +1299,7 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
       // Draw scene objects
       VkDeviceSize NoOffset = {};
 
-      for(auto Renderable : Slice(&Vulkan.Renderables))
+      for(auto Renderable : Slice(Vulkan.Renderables))
       {
         VulkanEnsureIsReadyForDrawing(&Vulkan, Renderable);
 
@@ -1586,7 +1586,7 @@ struct frame_time_stats
 
   sample MinSample{};
   sample MaxSample{};
-  scoped_array<sample> Samples;
+  array<sample> Samples;
 
   size_t MaxNumSamples{};
   size_t NumSamples{};
@@ -1605,7 +1605,7 @@ PrintFrameTimeStats(frame_time_stats const& FrameTimeStats, log_data* Log)
   frame_time_stats::sample MaxSample{};
   frame_time_stats::sample AverageSample{};
 
-  for(auto& Sample : Slice(&FrameTimeStats.Samples))
+  for(auto& Sample : Slice(FrameTimeStats.Samples))
   {
     AverageSample.CpuTime += Sample.CpuTime;
     AverageSample.GpuTime += Sample.GpuTime;
@@ -1649,7 +1649,7 @@ AddFrameTimeSample(frame_time_stats& Stats, frame_time_stats::sample Sample)
   auto const RequiredNumArrayElements = Stats.SampleIndex + 1;
   if(RequiredNumArrayElements > Stats.Samples.Num)
   {
-    ExpandBy(&Stats.Samples, RequiredNumArrayElements - Stats.Samples.Num);
+    ExpandBy(Stats.Samples, RequiredNumArrayElements - Stats.Samples.Num);
   }
 
   Stats.Samples[Stats.SampleIndex] = Sample;
@@ -1673,7 +1673,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
   Init(GlobalLog, Allocator);
   Defer [=](){ Finalize(GlobalLog); };
-  auto SinkSlots = ExpandBy(&GlobalLog->Sinks, 2);
+  auto SinkSlots = ExpandBy(GlobalLog->Sinks, 2);
   SinkSlots[0] = GetStdoutLogSink(stdout_log_sink_enable_prefixes::Yes);
   SinkSlots[1] = log_sink(VisualStudioLogSink);
 
@@ -1690,9 +1690,8 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
   }
 
   {
-    auto Vulkan = Allocate<vulkan>(Allocator);
-    *Vulkan = {};
-    Defer [=](){ Deallocate(Allocator, Vulkan); };
+    auto Vulkan = New<vulkan>(Allocator);
+    Defer [=](){ Delete(Allocator, Vulkan); };
 
     Init(Vulkan, Allocator);
     Defer [=](){ Finalize(Vulkan); };
@@ -2081,18 +2080,18 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     //
     {
       VulkanBuildDrawCommands(*Vulkan,
-                              Slice(&Vulkan->DrawCommandBuffers),
-                              Slice(&Vulkan->Framebuffers),
+                              Slice(Vulkan->DrawCommandBuffers),
+                              Slice(Vulkan->Framebuffers),
                               // color::CornflowerBlue,
                               color::Gray,
                               Vulkan->DepthStencilValue,
                               0);
       VulkanBuildPrePresentCommands(Vulkan->Device,
-                                    Slice(&Vulkan->PrePresentCommandBuffers),
-                                    Slice(&Vulkan->Swapchain.Images));
+                                    Slice(Vulkan->PrePresentCommandBuffers),
+                                    Slice(Vulkan->Swapchain.Images));
       VulkanBuildPostPresentCommands(Vulkan->Device,
-                                     Slice(&Vulkan->PostPresentCommandBuffers),
-                                     Slice(&Vulkan->Swapchain.Images));
+                                     Slice(Vulkan->PostPresentCommandBuffers),
+                                     Slice(Vulkan->Swapchain.Images));
     }
 
     //
@@ -2192,7 +2191,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         VulkanUploadShaderBufferData(Vulkan, Vulkan->SceneObjectsFoo.UboGlobals);
 
         // TODO: Don't do this every frame?
-        for(auto SceneObject : Slice(&Vulkan->SceneObjects))
+        for(auto SceneObject : Slice(Vulkan->SceneObjects))
         {
           SceneObject->UboModel.Data.ViewProjectionMatrix = Mat4x4(SceneObject->Transform) * ViewProjectionMatrix;
           VulkanUploadShaderBufferData(Vulkan, SceneObject->UboModel);

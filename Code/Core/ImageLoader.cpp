@@ -22,7 +22,7 @@ auto
   auto SzFileName = SliceAllocate<char>(Allocator, FileName.Num + 1);
   Defer [=](){ SliceDeallocate(Allocator, SzFileName); };
 
-  SliceCopy(SzFileName, FileName);
+  SliceCopyConstruct(SzFileName, FileName);
   SzFileName[SzFileName.Num - 1] = '\0';
 
   FILE* File = std::fopen(SzFileName.Ptr, "rb");
@@ -39,15 +39,15 @@ auto
   Defer [=](){ Allocator->Deallocate(BufferMemory); };
   auto Buffer = Slice(BufferMemorySize, Cast<char*>(BufferMemory));
 
-  scoped_array<char> Content(Allocator);
+  array<char> Content(Allocator);
   while(!std::feof(File))
   {
     const auto NumBytesRead = std::fread(Buffer.Ptr, 1, Buffer.Num, File);
-    auto NewSlice = ExpandBy(&Content, NumBytesRead);
+    auto NewSlice = ExpandBy(Content, NumBytesRead);
     SliceCopy(NewSlice, AsConst(Buffer));
   }
 
-  auto ContentSlice = Slice(&Content);
+  auto ContentSlice = Slice(Content);
   auto RawContentSlice = SliceReinterpret<void const>(ContentSlice);
   return Loader->LoadImageFromData(AsConst(RawContentSlice), Image);
 }
@@ -74,7 +74,7 @@ struct image_loader_module
 struct image_loader_registry
 {
   allocator_interface* Allocator;
-  dynamic_array<image_loader_module*> Modules;
+  array<image_loader_module*> Modules;
 };
 
 auto
@@ -82,9 +82,9 @@ CreateImageLoaderRegistry(allocator_interface* Allocator)
   -> image_loader_registry*
 {
   auto Registry = Allocate<image_loader_registry>(Allocator);
-  *Registry = {};
+  MemConstruct(1, Registry);
   Registry->Allocator = Allocator;
-  Init(&Registry->Modules, Allocator);
+  Registry->Modules.Allocator = Allocator;
 
   return Registry;
 }
@@ -93,7 +93,7 @@ auto
 DestroyImageLoaderRegistry(allocator_interface* Allocator, image_loader_registry* Registry)
   -> void
 {
-  Finalize(&Registry->Modules);
+  MemDestruct(1, Registry);
   Deallocate(Allocator, Registry);
 }
 
@@ -105,7 +105,7 @@ RegisterImageLoaderModule(image_loader_registry* Registry,
                           slice<char const> NameOfDestroyLoader)
   -> image_loader_module*
 {
-  for(auto Module : Slice(&Registry->Modules))
+  for(auto Module : Slice(Registry->Modules))
   {
     if(Slice(Module->Alias) == Alias)
     {
@@ -115,14 +115,14 @@ RegisterImageLoaderModule(image_loader_registry* Registry,
   }
 
   auto NewModule = Allocate<image_loader_module>(Registry->Allocator);
-  MemDefaultConstruct(1, NewModule);
+  MemConstruct(1, NewModule);
   NewModule->Alias = Alias;
   NewModule->ModuleName = ModuleName;
   NewModule->NameOfCreateLoader = NameOfCreateLoader;
   NewModule->NameOfDestroyLoader = NameOfDestroyLoader;
   NewModule->Factory.Allocator = Registry->Allocator;
 
-  Expand(&Registry->Modules) = NewModule;
+  Registry->Modules += NewModule;
 
   return NewModule;
 }
@@ -131,7 +131,7 @@ auto
 GetImageLoaderModuleByName(image_loader_registry* Registry, slice<char const> ModuleName)
   -> image_loader_module*
 {
-  for(auto Module : Slice(&Registry->Modules))
+  for(auto Module : Slice(Registry->Modules))
   {
     if(Slice(Module->Alias) == ModuleName || Slice(Module->ModuleName) == ModuleName)
     {
@@ -176,7 +176,7 @@ GetImageLoaderFactoryByFileExtension(image_loader_registry* Registry, slice<char
   if(FileExtension[0] == '.')
     FileExtension = SliceTrimFront(FileExtension, 1);
 
-  for(auto Module : Slice(&Registry->Modules))
+  for(auto Module : Slice(Registry->Modules))
   {
     if(StrIsEmpty(Module->AssociatedFileExtension))
       continue;

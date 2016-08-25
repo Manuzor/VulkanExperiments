@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreAPI.hpp"
-#include "DynamicArray.hpp"
+#include "Array.hpp"
 #include "ImageHeader.hpp"
 
 #include <Backbone.hpp>
@@ -23,8 +23,8 @@ struct image : public image_header
     int DataOffset;
   };
 
-  dynamic_array<sub_image> InternalSubImages;
-  dynamic_array<uint8> Data;
+  array<sub_image> InternalSubImages;
+  array<uint8> Data;
 };
 
 CORE_API

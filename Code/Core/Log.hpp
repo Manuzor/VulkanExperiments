@@ -2,9 +2,11 @@
 
 #include "CoreAPI.hpp"
 #include "Allocator.hpp"
-#include "DynamicArray.hpp"
+#include "Array.hpp"
 
 #include <functional>
+
+// TODO: Use arc_string instead of array<char>, slice<char>, slice<char const>, char*, char const*.
 
 
 enum class log_level
@@ -26,11 +28,13 @@ struct CORE_API log_sink_args
 
 using log_sink = std::function<void(log_sink_args)>;
 
+CORE_TEMPLATE_EXPORT(struct, array<log_sink>);
+
 struct CORE_API log_data
 {
-  dynamic_array<char> MessageBuffer;
-  dynamic_array<char> TempBuffer;
-  dynamic_array<log_sink> Sinks;
+  array<char> MessageBuffer;
+  array<char> TempBuffer;
+  array<log_sink> Sinks;
   int Indentation;
 };
 

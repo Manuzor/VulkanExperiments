@@ -1,5 +1,5 @@
 #include <Backbone.hpp>
-#include <Core/DynamicArray.hpp>
+#include <Core/Array.hpp>
 #include <Core/Log.hpp>
 
 #include <Cfg/Cfg.hpp>
@@ -11,18 +11,11 @@
 
 
 static bool
-ReadFileContentIntoArray(slice<char const> FileName, dynamic_array<uint8>* Array)
+ReadFileContentIntoArray(arc_string FileName, array<uint8>& Array)
 {
   Clear(Array);
 
-
-  temp_allocator TempAllocator{};
-  allocator_interface* Allocator = *TempAllocator;
-  scoped_array<char> SzFileName{ Allocator };
-  SliceCopy(ExpandBy(&SzFileName, FileName.Num), FileName);
-  Expand(&SzFileName) = '\0';
-
-  auto File = std::fopen(SzFileName.Ptr, "rb");
+  auto File = std::fopen(StrPtr(FileName), "rb");
   if(File == nullptr)
     return false;
 
@@ -40,14 +33,14 @@ ReadFileContentIntoArray(slice<char const> FileName, dynamic_array<uint8>* Array
     {
       // Correct the internal array value in case we didn't exactly read a
       // ChunkSize worth of bytes last time.
-      Array->Num -= Delta;
+      Array.Num -= Delta;
 
       return true;
     }
 
     if(Delta > 0)
     {
-      LogError("Didn't reach the end of file but failed to read any more bytes: %s", SzFileName);
+      LogError("Didn't reach the end of file but failed to read any more bytes: %s", StrPtr(FileName));
       return false;
     }
   }
@@ -55,15 +48,9 @@ ReadFileContentIntoArray(slice<char const> FileName, dynamic_array<uint8>* Array
 
 template<typename T>
 bool
-WriteArrayContentToFile(slice<T> Content, slice<char const> FileName, size_t* NumBytesWritten = nullptr)
+WriteArrayContentToFile(slice<T> Content, arc_string FileName, size_t* NumBytesWritten = nullptr)
 {
-  temp_allocator TempAllocator{};
-  allocator_interface* Allocator = *TempAllocator;
-  scoped_array<char> SzFileName{ Allocator };
-  SliceCopy(ExpandBy(&SzFileName, FileName.Num), FileName);
-  Expand(&SzFileName) = '\0';
-
-  auto File = std::fopen(SzFileName.Ptr, "wb");
+  auto File = std::fopen(StrPtr(FileName), "wb");
   if(File == nullptr)
     return false;
 
@@ -220,7 +207,7 @@ main(int NumArgs, char const* Args[])
   Init(GlobalLog, Allocator);
   Defer [=](){ Finalize(GlobalLog); };
   {
-    auto DefaultSinkSlots = ExpandBy(&GlobalLog->Sinks, 2);
+    auto DefaultSinkSlots = ExpandBy(GlobalLog->Sinks, 2);
     DefaultSinkSlots[0] = GetStdoutLogSink(stdout_log_sink_enable_prefixes::No);
     DefaultSinkSlots[1] = log_sink(VisualStudioLogSink);
   }
@@ -233,8 +220,8 @@ main(int NumArgs, char const* Args[])
 
   auto const InputFilePath = Options.InputFilePath;
 
-  scoped_array<uint8> Content{ Allocator };
-  if(!ReadFileContentIntoArray(InputFilePath, &Content))
+  array<uint8> Content{ Allocator };
+  if(!ReadFileContentIntoArray(InputFilePath, Content))
   {
     LogError("Failed to read file: %*s", Convert<int>(InputFilePath.Num), InputFilePath.Ptr);
     LogUsage(GlobalLog);
@@ -249,7 +236,7 @@ main(int NumArgs, char const* Args[])
     // TODO: Supply the GlobalLog here as soon as the cfg parser code is more robust.
     cfg_parsing_context Context{ InputFilePath, nullptr };
 
-    if(!CfgDocumentParseFromString(&Document, SliceReinterpret<char const>(Slice(&Content)), &Context))
+    if(!CfgDocumentParseFromString(&Document, SliceReinterpret<char const>(Slice(Content)), &Context))
     {
       LogError("Failed to parse cfg.");
       return 3;
@@ -316,7 +303,7 @@ main(int NumArgs, char const* Args[])
       if(CompiledSpv && Options.VertexShaderOutFilePath.Spirv)
       {
         auto const FileName = Options.VertexShaderOutFilePath.Spirv;
-        if(!WriteArrayContentToFile(Slice(&SpirvVertexShader.Code), FileName))
+        if(!WriteArrayContentToFile(Slice(SpirvVertexShader.Code), FileName))
         {
           LogWarning("%*s: Failed to write spv vertex shader file.", Convert<int>(FileName.Num), FileName.Ptr);
         }
@@ -372,7 +359,7 @@ main(int NumArgs, char const* Args[])
       if(CompiledSpv && Options.FragmentShaderOutFilePath.Spirv)
       {
         auto const FileName = Options.FragmentShaderOutFilePath.Spirv;
-        if(!WriteArrayContentToFile(Slice(&SpirvFragmentShader.Code), FileName))
+        if(!WriteArrayContentToFile(Slice(SpirvFragmentShader.Code), FileName))
         {
           LogWarning("%*s: Failed to write spv fragment shader file.", Convert<int>(FileName.Num), FileName.Ptr);
         }

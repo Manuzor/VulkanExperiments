@@ -7,7 +7,7 @@
 #endif
 
 #include <Core/Allocator.hpp>
-#include <Core/DynamicArray.hpp>
+#include <Core/Array.hpp>
 #include <Core/string.hpp>
 
 #include <Cfg/Cfg.hpp>
@@ -40,7 +40,7 @@ Finalize(glsl_shader& GlslShader);
 
 struct spirv_shader
 {
-  dynamic_array<uint32> Code{};
+  array<uint32> Code{};
 };
 
 SHADER_COMPILER_API

@@ -2,7 +2,7 @@
 
 // Note: Implementations of declarations here can be found in Main.cpp
 
-#include <Core/DynamicArray.hpp>
+#include <Core/Array.hpp>
 #include <Core/Allocator.hpp>
 #include <Core/Math.hpp>
 
@@ -74,4 +74,4 @@ operator <<(std::ostream& OutStream, slice<char> String)
 }
 
 bool
-ReadFileContentIntoArray(dynamic_array<uint8>* Array, char const* FileName);
+ReadFileContentIntoArray(array<uint8>& Array, char const* FileName);

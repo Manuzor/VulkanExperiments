@@ -21,25 +21,29 @@ void
 ArraySetDefaultAllocator(allocator_interface* Allocator);
 
 
-/// Dynamically growing copy-on-write array.
+/// Dynamically growing array.
 template<typename T>
 struct array
 {
-  allocator_interface* Allocator;
-  size_t Capacity;
-  size_t Num;
-  T* Ptr;
+  allocator_interface* Allocator{};
+  size_t Capacity{};
+  size_t Num{};
+  T* Ptr{};
 
 
   array() = default;
-  array(allocator_interface* Allocator) : array() { this->Allocator = Allocator; }
+  inline array(allocator_interface* Allocator) : array() { this->Allocator = Allocator; }
+
   array(array const& ToCopy) = default;
+
   array(array&& ToMove);
+
   ~array();
 
-  void operator=(array&& ToMove);
+  void
+  operator=(array&& ToMove);
 
-  inline operator bool() const { return this->Num && this->Ptr; }
+  constexpr operator bool() const { return this->Num && this->Ptr; }
 
   /// Index operator to access elements of this array.
   template<typename IndexType>
@@ -113,12 +117,15 @@ template<typename T>
 slice<T>
 ExpandBy(array<T>& Array, size_t Amount)
 {
+  if(Amount == 0)
+    return {};
+
   Reserve(Array, Array.Num + Amount);
   auto const BeginIndex = Array.Num;
   Array.Num += Amount;
   auto const EndIndex = Array.Num;
   auto Result = Slice(AllocatedMemory(Array), BeginIndex, EndIndex);
-  SliceDefaultConstruct(Result);
+  SliceConstruct(Result);
   return Result;
 }
 
@@ -131,19 +138,51 @@ Expand(array<T>& Array)
 
 template<typename T, typename U>
 void
-Append(array<T>& Array, slice<U> More)
+Append(array<T>& Array, U const& Item)
 {
-  if(More.Num)
-  {
-    auto NewSpace = ExpandBy(Array, More.Num);
-    SliceCopy(NewSpace, More);
-  }
+  Reserve(Array, Array.Num + 1);
+  auto const Index = Array.Num;
+  ++Array.Num;
+  auto NewPtr = &Array.Ptr[Index];
+  MemConstruct(1, NewPtr, Item);
+}
+
+template<typename T, typename U>
+inline void
+operator +=(array<T>& Array, U const& Value)
+{
+  Append(Array, Value);
+}
+
+template<typename T, typename U>
+void
+Append(array<T>& Array, slice<U const> More)
+{
+  if(More.Num == 0)
+    return;
+
+  Reserve(Array, Array.Num + More.Num);
+  auto const BeginIndex = Array.Num;
+  Array.Num += More.Num;
+  auto const EndIndex = Array.Num;
+  auto NewElements = Slice(AllocatedMemory(Array), BeginIndex, EndIndex);
+  SliceCopyConstruct(NewElements, AsConst(More));
+}
+
+template<typename T, typename U>
+inline void
+operator +=(array<T>& Array, slice<U> More)
+{
+  Append(Array, AsConst(More));
 }
 
 template<typename T>
 void
 ShrinkBy(array<T>& Array, size_t Amount)
 {
+  if(Amount == 0)
+    return;
+
   BoundsCheck(Array.Num >= Amount);
   auto ToDestruct = Slice(Slice(Array), Array.Num - Amount, Array.Num);
   SliceDestruct(ToDestruct);
@@ -225,14 +264,14 @@ RemoveFirst(array<T>& Array, const T& Needle)
 // ==============================================
 //
 
-template<typename T>
-array<T>::array(array<T>&& ToMove)
-{
-  this->Allocator = ToMove.Allocator;
-  this->Capacity = ToMove.Capacity;
-  this->Num = ToMove.Num;
-  this->Ptr = ToMove.Ptr;
 
+template<typename T>
+array<T>::array(array&& ToMove)
+  : Allocator(ToMove.Allocator)
+  , Capacity(ToMove.Capacity)
+  , Num(ToMove.Num)
+  , Ptr(ToMove.Ptr)
+{
   ToMove.Capacity = 0;
   ToMove.Num = 0;
   ToMove.Ptr = nullptr;
@@ -245,7 +284,8 @@ array<T>::~array()
 }
 
 template<typename T>
-void array<T>::operator=(array&& ToMove)
+void
+array<T>::operator=(array&& ToMove)
 {
   // TODO: Is Ptr check enough? Think of Num etc.
   if(this->Ptr != ToMove.Ptr)
@@ -282,3 +322,18 @@ array<T>::operator[](IndexType Index) const
   BoundsCheck(Index >= 0 && Index < this->Num);
   return this->Ptr[Index];
 }
+
+//
+// Exported instantiations for common types.
+//
+
+CORE_TEMPLATE_EXPORT(struct, array<uint8>);
+CORE_TEMPLATE_EXPORT(struct, array<int8>);
+CORE_TEMPLATE_EXPORT(struct, array<uint16>);
+CORE_TEMPLATE_EXPORT(struct, array<int16>);
+CORE_TEMPLATE_EXPORT(struct, array<uint32>);
+CORE_TEMPLATE_EXPORT(struct, array<int32>);
+CORE_TEMPLATE_EXPORT(struct, array<uint64>);
+CORE_TEMPLATE_EXPORT(struct, array<int64>);
+CORE_TEMPLATE_EXPORT(struct, array<float>);
+CORE_TEMPLATE_EXPORT(struct, array<double>);

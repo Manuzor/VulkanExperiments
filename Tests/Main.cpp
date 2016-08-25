@@ -18,7 +18,7 @@ int main(int NumArgs, char* const Args[])
 }
 
 auto
-::ReadFileContentIntoArray(dynamic_array<uint8>* Array, char const* FileName)
+::ReadFileContentIntoArray(array<uint8>& Array, char const* FileName)
   -> bool
 {
   Clear(Array);
@@ -41,7 +41,7 @@ auto
     {
       // Correct the internal array value in case we didn't exactly read a
       // ChunkSize worth of bytes last time.
-      Array->Num -= Delta;
+      Array.Num -= Delta;
 
       return true;
     }

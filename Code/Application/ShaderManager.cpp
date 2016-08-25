@@ -21,7 +21,7 @@ static compiled_shader*
 CreateCompiledShader(allocator_interface* Allocator)
 {
   auto CompiledShader = Allocate<compiled_shader>(Allocator);
-  MemDefaultConstruct(1, CompiledShader);
+  MemConstruct(1, CompiledShader);
   Init(&CompiledShader->Cfg, Allocator);
   Init(CompiledShader->GlslVertexShader, Allocator, glsl_shader_stage::Vertex);
   Init(CompiledShader->SpirvVertexShader, Allocator);
@@ -45,18 +45,17 @@ struct shader_manager
 {
   allocator_interface* Allocator;
   shader_compiler_context* CompilerContext;
-  dynamic_array<compiled_shader*> CompiledShaders;
+  array<compiled_shader*> CompiledShaders;
 };
 
 auto
 ::CreateShaderManager(allocator_interface* Allocator)
   -> shader_manager*
 {
-  auto Manager = Allocate<shader_manager>(Allocator);
-  *Manager = {};
+  auto Manager = New<shader_manager>(Allocator);
   Manager->Allocator = Allocator;
   Manager->CompilerContext = CreateShaderCompilerContext(Allocator);
-  Init(&Manager->CompiledShaders, Allocator);
+  Manager->CompiledShaders.Allocator = Allocator;
   return Manager;
 }
 
@@ -64,14 +63,13 @@ auto
 ::DestroyShaderManager(allocator_interface* Allocator, shader_manager* Manager)
   -> void
 {
-  for(auto CompiledShader : Slice(&Manager->CompiledShaders))
+  for(auto CompiledShader : Slice(Manager->CompiledShaders))
   {
     DestroyCompiledShader(Manager->Allocator, CompiledShader);
   }
 
-  Finalize(&Manager->CompiledShaders);
   DestroyShaderCompilerContext(Allocator, Manager->CompilerContext);
-  Deallocate(Allocator, Manager);
+  Delete(Allocator, Manager);
 }
 
 // TODO: This function is duplicated in a lot of places.
@@ -79,9 +77,9 @@ auto
 #include <cstdio>
 
 static bool
-ReadFileContentIntoArray(char const* FileName, dynamic_array<uint8>* Array, log_data* Log)
+ReadFileContentIntoArray(char const* FileName, array<uint8>* Array, log_data* Log)
 {
-  Clear(Array);
+  Clear(*Array);
 
   auto File = std::fopen(FileName, "rb");
   if(File == nullptr)
@@ -93,7 +91,7 @@ ReadFileContentIntoArray(char const* FileName, dynamic_array<uint8>* Array, log_
 
   while(true)
   {
-    auto NewSlice = ExpandBy(Array, ChunkSize);
+    auto NewSlice = ExpandBy(*Array, ChunkSize);
     auto const NumBytesRead = std::fread(NewSlice.Ptr, 1, ChunkSize, File);
     auto const Delta = ChunkSize - NumBytesRead;
 
@@ -125,7 +123,7 @@ LoadAndCompileShader(shader_manager* ShaderManager, slice<char const> FileName,
   temp_allocator TempAllocator{};
   allocator_interface* Allocator = *TempAllocator;
 
-  scoped_array<uint8> Content{ Allocator };
+  array<uint8> Content{ Allocator };
   if(!ReadFileContentIntoArray(InputFilePath.Ptr, &Content, Log))
   {
     LogError(Log, "Failed to read file: %s", InputFilePath.Ptr);
@@ -136,7 +134,7 @@ LoadAndCompileShader(shader_manager* ShaderManager, slice<char const> FileName,
   CompiledShader->Id = InputFilePath;
 
   // Copy over the source to ensure it lives as long as the document itself.
-  CompiledShader->CfgSource = SliceReinterpret<char const>(Slice(&Content));
+  CompiledShader->CfgSource = SliceReinterpret<char const>(Slice(Content));
 
   {
     // TODO: Supply the GlobalLog here as soon as the cfg parser code is more robust.
@@ -209,7 +207,7 @@ LoadAndCompileShader(shader_manager* ShaderManager, slice<char const> FileName,
     }
   }
 
-  Expand(&ShaderManager->CompiledShaders) = CompiledShader;
+  ShaderManager->CompiledShaders += CompiledShader;
 
   return CompiledShader;
 }
@@ -222,7 +220,7 @@ auto
   if(Manager == nullptr)
     return nullptr;
 
-  for(auto CompiledShader : Slice(&Manager->CompiledShaders))
+  for(auto CompiledShader : Slice(Manager->CompiledShaders))
   {
     if(Slice(CompiledShader->Id) == FileName)
     {
@@ -312,7 +310,7 @@ MapShaderTypeNameToFormatAndSize(slice<char const> TypeName, VkFormat* Format, u
 auto
 ::GenerateVertexInputDescriptions(compiled_shader* CompiledShader,
                                   VkVertexInputBindingDescription const& InputBinding,
-                                  dynamic_array<VkVertexInputAttributeDescription>* InputAttributes)
+                                  array<VkVertexInputAttributeDescription>& InputAttributes)
   -> void
 {
   // Note: this procedure assumes the shader code was compiled successfully
@@ -369,17 +367,17 @@ auto
 
   temp_allocator TempAllocator{};
   allocator_interface* Allocator = *TempAllocator;
-  scoped_array<input_decl> Decls{ Allocator };
+  array<input_decl> Decls{ Allocator };
 
   for(auto Node = InputNode->FirstChild;
       Node != nullptr;
       Node = Node->Next)
   {
-    auto& Decl = Expand(&Decls);
+    auto& Decl = Expand(Decls);
     Decl.TypeName = Node->Name.Value;
     Decl.Identifier = Convert<slice<char const>>(Node->Values[0]);
     Decl.Location = -1;
-    for(auto& Attr : Slice(&Node->Attributes))
+    for(auto& Attr : Slice(Node->Attributes))
     {
       if(Attr.Name == "Location"_S)
       {
@@ -393,7 +391,7 @@ auto
 
   uint32 CurrentOffset = 0;
 
-  for(auto& Decl : Slice(&Decls))
+  for(auto& Decl : Slice(Decls))
   {
     auto& Desc = Expand(InputAttributes);
     Desc = InitStruct<VkVertexInputAttributeDescription>();
@@ -486,7 +484,7 @@ auto
 
 auto
 ::GetDescriptorSetLayoutBindings(compiled_shader* CompiledShader,
-                                 dynamic_array<VkDescriptorSetLayoutBinding>* LayoutBindings)
+                                 array<VkDescriptorSetLayoutBinding>* LayoutBindings)
   -> void
 {
   if(CompiledShader == nullptr)
@@ -518,7 +516,7 @@ auto
         continue;
       }
 
-      for(auto Attr : Slice(&Node->Attributes))
+      for(auto Attr : Slice(Node->Attributes))
       {
         if(Attr.Name == "Binding"_S)
         {
@@ -541,5 +539,5 @@ auto
     }
   }
 
-  Append(LayoutBindings, AsConst(Values(&BindingSet)));
+  *LayoutBindings += Values(&BindingSet);
 }

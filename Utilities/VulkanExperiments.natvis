@@ -27,7 +27,8 @@
     </Expand>
   </Type>
 
-  <Type Name="dynamic_array&lt;*&gt;">
+  <Type Name="array&lt;*&gt;">
+    <AlternativeType Name="dynamic_array&lt;*&gt;" />
     <DisplayString Condition="Ptr == nullptr">{{ Null }}</DisplayString>
     <DisplayString Condition="Num == 0">{{ Empty }}</DisplayString>
     <DisplayString>{{ Num={Num}, Capacity={Capacity} }}</DisplayString>

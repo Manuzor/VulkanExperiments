@@ -96,8 +96,10 @@ auto
   //
   if(Message == WM_CHAR || Message == WM_UNICHAR)
   {
-    if(WParam == UNICODE_NOCHAR) return true;
-    Expand(&Input->CharacterBuffer) = Cast<char>(WParam);
+    if(WParam == UNICODE_NOCHAR)
+      return true;
+
+    Input->CharacterBuffer += Cast<char>(WParam);
     return true;
   }
 
