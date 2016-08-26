@@ -87,7 +87,7 @@ struct window
 };
 
 static window*
-Win32CreateWindow(allocator_interface* Allocator, window_setup const* Args,
+Win32CreateWindow(allocator_interface& Allocator, window_setup const* Args,
                   log_data* Log = nullptr)
 {
   if(Args->ProcessHandle == INVALID_HANDLE_VALUE)
@@ -111,7 +111,7 @@ Win32CreateWindow(allocator_interface* Allocator, window_setup const* Args,
     }
   }
 
-  WNDCLASSA WindowClass = {};
+  WNDCLASSA WindowClass{};
   WindowClass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
   WindowClass.lpfnWndProc = &Win32MainWindowCallback;
   WindowClass.hInstance = Args->ProcessHandle;
@@ -126,7 +126,7 @@ Win32CreateWindow(allocator_interface* Allocator, window_setup const* Args,
   DWORD const WindowStyleEx = 0;
   DWORD const WindowStyle = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
 
-  RECT WindowRect = {};
+  RECT WindowRect{};
   WindowRect.right = Args->ClientExtents.Width;
   WindowRect.bottom = Args->ClientExtents.Height;
   AdjustWindowRectEx(&WindowRect, WindowStyle, FALSE, WindowStyleEx);
@@ -141,7 +141,7 @@ Win32CreateWindow(allocator_interface* Allocator, window_setup const* Args,
   WindowRect.bottom += WindowRect.top;
 
 
-  RECT WindowWorkArea = {};
+  RECT WindowWorkArea{};
   SystemParametersInfoW(SPI_GETWORKAREA, 0, &WindowWorkArea, 0);
   WindowRect.left   += WindowWorkArea.left;
   WindowRect.right  += WindowWorkArea.left;
@@ -170,8 +170,7 @@ Win32CreateWindow(allocator_interface* Allocator, window_setup const* Args,
     return nullptr;
   }
 
-  auto Window = Allocate<window>(Allocator);
-  *Window = {};
+  auto Window = New<window>(Allocator);
   Window->WindowHandle = WindowHandle;
   Window->ClientExtents = Args->ClientExtents;
 
@@ -181,7 +180,7 @@ Win32CreateWindow(allocator_interface* Allocator, window_setup const* Args,
 }
 
 static void
-Win32DestroyWindow(allocator_interface* Allocator, window* Window)
+Win32DestroyWindow(allocator_interface& Allocator, window* Window)
 {
   // TODO: Close the window somehow?
   Deallocate(Allocator, Window);
@@ -190,12 +189,12 @@ Win32DestroyWindow(allocator_interface* Allocator, window* Window)
 enum class vulkan_enable_validation : bool { No = false, Yes = true };
 
 static bool
-VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
+VulkanCreateInstance(vulkan& Vulkan, vulkan_enable_validation EnableValidation)
 {
-  Assert(Vulkan->DLL);
-  Assert(Vulkan->vkCreateInstance);
-  Assert(Vulkan->vkEnumerateInstanceLayerProperties);
-  Assert(Vulkan->vkEnumerateInstanceExtensionProperties);
+  Assert(Vulkan.DLL);
+  Assert(Vulkan.vkCreateInstance);
+  Assert(Vulkan.vkEnumerateInstanceLayerProperties);
+  Assert(Vulkan.vkEnumerateInstanceExtensionProperties);
 
   //
   // Instance Layers
@@ -210,11 +209,11 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
     }
 
     uint32 LayerCount;
-    VulkanVerify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
+    VulkanVerify(Vulkan.vkEnumerateInstanceLayerProperties(&LayerCount, nullptr));
 
     array<VkLayerProperties> LayerProperties;
     ExpandBy(LayerProperties, LayerCount);
-    VulkanVerify(Vulkan->vkEnumerateInstanceLayerProperties(&LayerCount, LayerProperties.Ptr));
+    VulkanVerify(Vulkan.vkEnumerateInstanceLayerProperties(&LayerCount, LayerProperties.Ptr));
 
     LogBeginScope("Explicitly enabled instance layers:");
     Defer [](){ LogEndScope("=========="); };
@@ -252,11 +251,11 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
     bool PlatformSurfaceExtensionFound = false;
 
     uint32 ExtensionCount;
-    VulkanVerify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
+    VulkanVerify(Vulkan.vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
     array<VkExtensionProperties> ExtensionProperties;
     ExpandBy(ExtensionProperties, ExtensionCount);
-    VulkanVerify(Vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, ExtensionProperties.Ptr));
+    VulkanVerify(Vulkan.vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, ExtensionProperties.Ptr));
 
     LogBeginScope("Explicitly enabled instance extensions:");
     Defer [](){ LogEndScope("=========="); };
@@ -312,7 +311,7 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
     LogBeginScope("Creating Vulkan instance.");
     Defer [](){ LogEndScope(""); };
 
-    VkApplicationInfo ApplicationInfo = {};
+    VkApplicationInfo ApplicationInfo{};
     {
       ApplicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
       ApplicationInfo.pApplicationName = "Vulkan Experiments";
@@ -324,7 +323,7 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
       ApplicationInfo.apiVersion = VK_MAKE_VERSION(1, 0, 13);
     }
 
-    VkInstanceCreateInfo CreateInfo = {};
+    VkInstanceCreateInfo CreateInfo{};
     {
       CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 
@@ -337,7 +336,7 @@ VulkanCreateInstance(vulkan* Vulkan, vulkan_enable_validation EnableValidation)
       CreateInfo.ppEnabledLayerNames = LayerNames.Ptr;
     }
 
-    VulkanVerify(Vulkan->vkCreateInstance(&CreateInfo, nullptr, &Vulkan->InstanceHandle));
+    VulkanVerify(Vulkan.vkCreateInstance(&CreateInfo, nullptr, &Vulkan.InstanceHandle));
   }
 
   return true;
@@ -381,22 +380,22 @@ VulkanDebugCallback(
 }
 
 static bool
-VulkanSetupDebugging(vulkan* Vulkan)
+VulkanSetupDebugging(vulkan& Vulkan)
 {
   LogBeginScope("Setting up Vulkan debugging.");
   Defer [](){ LogEndScope("Finished debug setup."); };
 
-  if(Vulkan->vkCreateDebugReportCallbackEXT != nullptr)
+  if(Vulkan.vkCreateDebugReportCallbackEXT != nullptr)
   {
-    VkDebugReportCallbackCreateInfoEXT DebugSetupInfo = {};
+    VkDebugReportCallbackCreateInfoEXT DebugSetupInfo{};
     DebugSetupInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
     DebugSetupInfo.pfnCallback = &VulkanDebugCallback;
     DebugSetupInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
 
-    VulkanVerify(Vulkan->vkCreateDebugReportCallbackEXT(Vulkan->InstanceHandle,
+    VulkanVerify(Vulkan.vkCreateDebugReportCallbackEXT(Vulkan.InstanceHandle,
                                                   &DebugSetupInfo,
                                                   nullptr,
-                                                  &Vulkan->DebugCallbackHandle));
+                                                  &Vulkan.DebugCallbackHandle));
     return true;
   }
   else
@@ -407,19 +406,19 @@ VulkanSetupDebugging(vulkan* Vulkan)
 }
 
 static void
-VulkanCleanupDebugging(vulkan* Vulkan)
+VulkanCleanupDebugging(vulkan& Vulkan)
 {
-  if(Vulkan->vkDestroyDebugReportCallbackEXT && Vulkan->DebugCallbackHandle)
+  if(Vulkan.vkDestroyDebugReportCallbackEXT && Vulkan.DebugCallbackHandle)
   {
-    Vulkan->vkDestroyDebugReportCallbackEXT(Vulkan->InstanceHandle, Vulkan->DebugCallbackHandle, nullptr);
+    Vulkan.vkDestroyDebugReportCallbackEXT(Vulkan.InstanceHandle, Vulkan.DebugCallbackHandle, nullptr);
   }
 }
 
 static bool
-VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAllocator)
+VulkanChooseAndSetupPhysicalDevices(vulkan& Vulkan)
 {
   uint32 GpuCount;
-  VulkanVerify(Vulkan->vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
+  VulkanVerify(Vulkan.vkEnumeratePhysicalDevices(Vulkan.InstanceHandle,
                                             &GpuCount, nullptr));
   if(GpuCount == 0)
   {
@@ -429,15 +428,15 @@ VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAll
 
   LogInfo("Found %u physical device(s).", GpuCount);
 
-  array<VkPhysicalDevice> Gpus{ TempAllocator };
+  array<VkPhysicalDevice> Gpus;
   ExpandBy(Gpus, GpuCount);
 
-  VulkanVerify(Vulkan->vkEnumeratePhysicalDevices(Vulkan->InstanceHandle,
+  VulkanVerify(Vulkan.vkEnumeratePhysicalDevices(Vulkan.InstanceHandle,
                                             &GpuCount, Gpus.Ptr));
 
   // Use the first Physical Device for now.
   uint32 const GpuIndex = 0;
-  Vulkan->Gpu.GpuHandle = Gpus[GpuIndex];
+  Vulkan.Gpu.GpuHandle = Gpus[GpuIndex];
 
   //
   // Properties
@@ -446,21 +445,21 @@ VulkanChooseAndSetupPhysicalDevices(vulkan* Vulkan, allocator_interface* TempAll
     LogBeginScope("Querying for physical device and queue properties.");
     Defer [](){ LogEndScope("Retrieved physical device and queue properties."); };
 
-    Vulkan->vkGetPhysicalDeviceProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Properties);
-    Vulkan->vkGetPhysicalDeviceMemoryProperties(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.MemoryProperties);
-    Vulkan->vkGetPhysicalDeviceFeatures(Vulkan->Gpu.GpuHandle, &Vulkan->Gpu.Features);
+    Vulkan.vkGetPhysicalDeviceProperties(Vulkan.Gpu.GpuHandle, &Vulkan.Gpu.Properties);
+    Vulkan.vkGetPhysicalDeviceMemoryProperties(Vulkan.Gpu.GpuHandle, &Vulkan.Gpu.MemoryProperties);
+    Vulkan.vkGetPhysicalDeviceFeatures(Vulkan.Gpu.GpuHandle, &Vulkan.Gpu.Features);
 
     uint32 QueueCount;
-    Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, nullptr);
-    SetNum(Vulkan->Gpu.QueueProperties, QueueCount);
-    Vulkan->vkGetPhysicalDeviceQueueFamilyProperties(Vulkan->Gpu.GpuHandle, &QueueCount, Vulkan->Gpu.QueueProperties.Ptr);
+    Vulkan.vkGetPhysicalDeviceQueueFamilyProperties(Vulkan.Gpu.GpuHandle, &QueueCount, nullptr);
+    SetNum(Vulkan.Gpu.QueueProperties, QueueCount);
+    Vulkan.vkGetPhysicalDeviceQueueFamilyProperties(Vulkan.Gpu.GpuHandle, &QueueCount, Vulkan.Gpu.QueueProperties.Ptr);
   }
 
   return true;
 }
 
 static bool
-VulkanInitializeGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHandle, allocator_interface* TempAllocator)
+VulkanInitializeGraphics(vulkan& Vulkan, HINSTANCE ProcessHandle, HWND WindowHandle)
 {
   //
   // Create Logical Device
@@ -472,17 +471,17 @@ VulkanInitializeGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHan
     //
     // Device Extensions
     //
-    array<char const*> ExtensionNames(TempAllocator);
+    array<char const*> ExtensionNames;
     {
       // Required extensions:
-      bool SwapchainExtensionFound = {};
+      bool SwapchainExtensionFound{};
 
       uint ExtensionCount;
-      VulkanVerify(Vulkan->vkEnumerateDeviceExtensionProperties(Vulkan->Gpu.GpuHandle, nullptr, &ExtensionCount, nullptr));
+      VulkanVerify(Vulkan.vkEnumerateDeviceExtensionProperties(Vulkan.Gpu.GpuHandle, nullptr, &ExtensionCount, nullptr));
 
-      array<VkExtensionProperties> ExtensionProperties(TempAllocator);
+      array<VkExtensionProperties> ExtensionProperties;
       ExpandBy(ExtensionProperties, ExtensionCount);
-      VulkanVerify(Vulkan->vkEnumerateDeviceExtensionProperties(Vulkan->Gpu.GpuHandle, nullptr, &ExtensionCount, ExtensionProperties.Ptr));
+      VulkanVerify(Vulkan.vkEnumerateDeviceExtensionProperties(Vulkan.Gpu.GpuHandle, nullptr, &ExtensionCount, ExtensionProperties.Ptr));
 
       LogBeginScope("Explicitly enabled device extensions:");
       Defer [](){ LogEndScope("=========="); };
@@ -518,7 +517,7 @@ VulkanInitializeGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHan
 
     auto QueueCreateInfo = InitStruct<VkDeviceQueueCreateInfo>();
     {
-      QueueCreateInfo.queueFamilyIndex = Vulkan->Surface.PresentNode.Index;
+      QueueCreateInfo.queueFamilyIndex = Vulkan.Surface.PresentNode.Index;
       QueueCreateInfo.queueCount = 1;
       QueueCreateInfo.pQueuePriorities = &QueuePriority;
     }
@@ -541,21 +540,21 @@ VulkanInitializeGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHan
       DeviceCreateInfo.pEnabledFeatures = &EnabledFeatures;
     }
 
-    VulkanVerify(Vulkan->vkCreateDevice(Vulkan->Gpu.GpuHandle, &DeviceCreateInfo, nullptr, &Vulkan->Device.DeviceHandle));
-    Assert(Vulkan->Device.DeviceHandle);
+    VulkanVerify(Vulkan.vkCreateDevice(Vulkan.Gpu.GpuHandle, &DeviceCreateInfo, nullptr, &Vulkan.Device.DeviceHandle));
+    Assert(Vulkan.Device.DeviceHandle);
 
-    VulkanLoadDeviceFunctions(*Vulkan, &Vulkan->Device);
+    VulkanLoadDeviceFunctions(Vulkan, Vulkan.Device);
   }
 
-  auto const& Device = Vulkan->Device;
+  auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
   //
   // Get device Queue
   //
   {
-    Device.vkGetDeviceQueue(DeviceHandle, Vulkan->Surface.PresentNode.Index, 0, &Vulkan->Queue);
-    Assert(Vulkan->Queue);
+    Device.vkGetDeviceQueue(DeviceHandle, Vulkan.Surface.PresentNode.Index, 0, &Vulkan.Queue);
+    Assert(Vulkan.Queue);
   }
 
   //
@@ -567,12 +566,12 @@ VulkanInitializeGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHan
 
     auto CreateInfo = InitStruct<VkCommandPoolCreateInfo>();
     {
-      CreateInfo.queueFamilyIndex = Vulkan->Surface.PresentNode.Index;
+      CreateInfo.queueFamilyIndex = Vulkan.Surface.PresentNode.Index;
       CreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     }
 
-    VulkanVerify(Device.vkCreateCommandPool(DeviceHandle, &CreateInfo, nullptr, &Vulkan->CommandPool));
-    Assert(Vulkan->CommandPool);
+    VulkanVerify(Device.vkCreateCommandPool(DeviceHandle, &CreateInfo, nullptr, &Vulkan.CommandPool));
+    Assert(Vulkan.CommandPool);
   }
 
   //
@@ -580,8 +579,8 @@ VulkanInitializeGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHan
   //
   {
     auto CreateInfo = InitStruct<VkSemaphoreCreateInfo>();
-    VulkanVerify(Device.vkCreateSemaphore(DeviceHandle, &CreateInfo, nullptr, &Vulkan->PresentCompleteSemaphore));
-    VulkanVerify(Device.vkCreateSemaphore(DeviceHandle, &CreateInfo, nullptr, &Vulkan->RenderCompleteSemaphore));
+    VulkanVerify(Device.vkCreateSemaphore(DeviceHandle, &CreateInfo, nullptr, &Vulkan.PresentCompleteSemaphore));
+    VulkanVerify(Device.vkCreateSemaphore(DeviceHandle, &CreateInfo, nullptr, &Vulkan.RenderCompleteSemaphore));
   }
 
   // Done.
@@ -589,26 +588,26 @@ VulkanInitializeGraphics(vulkan* Vulkan, HINSTANCE ProcessHandle, HWND WindowHan
 }
 
 static void
-VulkanFinalizeGraphics(vulkan* Vulkan)
+VulkanFinalizeGraphics(vulkan& Vulkan)
 {
-  auto const& Device = Vulkan->Device;
+  auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
   //
   // Destroy Seamphores
   //
-  Device.vkDestroySemaphore(DeviceHandle, Vulkan->PresentCompleteSemaphore, nullptr);
-  Device.vkDestroySemaphore(DeviceHandle, Vulkan->RenderCompleteSemaphore, nullptr);
+  Device.vkDestroySemaphore(DeviceHandle, Vulkan.PresentCompleteSemaphore, nullptr);
+  Device.vkDestroySemaphore(DeviceHandle, Vulkan.RenderCompleteSemaphore, nullptr);
 
   //
   // Destroy Command Pool
   //
-  Device.vkDestroyCommandPool(DeviceHandle, Vulkan->CommandPool, nullptr);
+  Device.vkDestroyCommandPool(DeviceHandle, Vulkan.CommandPool, nullptr);
 
   //
   // Destroy Logical Device
   //
-  Vulkan->vkDestroyDevice(DeviceHandle, nullptr);
+  Vulkan.vkDestroyDevice(DeviceHandle, nullptr);
 }
 
 struct vulkan_graphics_pipeline_desc
@@ -686,23 +685,16 @@ struct vulkan_graphics_pipeline_desc
 };
 
 static VkPipeline
-ImplVulkanCreateGraphicsPipeline(vulkan* Vulkan,
-                             compiled_shader* CompiledShader,
-                             VkPipelineLayout PipelineLayout,
-                             vulkan_graphics_pipeline_desc& Desc,
-                             size_t VertexDataStride)
+ImplVulkanCreateGraphicsPipeline(vulkan& Vulkan,
+                                 compiled_shader& CompiledShader,
+                                 VkPipelineLayout PipelineLayout,
+                                 vulkan_graphics_pipeline_desc& Desc,
+                                 size_t VertexDataStride)
 {
-  if(CompiledShader == nullptr)
-  {
-    LogError("Unable to create graphics pipeline without a shader.");
-    return nullptr;
-  }
-
-  auto const& Device = Vulkan->Device;
+  auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
-  temp_allocator TempAllocator{};
-  allocator_interface* Allocator = *TempAllocator;
+  temp_allocator Allocator;
 
   LogBeginScope("Creating graphics pipeline.");
   Defer [](){ LogEndScope("Finished creating graphics pipeline."); };
@@ -799,11 +791,11 @@ ImplVulkanCreateGraphicsPipeline(vulkan* Vulkan,
     GraphicsPipelineCreateInfo.pColorBlendState = &ColorBlendState;
     GraphicsPipelineCreateInfo.pDynamicState = &DynamicState;
     GraphicsPipelineCreateInfo.layout = PipelineLayout;
-    GraphicsPipelineCreateInfo.renderPass = Vulkan->RenderPass;
+    GraphicsPipelineCreateInfo.renderPass = Vulkan.RenderPass;
   }
 
   VkPipeline Pipeline{};
-  VulkanVerify(Device.vkCreateGraphicsPipelines(DeviceHandle, Vulkan->PipelineCache,
+  VulkanVerify(Device.vkCreateGraphicsPipelines(DeviceHandle, Vulkan.PipelineCache,
                                                 1, &GraphicsPipelineCreateInfo,
                                                 nullptr,
                                                 &Pipeline));
@@ -812,7 +804,7 @@ ImplVulkanCreateGraphicsPipeline(vulkan* Vulkan,
 
 template<typename VertexType>
 inline VkPipeline
-VulkanCreateGraphicsPipeline(vulkan* Vulkan,
+VulkanCreateGraphicsPipeline(vulkan& Vulkan,
                              compiled_shader* CompiledShader,
                              VkPipelineLayout PipelineLayout,
                              vulkan_graphics_pipeline_desc& Desc)
@@ -821,18 +813,17 @@ VulkanCreateGraphicsPipeline(vulkan* Vulkan,
 }
 
 void
-ImplVulkanPrepareRenderableFoo(vulkan* Vulkan, arc_string const& ShaderPath, vulkan_graphics_pipeline_desc PipelineDesc, size_t VertexDataStride, vulkan_renderable_foo* Foo)
+ImplVulkanPrepareRenderableFoo(vulkan& Vulkan, arc_string const& ShaderPath, vulkan_graphics_pipeline_desc PipelineDesc, size_t VertexDataStride, vulkan_renderable_foo* Foo)
 {
-  auto const& Device = Vulkan->Device;
+  auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
-  temp_allocator TempAllocator;
-  allocator_interface* Allocator = *TempAllocator;
+  temp_allocator Allocator;
 
   //
   // Get compiled shader
   //
-  Foo->Shader = GetCompiledShader(Vulkan->ShaderManager, Slice(ShaderPath), GlobalLog);
+  Foo->Shader = GetCompiledShader(*Vulkan.ShaderManager, Slice(ShaderPath), GlobalLog);
   Assert(Foo->Shader != nullptr);
 
   //
@@ -844,7 +835,7 @@ ImplVulkanPrepareRenderableFoo(vulkan* Vulkan, arc_string const& ShaderPath, vul
 
     array<VkDescriptorSetLayoutBinding> LayoutBindings{ Allocator };
 
-    GetDescriptorSetLayoutBindings(Foo->Shader, &LayoutBindings);
+    GetDescriptorSetLayoutBindings(*Foo->Shader, LayoutBindings);
 
     auto DescriptorSetLayoutCreateInfo = InitStruct<VkDescriptorSetLayoutCreateInfo>();
     {
@@ -865,17 +856,17 @@ ImplVulkanPrepareRenderableFoo(vulkan* Vulkan, arc_string const& ShaderPath, vul
   //
   // Create Pipeline Cache (if necessary)
   //
-  if(Vulkan->PipelineCache == nullptr)
+  if(Vulkan.PipelineCache == nullptr)
   {
     auto PipelineCacheCreateInfo = InitStruct<VkPipelineCacheCreateInfo>();
-    VulkanVerify(Device.vkCreatePipelineCache(DeviceHandle, &PipelineCacheCreateInfo, nullptr, &Vulkan->PipelineCache));
+    VulkanVerify(Device.vkCreatePipelineCache(DeviceHandle, &PipelineCacheCreateInfo, nullptr, &Vulkan.PipelineCache));
   }
 
   //
   // Create Pipeline
   //
   {
-    Foo->Pipeline = ImplVulkanCreateGraphicsPipeline(Vulkan, Foo->Shader, Foo->PipelineLayout, PipelineDesc, VertexDataStride);
+    Foo->Pipeline = ImplVulkanCreateGraphicsPipeline(Vulkan, *Foo->Shader, Foo->PipelineLayout, PipelineDesc, VertexDataStride);
     Assert(Foo->Pipeline);
   }
 
@@ -883,27 +874,26 @@ ImplVulkanPrepareRenderableFoo(vulkan* Vulkan, arc_string const& ShaderPath, vul
   // Allocate the UBO for Globals
   //
   {
-    VulkanCreateShaderBuffer(Vulkan, &Foo->UboGlobals, is_read_only_for_shader::Yes);
+    VulkanCreateShaderBuffer(Vulkan, Foo->UboGlobals, is_read_only_for_shader::Yes);
   }
 }
 
 template<typename VertexDataType>
 void
-VulkanPrepareRenderableFoo(vulkan* Vulkan, arc_string const& ShaderPath, vulkan_graphics_pipeline_desc PipelineDesc, vulkan_renderable_foo* Foo)
+VulkanPrepareRenderableFoo(vulkan& Vulkan, arc_string const& ShaderPath, vulkan_graphics_pipeline_desc PipelineDesc, vulkan_renderable_foo* Foo)
 {
   ImplVulkanPrepareRenderableFoo(Vulkan, ShaderPath, PipelineDesc, SizeOf<VertexDataType>(), Foo);
 }
 
 static bool
-VulkanPrepareRenderPass(vulkan* Vulkan)
+VulkanPrepareRenderPass(vulkan& Vulkan)
 {
   // TODO: Put this somewhere else?
 
-  auto const& Device = Vulkan->Device;
+  auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
-  temp_allocator TempAllocator;
-  allocator_interface* Allocator = *TempAllocator;
+  temp_allocator Allocator;
 
 
   //
@@ -919,7 +909,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       auto& Attachment = Attachments[0];
       Attachment = InitStruct<decltype(Attachment)>();
 
-      Attachment.format = Vulkan->Surface.Format;
+      Attachment.format = Vulkan.Surface.Format;
       Attachment.samples = VK_SAMPLE_COUNT_1_BIT;
       Attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
       Attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -933,7 +923,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       auto& Attachment = Attachments[1];
       Attachment = InitStruct<decltype(Attachment)>();
 
-      Attachment.format = Vulkan->Depth.Format;
+      Attachment.format = Vulkan.Depth.Format;
       Attachment.samples = VK_SAMPLE_COUNT_1_BIT;
       Attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
       Attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -971,7 +961,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       RenderPassCreateInfo.pSubpasses = &SubpassDesc;
     }
 
-    VulkanVerify(Device.vkCreateRenderPass(DeviceHandle, &RenderPassCreateInfo, nullptr, &Vulkan->RenderPass));
+    VulkanVerify(Device.vkCreateRenderPass(DeviceHandle, &RenderPassCreateInfo, nullptr, &Vulkan.RenderPass));
   }
 
 
@@ -984,7 +974,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       auto PipelineDesc = InitStruct<vulkan_graphics_pipeline_desc>();
       PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
       PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-      VulkanPrepareRenderableFoo<vulkan_debug_grid::vertex>(Vulkan, DataPath("Shader/DebugGrid.shader"), PipelineDesc, &Vulkan->DebugGridsFoo);
+      VulkanPrepareRenderableFoo<vulkan_debug_grid::vertex>(Vulkan, DataPath("Shader/DebugGrid.shader"), PipelineDesc, &Vulkan.DebugGridsFoo);
     }
 
     // Scene Objects
@@ -993,7 +983,7 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
       PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
       PipelineDesc.RasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
       PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-      VulkanPrepareRenderableFoo<vulkan_scene_object::vertex>(Vulkan, DataPath("Shader/SceneObject.shader"), PipelineDesc, &Vulkan->SceneObjectsFoo);
+      VulkanPrepareRenderableFoo<vulkan_scene_object::vertex>(Vulkan, DataPath("Shader/SceneObject.shader"), PipelineDesc, &Vulkan.SceneObjectsFoo);
     }
   }
 
@@ -1006,9 +996,9 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     Defer [](){ LogEndScope("Finished preparing descriptor pool."); };
 
     // Get descriptor counts
-    scoped_dictionary<VkDescriptorType, uint32> DescriptorCounts{ Allocator };
-    GetDescriptorTypeCounts(Vulkan->DebugGridsFoo.Shader, &DescriptorCounts);
-    GetDescriptorTypeCounts(Vulkan->SceneObjectsFoo.Shader, &DescriptorCounts);
+    scoped_dictionary<VkDescriptorType, uint32> DescriptorCounts{ &Allocator };
+    GetDescriptorTypeCounts(*Vulkan.DebugGridsFoo.Shader, DescriptorCounts);
+    GetDescriptorTypeCounts(*Vulkan.SceneObjectsFoo.Shader, DescriptorCounts);
 
     uint32 const MaxNumInstances = 50;
 
@@ -1031,198 +1021,204 @@ VulkanPrepareRenderPass(vulkan* Vulkan)
     VulkanVerify(Device.vkCreateDescriptorPool(DeviceHandle,
                                                &DescriptorPoolCreateInfo,
                                                nullptr,
-                                               &Vulkan->DescriptorPool));
+                                               &Vulkan.DescriptorPool));
   }
 
   return true;
 }
 
-static void VulkanCreateFramebuffers(vulkan* Vulkan)
+static void VulkanCreateFramebuffers(vulkan& Vulkan)
 {
   LogBeginScope("Creating framebuffers.");
   Defer [](){ LogEndScope("Finished creating framebuffers."); };
 
-  fixed_block<2, VkImageView> Attachments = {};
-  Attachments[1] = Vulkan->Depth.View;
+  fixed_block<2, VkImageView> Attachments{};
+  Attachments[1] = Vulkan.Depth.View;
 
   auto FramebufferCreateInfo = InitStruct<VkFramebufferCreateInfo>();
   {
-    FramebufferCreateInfo.renderPass = Vulkan->RenderPass;
+    FramebufferCreateInfo.renderPass = Vulkan.RenderPass;
     FramebufferCreateInfo.attachmentCount = Cast<uint32>(Attachments.Num);
     FramebufferCreateInfo.pAttachments = &Attachments[0];
-    FramebufferCreateInfo.width = Vulkan->Swapchain.Extent.Width;
-    FramebufferCreateInfo.height = Vulkan->Swapchain.Extent.Height;
+    FramebufferCreateInfo.width = Vulkan.Swapchain.Extent.Width;
+    FramebufferCreateInfo.height = Vulkan.Swapchain.Extent.Height;
     FramebufferCreateInfo.layers = 1;
   }
 
-  SetNum(Vulkan->Framebuffers, Vulkan->Swapchain.ImageCount);
+  SetNum(Vulkan.Framebuffers, Vulkan.Swapchain.ImageCount);
 
-  auto const ImageCount = Vulkan->Swapchain.ImageCount;
+  auto const ImageCount = Vulkan.Swapchain.ImageCount;
   for(uint32 Index = 0; Index < ImageCount; ++Index)
   {
-    Attachments[0] = Vulkan->Swapchain.ImageViews[Index];
-    VulkanVerify(Vulkan->Device.vkCreateFramebuffer(Vulkan->Device.DeviceHandle,
+    Attachments[0] = Vulkan.Swapchain.ImageViews[Index];
+    VulkanVerify(Vulkan.Device.vkCreateFramebuffer(Vulkan.Device.DeviceHandle,
                                                     &FramebufferCreateInfo,
                                                     nullptr,
-                                                    &Vulkan->Framebuffers[Index]));
+                                                    &Vulkan.Framebuffers[Index]));
   }
 }
 
-static void VulkanDestroyFramebuffers(vulkan* Vulkan)
+static void VulkanDestroyFramebuffers(vulkan& Vulkan)
 {
-  auto const ImageCount = Vulkan->Swapchain.ImageCount;
+  auto const ImageCount = Vulkan.Swapchain.ImageCount;
   for(uint32 Index = 0; Index < ImageCount; ++Index)
   {
-    Vulkan->Device.vkDestroyFramebuffer(Vulkan->Device.DeviceHandle,
-                                                     Vulkan->Framebuffers[Index],
+    Vulkan.Device.vkDestroyFramebuffer(Vulkan.Device.DeviceHandle,
+                                                     Vulkan.Framebuffers[Index],
                                                      nullptr);
   }
 }
 
 static void
-VulkanCleanupRenderPass(vulkan* Vulkan)
+VulkanCleanupRenderPass(vulkan& Vulkan)
 {
   // TODO: Cleanup
 
   #if 0
-  auto const& Device = Vulkan->Device;
+  auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
   // Framebuffers
-  for(auto Framebuffer : Slice(Vulkan->Framebuffers))
+  for(auto Framebuffer : Slice(Vulkan.Framebuffers))
   {
     Device.vkDestroyFramebuffer(DeviceHandle, Framebuffer, nullptr);
   }
-  Clear(Vulkan->Framebuffers);
+  Clear(Vulkan.Framebuffers);
 
   // UBOs
-  Device.vkFreeMemory(DeviceHandle, Vulkan->SceneObjectGraphicsState.GlobalsUBO.MemoryHandle, nullptr);
-  Device.vkDestroyBuffer(DeviceHandle, Vulkan->SceneObjectGraphicsState.GlobalsUBO.BufferHandle, nullptr);
+  Device.vkFreeMemory(DeviceHandle, Vulkan.SceneObjectGraphicsState.GlobalsUBO.MemoryHandle, nullptr);
+  Device.vkDestroyBuffer(DeviceHandle, Vulkan.SceneObjectGraphicsState.GlobalsUBO.BufferHandle, nullptr);
 
   // Descriptor Sets
-  Device.vkFreeDescriptorSets(DeviceHandle, Vulkan->DescriptorPool, 1, &Vulkan->SceneObjectGraphicsState.DescriptorSet);
+  Device.vkFreeDescriptorSets(DeviceHandle, Vulkan.DescriptorPool, 1, &Vulkan.SceneObjectGraphicsState.DescriptorSet);
 
   // Descriptor Pool
-  Device.vkDestroyDescriptorPool(DeviceHandle, Vulkan->DescriptorPool, nullptr);
+  Device.vkDestroyDescriptorPool(DeviceHandle, Vulkan.DescriptorPool, nullptr);
 
   // Pipeline
-  Device.vkDestroyPipeline(DeviceHandle, Vulkan->SceneObjectGraphicsState.Pipeline, nullptr);
+  Device.vkDestroyPipeline(DeviceHandle, Vulkan.SceneObjectGraphicsState.Pipeline, nullptr);
 
   // Pipeline Cache
-  Device.vkDestroyPipelineCache(DeviceHandle, Vulkan->PipelineCache, nullptr);
+  Device.vkDestroyPipelineCache(DeviceHandle, Vulkan.PipelineCache, nullptr);
 
   // Render Pass
-  Device.vkDestroyRenderPass(DeviceHandle, Vulkan->RenderPass, nullptr);
+  Device.vkDestroyRenderPass(DeviceHandle, Vulkan.RenderPass, nullptr);
 
   // Pipeline Layout
-  Device.vkDestroyPipelineLayout(DeviceHandle, Vulkan->SceneObjectGraphicsState.PipelineLayout, nullptr);
+  Device.vkDestroyPipelineLayout(DeviceHandle, Vulkan.SceneObjectGraphicsState.PipelineLayout, nullptr);
 
   // Descriptor Set Layout
-  Device.vkDestroyDescriptorSetLayout(DeviceHandle, Vulkan->SceneObjectGraphicsState.DescriptorSetLayout, nullptr);
+  Device.vkDestroyDescriptorSetLayout(DeviceHandle, Vulkan.SceneObjectGraphicsState.DescriptorSetLayout, nullptr);
   #endif
 }
 
 static void
-VulkanCreateCommandBuffers(vulkan* Vulkan, VkCommandPool CommandPool, uint32 Num)
+VulkanCreateCommandBuffers(vulkan& Vulkan, VkCommandPool CommandPool, uint32 Num)
 {
   LogBeginScope("Creating command buffers.");
   Defer [](){ LogEndScope("Finished creating command buffers."); };
 
-  auto const& Device = Vulkan->Device;
+  auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
   auto AllocateInfo = InitStruct<VkCommandBufferAllocateInfo>();
   {
-    AllocateInfo.commandPool = Vulkan->CommandPool;
+    AllocateInfo.commandPool = Vulkan.CommandPool;
     AllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     AllocateInfo.commandBufferCount = Num;
   }
 
-  SetNum(Vulkan->DrawCommandBuffers, Num);
-  SetNum(Vulkan->PrePresentCommandBuffers, Num);
-  SetNum(Vulkan->PostPresentCommandBuffers, Num);
+  SetNum(Vulkan.DrawCommandBuffers, Num);
+  SetNum(Vulkan.PrePresentCommandBuffers, Num);
+  SetNum(Vulkan.PostPresentCommandBuffers, Num);
 
-  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->DrawCommandBuffers.Ptr));
-  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->PrePresentCommandBuffers.Ptr));
-  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan->PostPresentCommandBuffers.Ptr));
+  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan.DrawCommandBuffers.Ptr));
+  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan.PrePresentCommandBuffers.Ptr));
+  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan.PostPresentCommandBuffers.Ptr));
 }
 
-static void VulkanDestroyCommandBuffers(vulkan* Vulkan, VkCommandPool CommandPool)
+static void VulkanDestroyCommandBuffers(vulkan& Vulkan, VkCommandPool CommandPool)
 {
-  auto const& Device = Vulkan->Device;
+  auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
-  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->PostPresentCommandBuffers.Num), Vulkan->PostPresentCommandBuffers.Ptr);
-  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->PrePresentCommandBuffers.Num), Vulkan->PrePresentCommandBuffers.Ptr);
-  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan->DrawCommandBuffers.Num), Vulkan->DrawCommandBuffers.Ptr);
+  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan.PostPresentCommandBuffers.Num), Vulkan.PostPresentCommandBuffers.Ptr);
+  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan.PrePresentCommandBuffers.Num), Vulkan.PrePresentCommandBuffers.Ptr);
+  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan.DrawCommandBuffers.Num), Vulkan.DrawCommandBuffers.Ptr);
 
-  Clear(Vulkan->DrawCommandBuffers);
-  Clear(Vulkan->PrePresentCommandBuffers);
-  Clear(Vulkan->PostPresentCommandBuffers);
+  Clear(Vulkan.DrawCommandBuffers);
+  Clear(Vulkan.PrePresentCommandBuffers);
+  Clear(Vulkan.PostPresentCommandBuffers);
 }
 
 // TODO
 #if 0
 static void
-VulkanDestroySwapchain(vulkan* Vulkan)
+VulkanDestroySwapchain(vulkan& Vulkan)
 {
-  Assert(Vulkan->IsPrepared);
+  Assert(Vulkan.IsPrepared);
 
-  auto const& Device = Vulkan->Device;
+  auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
-  Vulkan->IsPrepared = false;
+  Vulkan.IsPrepared = false;
 
-  Device.vkDestroyDescriptorPool(DeviceHandle, Vulkan->DescriptorPool, nullptr);
+  Device.vkDestroyDescriptorPool(DeviceHandle, Vulkan.DescriptorPool, nullptr);
 
-  if(Vulkan->SetupCommand)
+  if(Vulkan.SetupCommand)
   {
-    Device.vkFreeCommandBuffers(DeviceHandle, Vulkan->CommandPool, 1, &Vulkan->SetupCommand);
+    Device.vkFreeCommandBuffers(DeviceHandle, Vulkan.CommandPool, 1, &Vulkan.SetupCommand);
   }
-  Device.vkFreeCommandBuffers(DeviceHandle, Vulkan->CommandPool, 1, &Vulkan->DrawCommand);
-  Device.vkDestroyCommandPool(DeviceHandle, Vulkan->CommandPool, nullptr);
+  Device.vkFreeCommandBuffers(DeviceHandle, Vulkan.CommandPool, 1, &Vulkan.DrawCommand);
+  Device.vkDestroyCommandPool(DeviceHandle, Vulkan.CommandPool, nullptr);
 
-  Device.vkDestroyPipeline(DeviceHandle, Vulkan->Pipeline, nullptr);
-  Device.vkDestroyRenderPass(DeviceHandle, Vulkan->RenderPass, nullptr);
-  Device.vkDestroyPipelineLayout(DeviceHandle, Vulkan->PipelineLayout, nullptr);
-  Device.vkDestroyDescriptorSetLayout(DeviceHandle, Vulkan->DescriptorSetLayout, nullptr);
+  Device.vkDestroyPipeline(DeviceHandle, Vulkan.Pipeline, nullptr);
+  Device.vkDestroyRenderPass(DeviceHandle, Vulkan.RenderPass, nullptr);
+  Device.vkDestroyPipelineLayout(DeviceHandle, Vulkan.PipelineLayout, nullptr);
+  Device.vkDestroyDescriptorSetLayout(DeviceHandle, Vulkan.DescriptorSetLayout, nullptr);
 
-  for(auto& SceneObject : Slice(Vulkan->SceneObjects))
+  for(auto& SceneObject : Slice(Vulkan.SceneObjects))
   {
     VulkanDestroyAndDeallocateSceneObject(Vulkan, &SceneObject);
   }
 
-  Device.vkDestroyImageView(DeviceHandle, Vulkan->Depth.View, nullptr);
-  Device.vkDestroyImage(DeviceHandle,     Vulkan->Depth.Image, nullptr);
-  Device.vkFreeMemory(DeviceHandle,       Vulkan->Depth.Memory, nullptr);
+  Device.vkDestroyImageView(DeviceHandle, Vulkan.Depth.View, nullptr);
+  Device.vkDestroyImage(DeviceHandle,     Vulkan.Depth.Image, nullptr);
+  Device.vkFreeMemory(DeviceHandle,       Vulkan.Depth.Memory, nullptr);
 }
 #endif
 
+#if 0
 static void
-VulkanCleanup(vulkan* Vulkan)
+VulkanCleanup(vulkan& Vulkan)
 {
   // TODO
 
-  #if 0
   LogBeginScope("Vulkan cleanup.");
   Defer [](){ LogEndScope("Finished Vulkan cleanup."); };
 
-  if(Vulkan->IsPrepared)
+  if(Vulkan.IsPrepared)
   {
     VulkanDestroySwapchain(Vulkan);
   }
 
-  Vulkan->Device.vkDestroyDevice(Vulkan->Device.DeviceHandle, nullptr);
+  Vulkan.Device.vkDestroyDevice(Vulkan.Device.DeviceHandle, nullptr);
 
-  Vulkan->vkDestroySurfaceKHR(Vulkan->InstanceHandle, Vulkan->Surface.SurfaceHandle, nullptr);
-  Vulkan->vkDestroyInstance(Vulkan->InstanceHandle, nullptr);
+  Vulkan.vkDestroySurfaceKHR(Vulkan.InstanceHandle, Vulkan.Surface.SurfaceHandle, nullptr);
+  Vulkan.vkDestroyInstance(Vulkan.InstanceHandle, nullptr);
 
-  Clear(Vulkan->Gpu.QueueProperties);
-  #endif
+  Clear(Vulkan.Gpu.QueueProperties);
+}
+#endif
+
+static void
+VulkanDestroyInstance(vulkan& Vulkan)
+{
+  Vulkan.vkDestroyInstance(Vulkan.InstanceHandle, nullptr);
 }
 
 static void
-VulkanResize(vulkan* Vulkan, extent2_<uint32> NewExtent)
+VulkanResize(vulkan& Vulkan, extent2_<uint32> NewExtent)
 {
   LogError("Resizing is not implemented yet!");
   return;
@@ -1230,7 +1226,7 @@ VulkanResize(vulkan* Vulkan, extent2_<uint32> NewExtent)
   #if 0
 
   // Don't react to resize until after first initialization.
-  if(!Vulkan->IsPrepared)
+  if(!Vulkan.IsPrepared)
     return;
 
   LogInfo("Resizing to %ux%u.", NewExtent.Width, NewExtent.Height);
@@ -1241,18 +1237,18 @@ VulkanResize(vulkan* Vulkan, extent2_<uint32> NewExtent)
   //
   // Perform some cleanup
   //
-  VulkanCleanupDepth(*Vulkan, &Vulkan->Depth);
-  VulkanDestroyCommandBuffers(Vulkan, Vulkan->CommandPool);
+  VulkanCleanupDepth(*Vulkan, &Vulkan.Depth);
+  VulkanDestroyCommandBuffers(Vulkan, Vulkan.CommandPool);
   VulkanDestroyFramebuffers(Vulkan);
 
   //
   // Re-create the swapchain
   //
   VulkanPrepareSetupCommandBuffer(Vulkan);
-  VulkanPrepareSwapchain(*Vulkan, &Vulkan->Swapchain, NewExtent, Vulkan->Swapchain.VSync);
-  VulkanPrepareDepth(Vulkan, &Vulkan->Depth, Vulkan->Swapchain.Extent);
+  VulkanPrepareSwapchain(*Vulkan, &Vulkan.Swapchain, NewExtent, Vulkan.Swapchain.VSync);
+  VulkanPrepareDepth(Vulkan, &Vulkan.Depth, Vulkan.Swapchain.Extent);
   VulkanCreateFramebuffers(Vulkan);
-  VulkanCreateCommandBuffers(Vulkan, Vulkan->CommandPool, Vulkan->Swapchain.ImageCount);
+  VulkanCreateCommandBuffers(Vulkan, Vulkan.CommandPool, Vulkan.Swapchain.ImageCount);
   VulkanCleanupSetupCommandBuffer(Vulkan, flush_command_buffer::Yes);
 
   #endif
@@ -1325,11 +1321,11 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
       }
 
       // Draw scene objects
-      VkDeviceSize NoOffset = {};
+      VkDeviceSize NoOffset{};
 
       for(auto Renderable : Slice(Vulkan.Renderables))
       {
-        VulkanEnsureIsReadyForDrawing(&Vulkan, Renderable);
+        VulkanEnsureIsReadyForDrawing(Vulkan, *Renderable);
 
         auto Shader = Renderable->Foo->Shader;
         if(Shader == nullptr)
@@ -1344,7 +1340,7 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
                                        1, &Renderable->DescriptorSet,
                                        0, nullptr); // Dynamic offsets
         Device.vkCmdBindPipeline(DrawCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Renderable->Foo->Pipeline);
-        Renderable->Draw(&Vulkan, DrawCommandBuffer);
+        Renderable->Draw(Vulkan, DrawCommandBuffer);
       }
     }
     Device.vkCmdEndRenderPass(DrawCommandBuffer);
@@ -1437,25 +1433,25 @@ VulkanBuildPostPresentCommands(vulkan_device const& Device,
 static bool GlobalIsDrawing = false;
 
 static void
-VulkanDraw(vulkan* Vulkan)
+VulkanDraw(vulkan& Vulkan)
 {
   ::GlobalIsDrawing = true;
   Defer [](){ ::GlobalIsDrawing = false; };
 
-  auto const& Device = Vulkan->Device;
+  auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
-  VkFence NullFence = {};
-  VkResult Error = {};
+  VkFence NullFence{};
+  VkResult Error{};
 
 
   //
   // Get next swapchain image.
   //
   {
-    Error = VulkanAcquireNextSwapchainImage(Vulkan->Swapchain,
-                                            Vulkan->PresentCompleteSemaphore,
-                                            &Vulkan->CurrentSwapchainImage);
+    Error = VulkanAcquireNextSwapchainImage(Vulkan.Swapchain,
+                                            Vulkan.PresentCompleteSemaphore,
+                                            Vulkan.CurrentSwapchainImage);
 
     VulkanVerify(Error);
     #if 0
@@ -1465,7 +1461,7 @@ VulkanDraw(vulkan* Vulkan)
       {
         // Swapchain is out of date (e.g. the window was resized) and must be
         // recreated:
-        VulkanResize(Vulkan, Vulkan->Swapchain.Extent);
+        VulkanResize(Vulkan, Vulkan.Swapchain.Extent);
         VulkanDraw(Vulkan);
       } break;
       case VK_SUBOPTIMAL_KHR:
@@ -1485,8 +1481,8 @@ VulkanDraw(vulkan* Vulkan)
   {
     auto SubmitInfo = InitStruct<VkSubmitInfo>();
     SubmitInfo.commandBufferCount = 1;
-    SubmitInfo.pCommandBuffers = &Vulkan->PostPresentCommandBuffers[Vulkan->CurrentSwapchainImage.Index];
-    VulkanVerify(Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, NullFence));
+    SubmitInfo.pCommandBuffers = &Vulkan.PostPresentCommandBuffers[Vulkan.CurrentSwapchainImage.Index];
+    VulkanVerify(Device.vkQueueSubmit(Vulkan.Queue, 1, &SubmitInfo, NullFence));
   }
 
 
@@ -1499,12 +1495,12 @@ VulkanDraw(vulkan* Vulkan)
     auto SubmitInfo = InitStruct<VkSubmitInfo>();
     SubmitInfo.pWaitDstStageMask = &SubmitPipelineStages;
     SubmitInfo.waitSemaphoreCount = 1;
-    SubmitInfo.pWaitSemaphores = &Vulkan->PresentCompleteSemaphore;
+    SubmitInfo.pWaitSemaphores = &Vulkan.PresentCompleteSemaphore;
     SubmitInfo.signalSemaphoreCount = 1;
-    SubmitInfo.pSignalSemaphores = &Vulkan->RenderCompleteSemaphore;
+    SubmitInfo.pSignalSemaphores = &Vulkan.RenderCompleteSemaphore;
     SubmitInfo.commandBufferCount = 1;
-    SubmitInfo.pCommandBuffers = &Vulkan->DrawCommandBuffers[Vulkan->CurrentSwapchainImage.Index];
-    VulkanVerify(Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, NullFence));
+    SubmitInfo.pCommandBuffers = &Vulkan.DrawCommandBuffers[Vulkan.CurrentSwapchainImage.Index];
+    VulkanVerify(Device.vkQueueSubmit(Vulkan.Queue, 1, &SubmitInfo, NullFence));
   }
 
 
@@ -1514,8 +1510,8 @@ VulkanDraw(vulkan* Vulkan)
   {
     auto SubmitInfo = InitStruct<VkSubmitInfo>();
     SubmitInfo.commandBufferCount = 1;
-    SubmitInfo.pCommandBuffers = &Vulkan->PrePresentCommandBuffers[Vulkan->CurrentSwapchainImage.Index];
-    VulkanVerify(Device.vkQueueSubmit(Vulkan->Queue, 1, &SubmitInfo, NullFence));
+    SubmitInfo.pCommandBuffers = &Vulkan.PrePresentCommandBuffers[Vulkan.CurrentSwapchainImage.Index];
+    VulkanVerify(Device.vkQueueSubmit(Vulkan.Queue, 1, &SubmitInfo, NullFence));
   }
 
 
@@ -1523,10 +1519,10 @@ VulkanDraw(vulkan* Vulkan)
   // Present
   //
   {
-    Error = VulkanQueuePresent(&Vulkan->Swapchain,
-                               Vulkan->Queue,
-                               Vulkan->CurrentSwapchainImage,
-                               Vulkan->RenderCompleteSemaphore);
+    Error = VulkanQueuePresent(Vulkan.Swapchain,
+                               Vulkan.Queue,
+                               Vulkan.CurrentSwapchainImage,
+                               Vulkan.RenderCompleteSemaphore);
 
     // TODO: See if we need to handle the cases in the switch below.
     VulkanVerify(Error);
@@ -1538,7 +1534,7 @@ VulkanDraw(vulkan* Vulkan)
       {
         // Swapchain is out of date (e.g. the window was resized) and must be
         // recreated:
-        VulkanResize(Vulkan, Vulkan->Swapchain.Extent);
+        VulkanResize(Vulkan, Vulkan.Swapchain.Extent);
         VulkanDraw(Vulkan);
       } break;
       case VK_SUBOPTIMAL_KHR:
@@ -1554,7 +1550,7 @@ VulkanDraw(vulkan* Vulkan)
   //
   // Wait for the presenting to finish.
   //
-  Device.vkQueueWaitIdle(Vulkan->Queue);
+  Device.vkQueueWaitIdle(Vulkan.Queue);
 }
 
 void Win32MessagePump()
@@ -1620,7 +1616,7 @@ struct frame_time_stats
   size_t NumSamples{};
   size_t SampleIndex{};
 
-  frame_time_stats(allocator_interface* Allocator)
+  frame_time_stats(allocator_interface& Allocator)
     : Samples{ Allocator }
   {
   }
@@ -1693,36 +1689,40 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
   Win32SetupConsole("Vulkan Experiments Console");
 
-  mallocator Mallocator = {};
-  allocator_interface* Allocator = &Mallocator;
-  log_data Log = {};
-  GlobalLog = &Log;
-  Defer [=](){ GlobalLog = nullptr; };
+  mallocator Mallocator{};
+  allocator_interface& Allocator = Mallocator;
+  allocator_interface* AllocatorPtr = &Allocator;
 
-  Init(GlobalLog, Allocator);
-  Defer [=](){ Finalize(GlobalLog); };
-  auto SinkSlots = ExpandBy(GlobalLog->Sinks, 2);
+  log_data Log{};
+  Init(Log, Allocator);
+  Defer [&](){ Finalize(Log); };
+  auto SinkSlots = ExpandBy(Log.Sinks, 2);
   SinkSlots[0] = GetStdoutLogSink(stdout_log_sink_enable_prefixes::Yes);
   SinkSlots[1] = log_sink(VisualStudioLogSink);
 
+  GlobalLog = &Log;
+  Defer [=](){ GlobalLog = nullptr; };
+
   image_loader_registry* ImageLoaderRegistry = CreateImageLoaderRegistry(Allocator);
-  Defer [=](){ DestroyImageLoaderRegistry(Allocator, ImageLoaderRegistry); };
+  Defer [&](){ DestroyImageLoaderRegistry(Allocator, ImageLoaderRegistry); };
 
   {
-    auto ImageLoaderModule = RegisterImageLoaderModule(ImageLoaderRegistry,
+    auto ImageLoaderModule = RegisterImageLoaderModule(*ImageLoaderRegistry,
                                                        "DDS"_S,
                                                        "Core.dll"_S,
                                                        "CreateImageLoader_DDS"_S,
                                                        "DestroyImageLoader_DDS"_S);
-    AssociateImageLoaderModuleWithFileExtension(ImageLoaderModule, ".dds"_S);
+    if(ImageLoaderModule)
+      AssociateImageLoaderModuleWithFileExtension(*ImageLoaderModule, ".dds"_S);
   }
 
   {
-    auto Vulkan = New<vulkan>(Allocator);
-    Defer [=](){ Delete(Allocator, Vulkan); };
+    auto VulkanPtr = New<vulkan>(Allocator);
+    Defer [&](){ Delete(Allocator, VulkanPtr); };
+    auto& Vulkan = *VulkanPtr;
 
     Init(Vulkan, Allocator);
-    Defer [=](){ Finalize(Vulkan); };
+    Defer [=](){ Finalize(*VulkanPtr); };
 
     ++CurrentExitCode;
     if(!VulkanLoadDLL(Vulkan))
@@ -1731,18 +1731,18 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     ++CurrentExitCode;
     if(!VulkanCreateInstance(Vulkan, vulkan_enable_validation::Yes))
       return CurrentExitCode;
-    Defer [=](){ VulkanCleanup(Vulkan); };
+    Defer [=](){ VulkanDestroyInstance(*VulkanPtr); };
 
     VulkanLoadInstanceFunctions(Vulkan);
 
     VulkanSetupDebugging(Vulkan);
-    Defer [=](){ VulkanCleanupDebugging(Vulkan); };
+    Defer [=](){ VulkanCleanupDebugging(*VulkanPtr); };
 
     ++CurrentExitCode;
-    if(!VulkanChooseAndSetupPhysicalDevices(Vulkan, Allocator))
+    if(!VulkanChooseAndSetupPhysicalDevices(Vulkan))
       return CurrentExitCode;
 
-    window_setup WindowSetup = {};
+    window_setup WindowSetup{};
     WindowSetup.ProcessHandle = Instance;
     WindowSetup.WindowClassName = "VulkanExperimentsWindowClass";
     WindowSetup.ClientExtents.Width = 1280;
@@ -1753,7 +1753,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     if(Window == nullptr)
       return CurrentExitCode;
 
-    Defer [=](){ Win32DestroyWindow(Allocator, Window); };
+    Defer [&](){ Win32DestroyWindow(Allocator, Window); };
 
     //
     // Surface
@@ -1762,7 +1762,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       LogBeginScope("Preparing OS surface.");
 
       ++CurrentExitCode;
-      if(!VulkanPrepareSurface(*Vulkan, &Vulkan->Surface, Instance, Window->WindowHandle))
+      if(!VulkanPrepareSurface(Vulkan, Vulkan.Surface, Instance, Window->WindowHandle))
       {
         LogEndScope("Surface creation failed.");
         return CurrentExitCode;
@@ -1770,7 +1770,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
       LogEndScope("OS surface successfully created.");
     }
-    Defer [Vulkan](){ VulkanCleanupSurface(*Vulkan, &Vulkan->Surface); };
+    Defer [VulkanPtr](){ VulkanCleanupSurface(*VulkanPtr, VulkanPtr->Surface); };
 
 
     //
@@ -1780,7 +1780,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       LogBeginScope("Initializing Vulkan for graphics.");
 
       ++CurrentExitCode;
-      if(!VulkanInitializeGraphics(Vulkan, Instance, Window->WindowHandle, Allocator))
+      if(!VulkanInitializeGraphics(Vulkan, Instance, Window->WindowHandle))
       {
         LogEndScope("Vulkan initialization failed.");
         return CurrentExitCode;
@@ -1788,9 +1788,9 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
       LogEndScope("Vulkan successfully initialized.");
     }
-    Defer [Vulkan](){ VulkanFinalizeGraphics(Vulkan); };
+    Defer [VulkanPtr](){ VulkanFinalizeGraphics(*VulkanPtr); };
 
-    VulkanSwapchainConnect(&Vulkan->Swapchain, &Vulkan->Device, &Vulkan->Surface);
+    VulkanSwapchainConnect(Vulkan.Swapchain, Vulkan.Device, Vulkan.Surface);
 
     // Now that we have a command pool, we can create the setup command
     VulkanPrepareSetupCommandBuffer(Vulkan);
@@ -1802,25 +1802,25 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       LogBeginScope("Preparing swapchain for the first time.");
 
       ++CurrentExitCode;
-      if(!VulkanPrepareSwapchain(*Vulkan, &Vulkan->Swapchain, WindowSetup.ClientExtents, vsync::On))
+      if(!VulkanPrepareSwapchain(Vulkan, Vulkan.Swapchain, WindowSetup.ClientExtents, vsync::On))
       {
         LogEndScope("Failed to prepare initial swapchain.");
         return CurrentExitCode;
       }
 
-      Vulkan->IsPrepared = true;
+      Vulkan.IsPrepared = true;
       LogEndScope("Initial Swapchain is prepared.");
     }
-    Defer [Vulkan](){ VulkanCleanupSwapchain(*Vulkan, &Vulkan->Swapchain); };
+    Defer [VulkanPtr](){ VulkanCleanupSwapchain(*VulkanPtr, VulkanPtr->Swapchain); };
 
 
     //
     // Create Command Buffers
     //
     {
-      VulkanCreateCommandBuffers(Vulkan, Vulkan->CommandPool, Vulkan->Swapchain.ImageCount);
+      VulkanCreateCommandBuffers(Vulkan, Vulkan.CommandPool, Vulkan.Swapchain.ImageCount);
     }
-    Defer [Vulkan](){ VulkanDestroyCommandBuffers(Vulkan, Vulkan->CommandPool); };
+    Defer [VulkanPtr](){ VulkanDestroyCommandBuffers(*VulkanPtr, VulkanPtr->CommandPool); };
 
 
     //
@@ -1830,7 +1830,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       LogBeginScope("Preparing depth.");
 
       ++CurrentExitCode;
-      if(!VulkanPrepareDepth(Vulkan, &Vulkan->Depth, Vulkan->Swapchain.Extent))
+      if(!VulkanPrepareDepth(Vulkan, Vulkan.Depth, Vulkan.Swapchain.Extent))
       {
         LogEndScope("Failed preparing depth.");
         return CurrentExitCode;
@@ -1838,7 +1838,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
       LogEndScope("Finished preparing depth.");
     }
-    Defer [Vulkan](){ VulkanCleanupDepth(*Vulkan, &Vulkan->Depth); };
+    Defer [VulkanPtr](){ VulkanCleanupDepth(*VulkanPtr, VulkanPtr->Depth); };
 
 
     //
@@ -1847,7 +1847,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     {
       VulkanPrepareRenderPass(Vulkan);
     }
-    Defer [Vulkan](){ VulkanCleanupRenderPass(Vulkan); };
+    Defer [VulkanPtr](){ VulkanCleanupRenderPass(*VulkanPtr); };
 
     //
     // Create framebuffers
@@ -1855,14 +1855,14 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     {
       VulkanCreateFramebuffers(Vulkan);
     }
-    Defer [Vulkan](){ VulkanDestroyFramebuffers(Vulkan); };
+    Defer [VulkanPtr](){ VulkanDestroyFramebuffers(*VulkanPtr); };
 
     // Flush the setup command once now to finalize initialization but prepare it for further use also.
     VulkanCleanupSetupCommandBuffer(Vulkan, flush_command_buffer::Yes);
     VulkanPrepareSetupCommandBuffer(Vulkan);
-    Defer [Vulkan](){ VulkanCleanupSetupCommandBuffer(Vulkan, flush_command_buffer::No); };
+    Defer [VulkanPtr](){ VulkanCleanupSetupCommandBuffer(*VulkanPtr, flush_command_buffer::No); };
 
-    Window->Vulkan = Vulkan;
+    Window->Vulkan = &Vulkan;
 
     LogInfo("Vulkan initialization finished!");
     Defer [](){ LogInfo("Shutting down..."); };
@@ -1871,79 +1871,81 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     //
     // Input Setup
     //
-    x_input_dll XInput = {};
-    Win32LoadXInput(&XInput, GlobalLog);
+    x_input_dll XInput{};
+    Win32LoadXInput(XInput, GlobalLog);
 
-    win32_input_context SystemInput = {};
-    Init(&SystemInput, Allocator);
-    Defer [&](){ Finalize(&SystemInput); };
+    auto InputContext = New<win32_input_context>(Allocator, Allocator);
+    Assert(InputContext);
+    Defer [=](){ Delete(*AllocatorPtr, InputContext); };
+
+    auto& SystemInput = *InputContext;
     {
       // Let's pretend the system is user 0 for now.
       SystemInput.UserIndex = 0;
 
-      Win32RegisterAllMouseSlots(&SystemInput, GlobalLog);
-      Win32RegisterAllXInputSlots(&SystemInput, GlobalLog);
-      Win32RegisterAllKeyboardSlots(&SystemInput, GlobalLog);
+      Win32RegisterAllMouseSlots(SystemInput, GlobalLog);
+      Win32RegisterAllXInputSlots(SystemInput, GlobalLog);
+      Win32RegisterAllKeyboardSlots(SystemInput, GlobalLog);
 
       //
       // Input Mappings
       //
-      RegisterInputSlot(&SystemInput, input_type::Button, MyInputSlots.Quit);
-      AddInputSlotMapping(&SystemInput, keyboard::Escape, MyInputSlots.Quit);
-      AddInputSlotMapping(&SystemInput, x_input::Start, MyInputSlots.Quit);
+      RegisterInputSlot(SystemInput, input_type::Button, MyInputSlots.Quit);
+      AddInputSlotMapping(SystemInput, keyboard::Escape, MyInputSlots.Quit);
+      AddInputSlotMapping(SystemInput, x_input::Start, MyInputSlots.Quit);
 
-      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Depth);
-      AddInputSlotMapping(&SystemInput, keyboard::Up, MyInputSlots.Depth, -1);
-      AddInputSlotMapping(&SystemInput, keyboard::Down, MyInputSlots.Depth, 1);
+      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Depth);
+      AddInputSlotMapping(SystemInput, keyboard::Up, MyInputSlots.Depth, -1);
+      AddInputSlotMapping(SystemInput, keyboard::Down, MyInputSlots.Depth, 1);
       auto DepthSlotProperties = GetOrCreate(&SystemInput.ValueProperties, MyInputSlots.Depth);
       DepthSlotProperties->Sensitivity = 0.005f;
 
-      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.MoveForward);
-      AddInputSlotMapping(&SystemInput, x_input::YLeftStick, MyInputSlots.Camera.MoveForward);
-      AddInputSlotMapping(&SystemInput, keyboard::W, MyInputSlots.Camera.MoveForward,  1);
-      AddInputSlotMapping(&SystemInput, keyboard::S, MyInputSlots.Camera.MoveForward, -1);
+      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.MoveForward);
+      AddInputSlotMapping(SystemInput, x_input::YLeftStick, MyInputSlots.Camera.MoveForward);
+      AddInputSlotMapping(SystemInput, keyboard::W, MyInputSlots.Camera.MoveForward,  1);
+      AddInputSlotMapping(SystemInput, keyboard::S, MyInputSlots.Camera.MoveForward, -1);
 
-      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.MoveRight);
-      AddInputSlotMapping(&SystemInput, x_input::XLeftStick, MyInputSlots.Camera.MoveRight);
-      AddInputSlotMapping(&SystemInput, keyboard::D, MyInputSlots.Camera.MoveRight,  1);
-      AddInputSlotMapping(&SystemInput, keyboard::A, MyInputSlots.Camera.MoveRight, -1);
+      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.MoveRight);
+      AddInputSlotMapping(SystemInput, x_input::XLeftStick, MyInputSlots.Camera.MoveRight);
+      AddInputSlotMapping(SystemInput, keyboard::D, MyInputSlots.Camera.MoveRight,  1);
+      AddInputSlotMapping(SystemInput, keyboard::A, MyInputSlots.Camera.MoveRight, -1);
 
-      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.MoveUp);
-      AddInputSlotMapping(&SystemInput, x_input::LeftTrigger,  MyInputSlots.Camera.MoveUp,  1);
-      AddInputSlotMapping(&SystemInput, x_input::RightTrigger, MyInputSlots.Camera.MoveUp, -1);
-      AddInputSlotMapping(&SystemInput, keyboard::E, MyInputSlots.Camera.MoveUp,  1);
-      AddInputSlotMapping(&SystemInput, keyboard::Q, MyInputSlots.Camera.MoveUp, -1);
+      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.MoveUp);
+      AddInputSlotMapping(SystemInput, x_input::LeftTrigger,  MyInputSlots.Camera.MoveUp,  1);
+      AddInputSlotMapping(SystemInput, x_input::RightTrigger, MyInputSlots.Camera.MoveUp, -1);
+      AddInputSlotMapping(SystemInput, keyboard::E, MyInputSlots.Camera.MoveUp,  1);
+      AddInputSlotMapping(SystemInput, keyboard::Q, MyInputSlots.Camera.MoveUp, -1);
       auto MoveUpSlotProperties = GetOrCreate(&SystemInput.ValueProperties, MyInputSlots.Camera.MoveUp);
       MoveUpSlotProperties->Exponent = 3.0f;
 
-      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.RelYaw);
-      AddInputSlotMapping(&SystemInput, x_input::XRightStick, MyInputSlots.Camera.RelYaw);
-      AddInputSlotMapping(&SystemInput, keyboard::Left,  MyInputSlots.Camera.RelYaw, 1);
-      AddInputSlotMapping(&SystemInput, keyboard::Right, MyInputSlots.Camera.RelYaw, -1);
+      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.RelYaw);
+      AddInputSlotMapping(SystemInput, x_input::XRightStick, MyInputSlots.Camera.RelYaw);
+      AddInputSlotMapping(SystemInput, keyboard::Left,  MyInputSlots.Camera.RelYaw, 1);
+      AddInputSlotMapping(SystemInput, keyboard::Right, MyInputSlots.Camera.RelYaw, -1);
 
-      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.RelPitch);
-      AddInputSlotMapping(&SystemInput, x_input::YRightStick, MyInputSlots.Camera.RelPitch, -1);
-      AddInputSlotMapping(&SystemInput, keyboard::Up,   MyInputSlots.Camera.RelPitch, -1);
-      AddInputSlotMapping(&SystemInput, keyboard::Down, MyInputSlots.Camera.RelPitch, 1);
+      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.RelPitch);
+      AddInputSlotMapping(SystemInput, x_input::YRightStick, MyInputSlots.Camera.RelPitch, -1);
+      AddInputSlotMapping(SystemInput, keyboard::Up,   MyInputSlots.Camera.RelPitch, -1);
+      AddInputSlotMapping(SystemInput, keyboard::Down, MyInputSlots.Camera.RelPitch, 1);
 
       float const CameraMouseSensitivity = 0.01f;
 
-      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.AbsYaw);
-      AddInputSlotMapping(&SystemInput, mouse::XDelta, MyInputSlots.Camera.AbsYaw);
+      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.AbsYaw);
+      AddInputSlotMapping(SystemInput, mouse::XDelta, MyInputSlots.Camera.AbsYaw);
       {
         auto SlotProperties = GetOrCreate(&SystemInput.ValueProperties, MyInputSlots.Camera.AbsYaw);
         SlotProperties->Sensitivity = CameraMouseSensitivity;
       }
 
-      RegisterInputSlot(&SystemInput, input_type::Axis, MyInputSlots.Camera.AbsPitch);
-      AddInputSlotMapping(&SystemInput, mouse::YDelta, MyInputSlots.Camera.AbsPitch);
+      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.AbsPitch);
+      AddInputSlotMapping(SystemInput, mouse::YDelta, MyInputSlots.Camera.AbsPitch);
       {
         auto SlotProperties = GetOrCreate(&SystemInput.ValueProperties, MyInputSlots.Camera.AbsPitch);
         SlotProperties->Sensitivity = CameraMouseSensitivity;
       }
 
-      RegisterInputSlot(&SystemInput, input_type::Button, MyInputSlots.Camera.Reset);
-      AddInputSlotMapping(&SystemInput, keyboard::R, MyInputSlots.Camera.Reset);
+      RegisterInputSlot(SystemInput, input_type::Button, MyInputSlots.Camera.Reset);
+      AddInputSlotMapping(SystemInput, keyboard::R, MyInputSlots.Camera.Reset);
 
       Window->Input = &SystemInput;
     }
@@ -1952,7 +1954,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     //
     // Camera Setup
     //
-    free_horizon_camera Cam = {};
+    free_horizon_camera Cam{};
     {
       Cam.VerticalFieldOfView = Degrees(60);
       Cam.Width = 1280;
@@ -1973,31 +1975,32 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       LogBeginScope("Creating scene objects");
       Defer [](){ LogEndScope("Finished creating scene objects."); };
 
-      VkCommandBuffer TextureUploadCommandBuffer = {};
+      VkCommandBuffer TextureUploadCommandBuffer{};
       {
         auto CommandBufferInfo = InitStruct<VkCommandBufferAllocateInfo>();
-        CommandBufferInfo.commandPool = Vulkan->CommandPool;
+        CommandBufferInfo.commandPool = Vulkan.CommandPool;
         CommandBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         CommandBufferInfo.commandBufferCount = 1;
-        VulkanVerify(Vulkan->Device.vkAllocateCommandBuffers(Vulkan->Device.DeviceHandle,
+        VulkanVerify(Vulkan.Device.vkAllocateCommandBuffers(Vulkan.Device.DeviceHandle,
                                                              &CommandBufferInfo,
                                                              &TextureUploadCommandBuffer));
       }
 
-      Defer [Vulkan, TextureUploadCommandBuffer]()
+      Defer [VulkanPtr, TextureUploadCommandBuffer]()
       {
-        Vulkan->Device.vkFreeCommandBuffers(Vulkan->Device.DeviceHandle,
-                                            Vulkan->CommandPool,
-                                            1,
-                                            &TextureUploadCommandBuffer);
+        auto& Vulkan = *VulkanPtr;
+        Vulkan.Device.vkFreeCommandBuffers(Vulkan.Device.DeviceHandle,
+                                           Vulkan.CommandPool,
+                                           1,
+                                           &TextureUploadCommandBuffer);
       };
 
-      arc_string KittenImageFilePath = "Data/Kitten_DXT1_Mipmaps.dds";
+      arc_string KittenImageFilePath = DataPath("Kitten_DXT1_Mipmaps.dds");
       auto KittenImageFileExtension = AsConst(FindFileExtension(Slice(KittenImageFilePath)));
-      auto KittenImageLoaderFactory = GetImageLoaderFactoryByFileExtension(ImageLoaderRegistry, KittenImageFileExtension);
+      auto KittenImageLoaderFactory = GetImageLoaderFactoryByFileExtension(*ImageLoaderRegistry, KittenImageFileExtension);
       image KittenImage{};
-      Init(&KittenImage, Allocator);
-      Defer [&](){ Finalize(&KittenImage); };
+      Init(KittenImage, Allocator);
+      Defer [&](){ Finalize(KittenImage); };
 
 
       //
@@ -2008,9 +2011,10 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
         if(KittenImageLoaderFactory)
         {
-          auto ImageLoader = CreateImageLoader(KittenImageLoaderFactory);
+          auto ImageLoader = CreateImageLoader(*KittenImageLoaderFactory);
+          Assert(ImageLoader);
 
-          if(LoadImageFromFile(ImageLoader, &KittenImage, Slice(KittenImageFilePath)))
+          if(LoadImageFromFile(*ImageLoader, KittenImage, Slice(KittenImageFilePath)))
           {
             LogInfo("Loaded image file: %s", StrPtr(KittenImageFilePath));
           }
@@ -2020,7 +2024,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
             UseFallbackImage = true;
           }
 
-          DestroyImageLoader(KittenImageLoaderFactory, ImageLoader);
+          DestroyImageLoader(*KittenImageLoaderFactory, ImageLoader);
         }
         else
         {
@@ -2030,7 +2034,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
         if(UseFallbackImage)
         {
-          ImageSetAsSolidColor(&KittenImage, color::Pink, image_format::R32G32B32A32_FLOAT);
+          ImageSetAsSolidColor(KittenImage, color::Pink, image_format::R32G32B32A32_FLOAT);
         }
       }
 
@@ -2044,12 +2048,12 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
         Kitten->Transform.Translation = Vec3(0, 0, 2);
 
-        Copy(&Kitten->Texture.Image, KittenImage);
-        VulkanUploadTexture(*Vulkan,
+        Copy(Kitten->Texture.Image, KittenImage);
+        VulkanUploadTexture(Vulkan,
                             TextureUploadCommandBuffer,
-                            &Kitten->Texture);
+                            Kitten->Texture);
 
-        VulkanSetQuadGeometry(Vulkan, &Kitten->VertexBuffer, &Kitten->IndexBuffer);
+        VulkanSetQuadGeometry(Vulkan, Kitten->VertexBuffer, Kitten->IndexBuffer);
       }
 
 
@@ -2062,12 +2066,12 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
 
         Kitten->Transform.Translation = Vec3(0.5f, 2, 1);
 
-        Copy(&Kitten->Texture.Image, KittenImage);
-        VulkanUploadTexture(*Vulkan,
+        Copy(Kitten->Texture.Image, KittenImage);
+        VulkanUploadTexture(Vulkan,
                             TextureUploadCommandBuffer,
-                            &Kitten->Texture);
+                            Kitten->Texture);
 
-        VulkanSetBoxGeometry(Vulkan, &Kitten->VertexBuffer, &Kitten->IndexBuffer);
+        VulkanSetBoxGeometry(Vulkan, Kitten->VertexBuffer, Kitten->IndexBuffer);
       }
 
 
@@ -2082,12 +2086,12 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         Kitten->Transform.Scale = Vec3(2, 2, 2);
         Kitten->Transform.Rotation = Quaternion(UpVector3, Degrees(30)) * Quaternion(RightVector3, Degrees(45));
 
-        Copy(&Kitten->Texture.Image, KittenImage);
-        VulkanUploadTexture(*Vulkan,
+        Copy(Kitten->Texture.Image, KittenImage);
+        VulkanUploadTexture(Vulkan,
                             TextureUploadCommandBuffer,
-                            &Kitten->Texture);
+                            Kitten->Texture);
 
-        VulkanSetBoxGeometry(Vulkan, &Kitten->VertexBuffer, &Kitten->IndexBuffer);
+        VulkanSetBoxGeometry(Vulkan, Kitten->VertexBuffer, Kitten->IndexBuffer);
       }
 
       //
@@ -2098,8 +2102,8 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         // TODO: Cleanup
 
         VulkanSetDebugGridGeometry(Vulkan, { 10, 10, 5 }, { 10, 10, 10 },
-                                   &DebugGrid->VertexBuffer,
-                                   &DebugGrid->IndexBuffer);
+                                   DebugGrid->VertexBuffer,
+                                   DebugGrid->IndexBuffer);
       }
     }
 
@@ -2107,29 +2111,29 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     // Build Command Buffers
     //
     {
-      VulkanBuildDrawCommands(*Vulkan,
-                              Slice(Vulkan->DrawCommandBuffers),
-                              Slice(Vulkan->Framebuffers),
+      VulkanBuildDrawCommands(Vulkan,
+                              Slice(Vulkan.DrawCommandBuffers),
+                              Slice(Vulkan.Framebuffers),
                               // color::CornflowerBlue,
                               color::Gray,
-                              Vulkan->DepthStencilValue,
+                              Vulkan.DepthStencilValue,
                               0);
-      VulkanBuildPrePresentCommands(Vulkan->Device,
-                                    Slice(Vulkan->PrePresentCommandBuffers),
-                                    Slice(Vulkan->Swapchain.Images));
-      VulkanBuildPostPresentCommands(Vulkan->Device,
-                                     Slice(Vulkan->PostPresentCommandBuffers),
-                                     Slice(Vulkan->Swapchain.Images));
+      VulkanBuildPrePresentCommands(Vulkan.Device,
+                                    Slice(Vulkan.PrePresentCommandBuffers),
+                                    Slice(Vulkan.Swapchain.Images));
+      VulkanBuildPostPresentCommands(Vulkan.Device,
+                                     Slice(Vulkan.PostPresentCommandBuffers),
+                                     Slice(Vulkan.Swapchain.Images));
     }
 
     //
     // Main Loop
     //
-    Vulkan->DepthStencilValue = 1.0f;
+    Vulkan.DepthStencilValue = 1.0f;
     ::GlobalRunning = true;
 
-    stopwatch FrameTimer = {};
-    stopwatch PerfTimer = {};
+    stopwatch FrameTimer{};
+    stopwatch PerfTimer{};
 
     time CurrentFrameTime = Milliseconds(16); // Assume 16 milliseconds for the first frame.
     float DeltaSeconds = Convert<float>(TimeAsSeconds(CurrentFrameTime));
@@ -2142,12 +2146,12 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       StopwatchStart(&FrameTimer);
       StopwatchStart(&PerfTimer);
 
-      BeginInputFrame(&SystemInput);
+      BeginInputFrame(SystemInput);
       {
         Win32MessagePump();
-        Win32PollXInput(&XInput, &SystemInput);
+        Win32PollXInput(XInput, SystemInput);
       }
-      EndInputFrame(&SystemInput);
+      EndInputFrame(SystemInput);
 
       //
       // Check for Quit requests
@@ -2169,7 +2173,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         PrintFrameTimeStats(FrameTimeStats, GlobalLog);
       }
 
-      //Vulkan->DepthStencilValue = Clamp(Vulkan->DepthStencilValue + AxisValue(SystemInput[MyInputSlots.Depth]), 0.8f, 1.0f);
+      //Vulkan.DepthStencilValue = Clamp(Vulkan.DepthStencilValue + AxisValue(SystemInput[MyInputSlots.Depth]), 0.8f, 1.0f);
 
       //
       // Update camera
@@ -2212,14 +2216,14 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       // Upload shader buffers
       //
       {
-        Vulkan->DebugGridsFoo.UboGlobals.Data.ViewProjectionMatrix = ViewProjectionMatrix;
-        VulkanUploadShaderBufferData(Vulkan, Vulkan->DebugGridsFoo.UboGlobals);
+        Vulkan.DebugGridsFoo.UboGlobals.Data.ViewProjectionMatrix = ViewProjectionMatrix;
+        VulkanUploadShaderBufferData(Vulkan, Vulkan.DebugGridsFoo.UboGlobals);
 
-        Vulkan->SceneObjectsFoo.UboGlobals.Data.ViewProjectionMatrix = ViewProjectionMatrix;
-        VulkanUploadShaderBufferData(Vulkan, Vulkan->SceneObjectsFoo.UboGlobals);
+        Vulkan.SceneObjectsFoo.UboGlobals.Data.ViewProjectionMatrix = ViewProjectionMatrix;
+        VulkanUploadShaderBufferData(Vulkan, Vulkan.SceneObjectsFoo.UboGlobals);
 
         // TODO: Don't do this every frame?
-        for(auto SceneObject : Slice(Vulkan->SceneObjects))
+        for(auto SceneObject : Slice(Vulkan.SceneObjects))
         {
           SceneObject->UboModel.Data.ViewProjectionMatrix = Mat4x4(SceneObject->Transform) * ViewProjectionMatrix;
           VulkanUploadShaderBufferData(Vulkan, SceneObject->UboModel);
@@ -2292,7 +2296,7 @@ Win32MainWindowCallback(HWND WindowHandle, UINT Message,
     if(Window->Input)
     {
       // TODO(Manu): Deal with the return value?
-      Win32ProcessInputMessage(WindowHandle, Message, WParam, LParam, Window->Input);
+      Win32ProcessInputMessage(WindowHandle, Message, WParam, LParam, *Window->Input);
     }
   }
   else if(Message == WM_SIZE)
@@ -2317,7 +2321,7 @@ Win32MainWindowCallback(HWND WindowHandle, UINT Message,
     if(Vulkan && Vulkan->IsPrepared)
     {
       temp_allocator TempAllocator;
-      VulkanDraw(Vulkan);
+      VulkanDraw(*Vulkan);
     }
 
     if(MustBeginAndEndPaint)

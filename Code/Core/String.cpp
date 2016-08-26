@@ -11,23 +11,25 @@ GetDefaultStringAllocator()
 }
 
 static arc_string::internal*
-CreateInternal(allocator_interface* Allocator)
+CreateInternal(allocator_interface& Allocator)
 {
   auto Internal = Allocate<arc_string::internal>(Allocator);
   Assert(Internal);
   MemConstruct(1, Internal);
-  Internal->Data.Allocator = Allocator;
+  Internal->Data.Allocator = &Allocator;
   Internal->RefCount = 1;
 
   return Internal;
 }
 
 static void
-DestroyInternal(allocator_interface* Allocator, arc_string::internal* Internal)
+DestroyInternal(allocator_interface& Allocator, arc_string::internal* Internal)
 {
-  MemDestruct(1, Internal);
-  if(Allocator)
+  if(Internal)
+  {
+    MemDestruct(1, Internal);
     Deallocate(Allocator, Internal);
+  }
 }
 
 static bool
@@ -60,7 +62,7 @@ StrReleaseRef(allocator_interface* Allocator, arc_string::internal* Internal)
 
   if(Internal->RefCount <= 0)
   {
-    DestroyInternal(Allocator, Internal);
+    DestroyInternal(*Allocator, Internal);
   }
 }
 
@@ -76,8 +78,8 @@ arc_string::arc_string(char const* StringPtr)
   StrSet(*this, SliceFromString(StringPtr));
 }
 
-arc_string::arc_string(char const* StringPtr, allocator_interface* Allocator)
-  : Allocator(Allocator)
+arc_string::arc_string(char const* StringPtr, allocator_interface& Allocator)
+  : Allocator(&Allocator)
 {
   StrSet(*this, SliceFromString(StringPtr));
 }
@@ -87,8 +89,8 @@ arc_string::arc_string(slice<char const> Content)
   StrSet(*this, Content);
 }
 
-arc_string::arc_string(slice<char const> Content, allocator_interface* Allocator)
-  : Allocator(Allocator)
+arc_string::arc_string(slice<char const> Content, allocator_interface& Allocator)
+  : Allocator(&Allocator)
 {
   StrSet(*this, Content);
 }
@@ -98,8 +100,8 @@ arc_string::arc_string(slice<char> Content)
   StrSet(*this, AsConst(Content));
 }
 
-arc_string::arc_string(slice<char> Content, allocator_interface* Allocator)
-  : Allocator(Allocator)
+arc_string::arc_string(slice<char> Content, allocator_interface& Allocator)
+  : Allocator(&Allocator)
 {
   StrSet(*this, AsConst(Content));
 }
@@ -174,7 +176,7 @@ auto
   if(String.Allocator == nullptr)
     String.Allocator = GetDefaultStringAllocator();
 
-  String.Internal = CreateInternal(String.Allocator);
+  String.Internal = CreateInternal(*String.Allocator);
 }
 
 auto
@@ -184,11 +186,12 @@ auto
   StrEnsureInitialized(String);
   if(String.Internal->RefCount > 1)
   {
+    Assert(String.Allocator);
     auto Allocator = String.Allocator;
     auto OldInternal = String.Internal;
     StrReleaseRef(Allocator, OldInternal);
 
-    auto NewInternal = CreateInternal(Allocator);
+    auto NewInternal = CreateInternal(*Allocator);
 
     // Copy the old content over.
     SliceCopy(ExpandBy(NewInternal->Data, OldInternal->Data.Num),

@@ -35,26 +35,26 @@ enum class shader_stage
 
 
 shader_manager*
-CreateShaderManager(allocator_interface* Allocator);
+CreateShaderManager(allocator_interface& Allocator);
 
 void
-DestroyShaderManager(allocator_interface* Allocator, shader_manager* Manager);
+DestroyShaderManager(allocator_interface& Allocator, shader_manager* Manager);
 
 compiled_shader*
-GetCompiledShader(shader_manager* Manager, slice<char const> FileName,
+GetCompiledShader(shader_manager& Manager, slice<char const> FileName,
                   log_data* Log = nullptr);
 
 bool
-HasShaderStage(compiled_shader* CompiledShader, shader_stage Stage);
+HasShaderStage(compiled_shader& CompiledShader, shader_stage Stage);
 
 glsl_shader*
-GetGlslShader(compiled_shader* CompiledShader, shader_stage Stage);
+GetGlslShader(compiled_shader& CompiledShader, shader_stage Stage);
 
 spirv_shader*
-GetSpirvShader(compiled_shader* CompiledShader, shader_stage Stage);
+GetSpirvShader(compiled_shader& CompiledShader, shader_stage Stage);
 
 void
-GenerateVertexInputDescriptions(compiled_shader* CompiledShader,
+GenerateVertexInputDescriptions(compiled_shader& CompiledShader,
                                 VkVertexInputBindingDescription const& Binding,
                                 array<VkVertexInputAttributeDescription>& InputAttributes);
 
@@ -65,9 +65,9 @@ VkShaderStageFlagBits
 ShaderStageToVulkan(shader_stage Stage);
 
 void
-GetDescriptorTypeCounts(compiled_shader* CompiledShader,
-                        dictionary<VkDescriptorType, uint32>* DescriptorCounts);
+GetDescriptorTypeCounts(compiled_shader& CompiledShader,
+                        dictionary<VkDescriptorType, uint32>& DescriptorCounts);
 
 void
-GetDescriptorSetLayoutBindings(compiled_shader* CompiledShader,
-                               array<VkDescriptorSetLayoutBinding>* LayoutBindings);
+GetDescriptorSetLayoutBindings(compiled_shader& CompiledShader,
+                               array<VkDescriptorSetLayoutBinding>& LayoutBindings);

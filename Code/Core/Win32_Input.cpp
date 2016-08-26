@@ -18,7 +18,7 @@ LoadHelper(HMODULE DLL, char const* FuncName, T** OutPtrToProcPtr)
 }
 
 auto
-::Win32LoadXInput(x_input_dll* XInput, log_data* Log)
+::Win32LoadXInput(x_input_dll& XInput, log_data* Log)
   -> bool
 {
   char const* DLLNames[] =
@@ -42,10 +42,10 @@ auto
     }
 
     LogInfo(Log, "Loaded XInput DLL: %s", DLLName);
-    XInput->DLL = DLL;
-    XInput->DLLName = SliceFromString(DLLName);
+    XInput.DLL = DLL;
+    XInput.DLLName = SliceFromString(DLLName);
 
-    #define TRY_LOAD(Name) if(!LoadHelper(DLL, #Name, &XInput->##Name)) \
+    #define TRY_LOAD(Name) if(!LoadHelper(DLL, #Name, &XInput.##Name)) \
     { \
       LogError(Log, "Failed to load procedure: %s", #Name); \
       return false; \
@@ -67,28 +67,20 @@ auto
   return false;
 }
 
+win32_input_context::win32_input_context(allocator_interface& Allocator)
+  : input_context(Allocator)
+{
+  // Nothing to do here yet.
+}
 
 win32_input_context::~win32_input_context()
 {
-}
-
-auto
-::Init(win32_input_context* Context, allocator_interface* Allocator)
-  -> void
-{
-  Init(Cast<input_context*>(Context), Allocator);
-}
-
-auto
-::Finalize(win32_input_context* Context)
-  -> void
-{
-  Finalize(Cast<input_context*>(Context));
+  // Nothing to do here yet.
 }
 
 auto
 ::Win32ProcessInputMessage(HWND WindowHandle, UINT Message, WPARAM WParam, LPARAM LParam,
-                         win32_input_context* Input, log_data* Log)
+                         win32_input_context& Input, log_data* Log)
   -> bool
 {
   //
@@ -99,7 +91,7 @@ auto
     if(WParam == UNICODE_NOCHAR)
       return true;
 
-    Input->CharacterBuffer += Cast<char>(WParam);
+    Input.CharacterBuffer += Cast<char>(WParam);
     return true;
   }
 
@@ -440,41 +432,42 @@ auto
 }
 
 auto
-::Win32PollXInput(x_input_dll* XInput, win32_input_context* Input)
+::Win32PollXInput(x_input_dll& XInput, win32_input_context& Input)
   -> void
 {
-  if(Input->UserIndex < 0)
+  if(Input.UserIndex < 0)
   {
     // Need a user index to poll for gamepad state.
     return;
   }
 
-  auto UserIndex = Cast<DWORD>(Input->UserIndex);
+  auto UserIndex = Cast<DWORD>(Input.UserIndex);
 
   XINPUT_STATE NewControllerState;
-  if(XInput->XInputGetState(UserIndex, &NewControllerState) != ERROR_SUCCESS)
+  if(XInput.XInputGetState(UserIndex, &NewControllerState) != ERROR_SUCCESS)
   {
     // The gamepad seems to be disconnected.
     return;
   }
 
-  if(Input->XInputPreviousState[UserIndex].dwPacketNumber == NewControllerState.dwPacketNumber)
+  if(Input.XInputPreviousState[UserIndex].dwPacketNumber == NewControllerState.dwPacketNumber)
   {
     // There are no updates for us.
     return;
   }
 
+  auto InputPtr = &Input;
   auto NewControllerStatePtr = &NewControllerState;
-  Defer [=](){ Input->XInputPreviousState[UserIndex] = *NewControllerStatePtr; };
+  Defer [=](){ InputPtr->XInputPreviousState[UserIndex] = *NewControllerStatePtr; };
 
-  auto OldGamepad = &Input->XInputPreviousState[UserIndex].Gamepad;
+  auto OldGamepad = &Input.XInputPreviousState[UserIndex].Gamepad;
   auto NewGamepad = &NewControllerState.Gamepad;
 
   //
   // Buttons
   //
   {
-    auto UpdateButton = [](win32_input_context* Input, input_id Id, WORD OldButtons, WORD NewButtons, WORD ButtonMask)
+    auto UpdateButton = [](win32_input_context& Input, input_id Id, WORD OldButtons, WORD NewButtons, WORD ButtonMask)
     {
       bool WasDown = (OldButtons & ButtonMask) != 0;
       bool IsDown  = (NewButtons & ButtonMask) != 0;
@@ -505,7 +498,7 @@ auto
   // Triggers
   //
   {
-    auto UpdateTrigger = [](win32_input_context* Input, input_id Id, BYTE OldValue, BYTE NewValue)
+    auto UpdateTrigger = [](win32_input_context& Input, input_id Id, BYTE OldValue, BYTE NewValue)
     {
       if(OldValue != NewValue)
       {
@@ -522,7 +515,7 @@ auto
   // Thumbsticks
   //
   {
-    auto UpdateThumbStick = [](win32_input_context* Input, input_id Id, SHORT OldValue, SHORT NewValue)
+    auto UpdateThumbStick = [](win32_input_context& Input, input_id Id, SHORT OldValue, SHORT NewValue)
     {
       if(OldValue != NewValue)
       {
@@ -541,7 +534,7 @@ auto
 }
 
 auto
-::Win32RegisterAllMouseSlots(win32_input_context* Context, log_data* Log)
+::Win32RegisterAllMouseSlots(win32_input_context& Context, log_data* Log)
   -> void
 {
   RegisterInputSlot(Context, input_type::Button, mouse::LeftButton);
@@ -584,7 +577,7 @@ auto
 }
 
 auto
-::Win32RegisterAllXInputSlots(win32_input_context* Context, log_data* Log)
+::Win32RegisterAllXInputSlots(win32_input_context& Context, log_data* Log)
   -> void
 {
   RegisterInputSlot(Context, input_type::Button, x_input::DPadUp);
@@ -604,47 +597,47 @@ auto
 
   RegisterInputSlot(Context, input_type::Axis, x_input::LeftTrigger);
   {
-    auto Props = GetOrCreate(&Context->ValueProperties, x_input::LeftTrigger);
+    auto Props = GetOrCreate(&Context.ValueProperties, x_input::LeftTrigger);
     SetDeadZones(Props, XINPUT_GAMEPAD_TRIGGER_THRESHOLD / 255.0f);
   }
 
   RegisterInputSlot(Context, input_type::Axis, x_input::RightTrigger);
   {
-    auto Props = GetOrCreate(&Context->ValueProperties, x_input::RightTrigger);
+    auto Props = GetOrCreate(&Context.ValueProperties, x_input::RightTrigger);
     SetDeadZones(Props, XINPUT_GAMEPAD_TRIGGER_THRESHOLD / 255.0f);
   }
 
   RegisterInputSlot(Context, input_type::Axis, x_input::XLeftStick);
   {
-    auto Props = GetOrCreate(&Context->ValueProperties, x_input::XLeftStick);
+    auto Props = GetOrCreate(&Context.ValueProperties, x_input::XLeftStick);
     Props->PositiveDeadZone = XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE / 32767.0f;
     Props->NegativeDeadZone = XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE / 32768.0f;
   }
 
   RegisterInputSlot(Context, input_type::Axis, x_input::YLeftStick);
   {
-    auto Props = GetOrCreate(&Context->ValueProperties, x_input::YLeftStick);
+    auto Props = GetOrCreate(&Context.ValueProperties, x_input::YLeftStick);
     Props->PositiveDeadZone = XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE / 32767.0f;
     Props->NegativeDeadZone = XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE / 32768.0f;
   }
 
   RegisterInputSlot(Context, input_type::Axis, x_input::XRightStick);
   {
-    auto Props = GetOrCreate(&Context->ValueProperties, x_input::XRightStick);
+    auto Props = GetOrCreate(&Context.ValueProperties, x_input::XRightStick);
     Props->PositiveDeadZone = XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE / 32767.0f;
     Props->NegativeDeadZone = XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE / 32768.0f;
   }
 
   RegisterInputSlot(Context, input_type::Axis, x_input::YRightStick);
   {
-    auto Props = GetOrCreate(&Context->ValueProperties, x_input::YRightStick);
+    auto Props = GetOrCreate(&Context.ValueProperties, x_input::YRightStick);
     Props->PositiveDeadZone = XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE / 32767.0f;
     Props->NegativeDeadZone = XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE / 32768.0f;
   }
 }
 
 auto
-::Win32RegisterAllKeyboardSlots(win32_input_context* Context, log_data* Log)
+::Win32RegisterAllKeyboardSlots(win32_input_context& Context, log_data* Log)
   -> void
 {
   RegisterInputSlot(Context, input_type::Button, keyboard::Escape);

@@ -80,10 +80,10 @@ struct cfg_document
 };
 
 CFG_API void
-Init(cfg_document* Document, allocator_interface* Allocator);
+Init(cfg_document& Document, allocator_interface& Allocator);
 
 CFG_API void
-Finalize(cfg_document* Document);
+Finalize(cfg_document& Document);
 
 inline bool
 CfgLiteralIsValid(cfg_literal const& Literal)
@@ -95,10 +95,10 @@ CFG_API bool
 CfgIdentifierMatchesFilter(cfg_identifier Identifier, slice<char const> Filter);
 
 CFG_API cfg_node*
-CfgCreateNode(cfg_document* Document);
+CfgCreateNode(cfg_document& Document);
 
 CFG_API void
-CfgDestroyNode(cfg_document* Document, cfg_node* Node);
+CfgDestroyNode(cfg_document& Document, cfg_node* Node);
 
 
 //

@@ -27,29 +27,22 @@ struct CORE_API x_input_dll
 
 CORE_API
 bool
-Win32LoadXInput(x_input_dll* XInput, log_data* Log = nullptr);
+Win32LoadXInput(x_input_dll& XInput, log_data* Log = nullptr);
 
 
 class CORE_API win32_input_context : public input_context
 {
 public:
-  fixed_block<XUSER_MAX_COUNT, XINPUT_STATE> XInputPreviousState;
+  fixed_block<XUSER_MAX_COUNT, XINPUT_STATE> XInputPreviousState{};
 
+  win32_input_context(allocator_interface& Allocator);
   virtual ~win32_input_context();
 };
 
 CORE_API
-void
-Init(win32_input_context* Context, allocator_interface* Allocator);
-
-CORE_API
-void
-Finalize(win32_input_context* Context);
-
-CORE_API
 bool
 Win32ProcessInputMessage(HWND WindowHandle, UINT Message, WPARAM WParam, LPARAM LParam,
-                         win32_input_context* Input,
+                         win32_input_context& Input,
                          log_data* Log = nullptr);
 
 CORE_API
@@ -58,19 +51,19 @@ Win32VirtualKeyToInputId(WPARAM VKCode, LPARAM lParam, slice<input_id> Buffer);
 
 CORE_API
 void
-Win32PollXInput(x_input_dll* XInput, win32_input_context* Input);
+Win32PollXInput(x_input_dll& XInput, win32_input_context& Input);
 
 CORE_API
 void
-Win32RegisterAllMouseSlots(win32_input_context* Context,
+Win32RegisterAllMouseSlots(win32_input_context& Context,
                            log_data* Log = nullptr);
 
 CORE_API
 void
-Win32RegisterAllXInputSlots(win32_input_context* Context,
+Win32RegisterAllXInputSlots(win32_input_context& Context,
                             log_data* Log = nullptr);
 
 CORE_API
 void
-Win32RegisterAllKeyboardSlots(win32_input_context* Context,
+Win32RegisterAllKeyboardSlots(win32_input_context& Context,
                               log_data* Log = nullptr);

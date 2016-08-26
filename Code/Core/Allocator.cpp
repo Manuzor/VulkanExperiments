@@ -21,17 +21,22 @@ static mallocator GlobalTempAllocator = {};
 
 temp_allocator::temp_allocator()
 {
-  this->Impl = &GlobalTempAllocator;
+  // Nothing to do here yet.
 }
 
 temp_allocator::~temp_allocator()
 {
-  this->Impl = nullptr;
+  // Nothing to do here yet.
 }
 
-allocator_interface*
-temp_allocator::operator *()
+void*
+temp_allocator::Allocate(size_t NumBytes, size_t Alignment)
 {
-  Assert(this->Impl);
-  return Reinterpret<allocator_interface*>(this->Impl);
+  return GlobalTempAllocator.Allocate(NumBytes, Alignment);
+}
+
+bool
+temp_allocator::Deallocate(void* Memory)
+{
+  return GlobalTempAllocator.Deallocate(Memory);
 }

@@ -10,12 +10,12 @@ struct shader_compiler_context
 };
 
 auto
-::Init(glsl_shader& GlslShader, allocator_interface* Allocator, glsl_shader_stage Stage)
+::Init(glsl_shader& GlslShader, allocator_interface& Allocator, glsl_shader_stage Stage)
   -> void
 {
   GlslShader.Stage = Stage;
-  GlslShader.EntryPoint.Allocator = Allocator;
-  GlslShader.Code.Allocator = Allocator;
+  GlslShader.EntryPoint.Allocator = &Allocator;
+  GlslShader.Code.Allocator = &Allocator;
 }
 
 auto
@@ -27,10 +27,10 @@ auto
 }
 
 auto
-Init(spirv_shader& SpirvShader, allocator_interface* Allocator)
+Init(spirv_shader& SpirvShader, allocator_interface& Allocator)
   -> void
 {
-  SpirvShader.Code.Allocator = Allocator;
+  SpirvShader.Code.Allocator = &Allocator;
 }
 
 auto
@@ -43,12 +43,9 @@ Finalize(spirv_shader& SpirvShader)
 int GlobalShaderCompilerCount = 0;
 
 auto
-::CreateShaderCompilerContext(allocator_interface* Allocator)
+::CreateShaderCompilerContext(allocator_interface& Allocator)
   -> shader_compiler_context*
 {
-  if(Allocator == nullptr)
-    return nullptr;
-
   auto Context = Allocate<shader_compiler_context>(Allocator);
 
   if(Context == nullptr)
@@ -66,10 +63,10 @@ auto
 }
 
 auto
-::DestroyShaderCompilerContext(allocator_interface* Allocator, shader_compiler_context* Context)
+::DestroyShaderCompilerContext(allocator_interface& Allocator, shader_compiler_context* Context)
   -> void
 {
-  if(Allocator == nullptr || Context == nullptr)
+  if(Context == nullptr)
     return;
 
   Deallocate(Allocator, Context);
@@ -161,8 +158,7 @@ GetDeclarations(cfg_node const* FirstSibling, array<declaration>& OutDeclaration
 }
 
 static void
-GetShaderData(cfg_node const* ShaderNode,
-              allocator_interface* Allocator,
+GetShaderData(cfg_node const& ShaderNode,
               array<declaration>& MiscGlobals,        // Out
               array<buffer>& Buffers,                 // Out
               array<declaration>& InputDeclarations,  // Out
@@ -170,10 +166,10 @@ GetShaderData(cfg_node const* ShaderNode,
               arc_string* EntryPoint,                 // Out
               array<slice<char const>>& Code)         // Out
 {
-  if(ShaderNode->FirstChild == nullptr)
+  if(ShaderNode.FirstChild == nullptr)
     return;
 
-  for(auto Node = ShaderNode->FirstChild;
+  for(auto Node = ShaderNode.FirstChild;
       Node != nullptr;
       Node = Node->Next)
   {
@@ -232,7 +228,6 @@ GetShaderData(cfg_node const* ShaderNode,
           }
         }
 
-        Buffer.InnerDeclarations.Allocator = Allocator;
         GetDeclarations(Node->FirstChild, Buffer.InnerDeclarations);
     }
     else if(Node->Name == "sampler2D"_S)
@@ -320,59 +315,55 @@ WriteDeclaration(slice<char const> Prefix, declaration const& Decl, arc_string& 
 }
 
 auto
-::CompileCfgToGlsl(shader_compiler_context* Context, cfg_node const* ShaderRoot,
-                   glsl_shader* GlslShader)
+::CompileCfgToGlsl(shader_compiler_context& Context, cfg_node const& ShaderRoot,
+                   glsl_shader& GlslShader)
 -> bool
 {
-  temp_allocator TempAllocator;
-  allocator_interface* Allocator = *TempAllocator;
+  StrClear(GlslShader.EntryPoint);
+  StrClear(GlslShader.Code);
 
-  StrClear(GlslShader->EntryPoint);
-  StrClear(GlslShader->Code);
-
-  array<declaration> MiscGlobals{ Allocator };
-  array<declaration> InputDeclarations{ Allocator };
-  array<declaration> OutputDeclarations{ Allocator };
+  array<declaration> MiscGlobals;
+  array<declaration> InputDeclarations;
+  array<declaration> OutputDeclarations;
   slice<char const> EntryPoint{};
-  array<slice<char const>> ExtraCode{ Allocator };
-  array<buffer> Buffers{ Allocator };
+  array<slice<char const>> ExtraCode;
+  array<buffer> Buffers;
 
   GetShaderData(ShaderRoot,
-                Allocator,
                 MiscGlobals,
                 Buffers,
                 InputDeclarations,
                 OutputDeclarations,
-                &GlslShader->EntryPoint,
+                &GlslShader.EntryPoint,
                 ExtraCode);
 
   // TODO: Support reading #version and #extension values from cfg?
   // Add default version and extensions.
-  GlslShader->Code += "#version 450\n\n"
+  GlslShader.Code += "#version 450\n\n"
                       "#extension GL_ARB_separate_shader_objects : enable\n"
                       "#extension GL_ARB_shading_language_420pack : enable\n\n";
 
   if(MiscGlobals.Num > 0)
   {
-    GlslShader->Code += "\n";
+    GlslShader.Code += "\n";
     for(auto& Decl : Slice(MiscGlobals))
     {
-      WriteDeclaration("uniform"_S, Decl, GlslShader->Code, true);
+      WriteDeclaration("uniform"_S, Decl, GlslShader.Code, true);
     }
-    GlslShader->Code += "\n";
+    GlslShader.Code += "\n";
   }
 
   if(Buffers.Num)
   {
-    GlslShader->Code += "\n"
+    GlslShader.Code += "\n"
                         "//\n"
                         "// Buffers\n"
                         "//\n";
     for(auto& Buffer : Slice(Buffers))
     {
-      WriteDeclaration({}, Buffer, GlslShader->Code, true, false);
+      WriteDeclaration({}, Buffer, GlslShader.Code, true, false);
 
-      GlslShader->Code += "{\n";
+      GlslShader.Code += "{\n";
       for(auto& Decl : Slice(Buffer.InnerDeclarations))
       {
         if(Decl.Location != -1)
@@ -385,53 +376,53 @@ auto
           LogWarning("Ignoring layout spec `binding` in buffer declaration.");
         }
 
-        GlslShader->Code += "  ";
-        WriteDeclaration({}, Decl, GlslShader->Code, false);
+        GlslShader.Code += "  ";
+        WriteDeclaration({}, Decl, GlslShader.Code, false);
       }
-      GlslShader->Code += "};\n";
+      GlslShader.Code += "};\n";
     }
-    GlslShader->Code += "\n";
+    GlslShader.Code += "\n";
   }
 
   if(InputDeclarations.Num)
   {
-    GlslShader->Code += "\n"
+    GlslShader.Code += "\n"
                         "//\n"
                         "// Input\n"
                         "//\n";
 
     for(auto& Decl : Slice(InputDeclarations))
     {
-      WriteDeclaration("in"_S, Decl, GlslShader->Code, true);
+      WriteDeclaration("in"_S, Decl, GlslShader.Code, true);
     }
-    GlslShader->Code += "\n";
+    GlslShader.Code += "\n";
   }
 
   if(OutputDeclarations.Num)
   {
-    GlslShader->Code += "\n"
+    GlslShader.Code += "\n"
                         "//\n"
                         "// Output\n"
                         "//\n";
 
     for(auto& Decl : Slice(OutputDeclarations))
     {
-      WriteDeclaration("out"_S, Decl, GlslShader->Code, true);
+      WriteDeclaration("out"_S, Decl, GlslShader.Code, true);
     }
-    GlslShader->Code += "\n";
+    GlslShader.Code += "\n";
   }
 
   if(ExtraCode.Num)
   {
-    GlslShader->Code += "\n"
+    GlslShader.Code += "\n"
                         "//\n"
                         "// Code\n"
                         "//\n";
 
     for(auto& Line : Slice(ExtraCode))
     {
-      GlslShader->Code += Line;
-      GlslShader->Code += "\n";
+      GlslShader.Code += Line;
+      GlslShader.Code += "\n";
     }
   }
 
@@ -457,21 +448,21 @@ ToShLanguage(glsl_shader_stage ShaderStage)
 extern const TBuiltInResource GlobalDefaultGlslangBuiltInResources;
 
 auto
-::CompileGlslToSpv(shader_compiler_context* Context, glsl_shader const* GlslShader,
-                   spirv_shader* SpirvShader)
+::CompileGlslToSpv(shader_compiler_context& Context, glsl_shader const& GlslShader,
+                   spirv_shader& SpirvShader)
   -> bool
 {
   {
-    glslang::TShader Shader{ ToShLanguage(GlslShader->Stage) };
+    glslang::TShader Shader{ ToShLanguage(GlslShader.Stage) };
 
     // Note: Program needs to be destructed before all shaders it references.
     glslang::TProgram Program;
 
 
-    int NumBytes = Convert<int>(StrNumBytes(GlslShader->Code));
-    auto StringPtr = StrPtr(GlslShader->Code);
+    int NumBytes = Convert<int>(StrNumBytes(GlslShader.Code));
+    auto StringPtr = StrPtr(GlslShader.Code);
     Shader.setStringsWithLengths(&StringPtr, &NumBytes, 1);
-    Shader.setEntryPoint(StrPtr(GlslShader->EntryPoint));
+    Shader.setEntryPoint(StrPtr(GlslShader.EntryPoint));
 
     const int DefaultVersion = 110; // For Desktop;
     EShMessages Messages{ Coerce<EShMessages>(EShMsgDefault | EShMsgSpvRules | EShMsgVulkanRules) };
@@ -527,8 +518,8 @@ auto
       }
 
       // Copy over the result.
-      SetNum(SpirvShader->Code, SpirvCodeVector.size());
-      SliceCopy(Slice(SpirvShader->Code),
+      SetNum(SpirvShader.Code, SpirvCodeVector.size());
+      SliceCopy(Slice(SpirvShader.Code),
                 AsConst(Slice(SpirvCodeVector.size(), SpirvCodeVector.data())));
     }
   }
@@ -537,8 +528,8 @@ auto
 }
 
 auto
-CompileCfgToGlslAndSpv(shader_compiler_context* Context, cfg_node const* ShaderRoot,
-                       glsl_shader* GlslShader, spirv_shader* SpirvShader)
+CompileCfgToGlslAndSpv(shader_compiler_context& Context, cfg_node const& ShaderRoot,
+                       glsl_shader& GlslShader, spirv_shader& SpirvShader)
   -> bool
 {
   return CompileCfgToGlsl(Context, ShaderRoot, GlslShader) && CompileGlslToSpv(Context, GlslShader, SpirvShader);

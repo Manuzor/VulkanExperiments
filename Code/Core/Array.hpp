@@ -32,7 +32,7 @@ struct array
 
 
   array() = default;
-  inline array(allocator_interface* Allocator) : array() { this->Allocator = Allocator; }
+  inline array(allocator_interface& Allocator) : array() { this->Allocator = &Allocator; }
 
   array(array const& ToCopy) = default;
 
@@ -95,6 +95,7 @@ EnsureInitialized(array<T>& Array)
 {
   if(Array.Allocator == nullptr)
     Array.Allocator = ArrayDefaultAllocator();
+  Assert(Array.Allocator);
 }
 
 template<typename T>
@@ -102,7 +103,7 @@ void
 Reserve(array<T>& Array, size_t MinBytesToReserve)
 {
   EnsureInitialized(Array);
-  auto NewAllocatedMemory = ContainerReserve(Array.Allocator,
+  auto NewAllocatedMemory = ContainerReserve(*Array.Allocator,
                                              Array.Ptr, Array.Num,
                                              Array.Capacity,
                                              MinBytesToReserve,
@@ -231,7 +232,7 @@ Reset(array<T>& Array)
   SliceDestruct(Slice(Array));
   if(Array.Allocator)
   {
-    SliceDeallocate(Array.Allocator, AllocatedMemory(Array));
+    SliceDeallocate(*Array.Allocator, AllocatedMemory(Array));
     Array.Capacity = 0;
     Array.Num = 0;
     Array.Ptr = nullptr;

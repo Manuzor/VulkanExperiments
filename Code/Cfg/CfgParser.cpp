@@ -276,7 +276,7 @@ auto
 }
 
 auto
-::CfgDocumentParseFromString(cfg_document* Document, slice<char const> SourceString, cfg_parsing_context* Context)
+::CfgDocumentParseFromString(cfg_document& Document, slice<char const> SourceString, cfg_parsing_context* Context)
   -> bool
 {
   cfg_source Source;
@@ -288,10 +288,10 @@ auto
 }
 
 auto
-::CfgDocumentParseFromSource(cfg_document* Document, cfg_source* Source, cfg_parsing_context* Context)
+::CfgDocumentParseFromSource(cfg_document& Document, cfg_source* Source, cfg_parsing_context* Context)
   -> bool
 {
-  if(Document->Root == nullptr)
+  if(Document.Root == nullptr)
   {
     LogError("The given document was not properly initialized.");
     return false;
@@ -301,7 +301,7 @@ auto
   auto Success = CfgDocumentParseInnerNodes(Document, Source, Context, &FirstChildOfRoot);
   if(Success)
   {
-    Document->Root->FirstChild = FirstChildOfRoot;
+    Document.Root->FirstChild = FirstChildOfRoot;
     return true;
   }
 
@@ -309,7 +309,7 @@ auto
 }
 
 auto
-::CfgDocumentParseInnerNodes(cfg_document* Document, cfg_source* Source, cfg_parsing_context* Context,
+::CfgDocumentParseInnerNodes(cfg_document& Document, cfg_source* Source, cfg_parsing_context* Context,
                              cfg_node** FirstNode)
   -> bool
 {
@@ -336,7 +336,7 @@ auto
 }
 
 auto
-::CfgDocumentParseIdentifier(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
+::CfgDocumentParseIdentifier(cfg_document& Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
                              cfg_identifier* Result)
   -> bool
 {
@@ -372,7 +372,7 @@ auto
 }
 
 auto
-::CfgDocumentParseNode(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
+::CfgDocumentParseNode(cfg_document& Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
                        cfg_node** OutNode)
   -> bool
 {
@@ -477,7 +477,7 @@ auto
 }
 
 auto
-::CfgDocumentParseLiteral(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
+::CfgDocumentParseLiteral(cfg_document& Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
                           cfg_literal* OutLiteral)
   -> bool
 {
@@ -564,7 +564,7 @@ auto
 }
 
 auto
-::CfgDocumentParseAttribute(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
+::CfgDocumentParseAttribute(cfg_document& Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
                             cfg_attribute* OutAttribute)
   -> bool
 {
@@ -627,7 +627,7 @@ auto
 }
 
 auto
-::CfgDocumentParseName(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
+::CfgDocumentParseName(cfg_document& Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
                        cfg_identifier* OutName)
   -> bool
 {

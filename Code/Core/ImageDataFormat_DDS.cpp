@@ -128,12 +128,12 @@ ConsumeAndReadInto(slice<void const>* Data, slice<void> Result)
 
 template<typename T>
 bool
-ConsumeAndReadInto(slice<void const>* Data, T* Result)
+ConsumeAndReadInto(slice<void const>* Data, T& Result)
 {
   if(Data->Num < sizeof(T))
     return false;
 
-  auto RawResult = Slice<void>(sizeof(T), Result);
+  auto RawResult = Slice<void>(sizeof(T), &Result);
   auto NumBytesRead = ConsumeAndReadInto(Data, RawResult);
   Assert(NumBytesRead == sizeof(T));
 
@@ -141,17 +141,14 @@ ConsumeAndReadInto(slice<void const>* Data, T* Result)
 }
 
 auto
-image_loader_dds::LoadImageFromData(slice<void const> RawImageData, image* ResultImage)
+image_loader_dds::LoadImageFromData(slice<void const> RawImageData, image& ResultImage)
   -> bool
 {
   if(!RawImageData)
     return false;
 
-  if(ResultImage == nullptr)
-    return false;
-
   dds_header FileHeader;
-  if(!ConsumeAndReadInto(&RawImageData, &FileHeader))
+  if(!ConsumeAndReadInto(&RawImageData, FileHeader))
   {
     LogError("Failed to read file header.");
     return false;
@@ -187,8 +184,8 @@ image_loader_dds::LoadImageFromData(slice<void const> RawImageData, image* Resul
 
   bool HasPitch = (FileHeader.Flags & ddsd_flags::PITCH) != 0;
 
-  ResultImage->Width = FileHeader.Width;
-  ResultImage->Height = FileHeader.Height;
+  ResultImage.Width = FileHeader.Width;
+  ResultImage.Height = FileHeader.Height;
 
   if(FileHeader.Ddspf.Size != 32)
   {
@@ -220,7 +217,7 @@ image_loader_dds::LoadImageFromData(slice<void const> RawImageData, image* Resul
   {
     if(FileHeader.Ddspf.FourCC == DdsDxt10FourCc)
     {
-      if(ConsumeAndReadInto(&RawImageData, &HeaderDxt10))
+      if(ConsumeAndReadInto(&RawImageData, HeaderDxt10))
       {
         LogError("Failed to read file header.");
         return false;
@@ -256,7 +253,7 @@ image_loader_dds::LoadImageFromData(slice<void const> RawImageData, image* Resul
     return false;
   }
 
-  ResultImage->Format = format;
+  ResultImage.Format = format;
 
   bool IsComplex  = (FileHeader.Caps  & dds_caps::COMPLEX)  != 0;
   bool HasMipMaps = (FileHeader.Caps  & dds_caps::MIPMAP)   != 0;
@@ -272,7 +269,7 @@ image_loader_dds::LoadImageFromData(slice<void const> RawImageData, image* Resul
 
   if(HasMipMaps)
   {
-    ResultImage->NumMipLevels = FileHeader.MipMapCount;
+    ResultImage.NumMipLevels = FileHeader.MipMapCount;
   }
 
   // Cubemap and volume texture are mutually exclusive
@@ -284,11 +281,11 @@ image_loader_dds::LoadImageFromData(slice<void const> RawImageData, image* Resul
 
   if(IsCubeMap)
   {
-    ResultImage->NumFaces = 6;
+    ResultImage.NumFaces = 6;
   }
   else if(IsVolume)
   {
-    ResultImage->Depth = FileHeader.Depth;
+    ResultImage.Depth = FileHeader.Depth;
   }
 
   ImageAllocateData(ResultImage);
@@ -313,25 +310,30 @@ image_loader_dds::LoadImageFromData(slice<void const> RawImageData, image* Resul
 }
 
 auto
-image_loader_dds::WriteImageToArray(image* Image, array<uint8>* RawImageData)
+image_loader_dds::WriteImageToArray(image& Image, array<uint8>& RawImageData)
   -> bool
 {
   return false;
 }
 
 auto
-::CreateImageLoader_DDS(allocator_interface* Allocator)
+::CreateImageLoader_DDS(allocator_interface& Allocator)
   -> image_loader_interface*
 {
   auto Loader = Allocate<image_loader_dds>(Allocator);
-  MemConstruct(1, Loader);
+  if(Loader)
+    MemConstruct(1, Loader);
+
   return Loader;
 }
 
 auto
-::DestroyImageLoader_DDS(allocator_interface* Allocator, image_loader_interface* Loader)
+::DestroyImageLoader_DDS(allocator_interface& Allocator, image_loader_interface* Loader)
   -> void
 {
-  MemDestruct(1, Loader);
-  Deallocate(Allocator, Loader);
+  if(Loader)
+  {
+    MemDestruct(1, Loader);
+    Deallocate(Allocator, Loader);
+  }
 }

@@ -28,13 +28,13 @@ public:
   arc_string() = default;
 
   arc_string(char const* StringPtr);
-  arc_string(char const* StringPtr, allocator_interface* Allocator);
+  arc_string(char const* StringPtr, allocator_interface& Allocator);
 
   arc_string(slice<char const> Content);
-  arc_string(slice<char const> Content, allocator_interface* Allocator);
+  arc_string(slice<char const> Content, allocator_interface& Allocator);
 
   arc_string(slice<char> Content);
-  arc_string(slice<char> Content, allocator_interface* Allocator);
+  arc_string(slice<char> Content, allocator_interface& Allocator);
 
   //
   // Copy

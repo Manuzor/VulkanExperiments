@@ -199,18 +199,25 @@ int
 main(int NumArgs, char const* Args[])
 {
   mallocator Mallocator = {};
-  allocator_interface* Allocator = &Mallocator;
-  log_data Log = {};
-  GlobalLog = &Log;
-  Defer [=](){ GlobalLog = nullptr; };
+  allocator_interface& Allocator = Mallocator;
 
-  Init(GlobalLog, Allocator);
-  Defer [=](){ Finalize(GlobalLog); };
+  //
+  // Set up a logger
+  //
+  log_data Log = {};
+  Init(Log, Allocator);
+  Defer [&](){ Finalize(Log); };
   {
-    auto DefaultSinkSlots = ExpandBy(GlobalLog->Sinks, 2);
+    auto DefaultSinkSlots = ExpandBy(Log.Sinks, 2);
     DefaultSinkSlots[0] = GetStdoutLogSink(stdout_log_sink_enable_prefixes::No);
     DefaultSinkSlots[1] = log_sink(VisualStudioLogSink);
   }
+
+  //
+  // Set the global log
+  //
+  GlobalLog = &Log;
+  Defer [=](){ GlobalLog = nullptr; };
 
   cmd_options Options{};
   if(!ParseCommandLineOptions(Slice(NumArgs - 1, &Args[1]), &Options))
@@ -229,14 +236,15 @@ main(int NumArgs, char const* Args[])
   }
 
   cfg_document Document{};
-  Init(&Document, Allocator);
-  Defer [&](){ Finalize(&Document); };
+  Init(Document, Allocator);
+  Defer [&](){ Finalize(Document); };
 
   {
-    // TODO: Supply the GlobalLog here as soon as the cfg parser code is more robust.
+    // TODO: Supply the GlobalLog here as soon as the cfg parser code is more
+    // robust and doesn't produce as many warnings.
     cfg_parsing_context Context{ InputFilePath, nullptr };
 
-    if(!CfgDocumentParseFromString(&Document, SliceReinterpret<char const>(Slice(Content)), &Context))
+    if(!CfgDocumentParseFromString(Document, SliceReinterpret<char const>(Slice(Content)), &Context))
     {
       LogError("Failed to parse cfg.");
       return 3;
@@ -253,7 +261,7 @@ main(int NumArgs, char const* Args[])
   }
 
   auto Context = CreateShaderCompilerContext(Allocator);
-  Defer [=](){ DestroyShaderCompilerContext(Allocator, Context); };
+  Defer [&](){ DestroyShaderCompilerContext(Allocator, Context); };
 
 
   //
@@ -273,7 +281,7 @@ main(int NumArgs, char const* Args[])
     // Compile to GLSL
     //
     LogBeginScope("Compiling vertex shader from Cfg to GLSL");
-    bool const CompiledGLSL = CompileCfgToGlsl(Context, VertexShaderNode, &GlslVertexShader);
+    bool const CompiledGLSL = CompileCfgToGlsl(*Context, *VertexShaderNode, GlslVertexShader);
     LogEndScope("Finished compiling vertex shader from Cfg to GLSL");
 
     //
@@ -294,7 +302,7 @@ main(int NumArgs, char const* Args[])
     if(CompiledGLSL)
     {
       LogBeginScope("Compiling vertex shader from GLSL to SPIR-V");
-      bool const CompiledSpv = CompileGlslToSpv(Context, &GlslVertexShader, &SpirvVertexShader);
+      bool const CompiledSpv = CompileGlslToSpv(*Context, GlslVertexShader, SpirvVertexShader);
       LogEndScope("Finished compiling vertex shader from GLSL to SPIR-V");
 
       //
@@ -329,7 +337,7 @@ main(int NumArgs, char const* Args[])
     // Compile to GLSL
     //
     LogBeginScope("Compiling fragment shader from Cfg to GLSL");
-    bool const CompiledGLSL = CompileCfgToGlsl(Context, FragmentShaderNode, &GlslFragmentShader);
+    bool const CompiledGLSL = CompileCfgToGlsl(*Context, *FragmentShaderNode, GlslFragmentShader);
     LogEndScope("Finished compiling fragment shader from Cfg to GLSL");
 
     //
@@ -350,7 +358,7 @@ main(int NumArgs, char const* Args[])
     if(CompiledGLSL)
     {
       LogBeginScope("Compiling fragment shader from GLSL to SPIR-V");
-      bool const CompiledSpv = CompileGlslToSpv(Context, &GlslFragmentShader, &SpirvFragmentShader);
+      bool const CompiledSpv = CompileGlslToSpv(*Context, GlslFragmentShader, SpirvFragmentShader);
       LogEndScope("Finished compiling fragment shader from GLSL to SPIR-V");
 
       //

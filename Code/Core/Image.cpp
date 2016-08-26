@@ -5,21 +5,21 @@
 
 
 static bool
-ImageValidateSubImageIndices(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
+ImageValidateSubImageIndices(image const& Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
 {
-  if(MipLevel >= Image->NumMipLevels)
+  if(MipLevel >= Image.NumMipLevels)
   {
-    LogError("Invalid Mip Level: %d / %d", MipLevel, Image->NumMipLevels);
+    LogError("Invalid Mip Level: %d / %d", MipLevel, Image.NumMipLevels);
     return false;
   }
-  if(Face >= Image->NumFaces)
+  if(Face >= Image.NumFaces)
   {
-    LogError("Invalid Face: %d / %d", Face, Image->NumFaces);
+    LogError("Invalid Face: %d / %d", Face, Image.NumFaces);
     return false;
   }
-  if(ArrayIndex >= Image->NumArrayIndices)
+  if(ArrayIndex >= Image.NumArrayIndices)
   {
-    LogError("Invalid Array Slice: %d / %d", ArrayIndex, Image->NumArrayIndices);
+    LogError("Invalid Array Slice: %d / %d", ArrayIndex, Image.NumArrayIndices);
     return false;
   }
 
@@ -27,60 +27,60 @@ ImageValidateSubImageIndices(image const* Image, uint32 MipLevel, uint32 Face, u
 }
 
 image::sub_image const*
-::ImageInternalSubImage(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
+::ImageInternalSubImage(image const& Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
 {
   if(!ImageValidateSubImageIndices(Image, MipLevel, Face, ArrayIndex))
     return nullptr;
 
-  auto Index = MipLevel + Image->NumMipLevels * (Face + Image->NumFaces * ArrayIndex);
-  return &Image->InternalSubImages[Index];
+  auto Index = MipLevel + Image.NumMipLevels * (Face + Image.NumFaces * ArrayIndex);
+  return &Image.InternalSubImages[Index];
 }
 
 image::sub_image*
-::ImageInternalSubImage(image* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
+::ImageInternalSubImage(image& Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
 {
   if(!ImageValidateSubImageIndices(Image, MipLevel, Face, ArrayIndex))
     return nullptr;
 
-  auto Index = MipLevel + Image->NumMipLevels * (Face + Image->NumFaces * ArrayIndex);
-  return &Image->InternalSubImages[Index];
+  auto Index = MipLevel + Image.NumMipLevels * (Face + Image.NumFaces * ArrayIndex);
+  return &Image.InternalSubImages[Index];
 }
 
 auto
-::Init(image* Image, allocator_interface* Allocator)
+::Init(image& Image, allocator_interface& Allocator)
   -> void
 {
-  Image->InternalSubImages.Allocator = Allocator;
-  Image->Data.Allocator = Allocator;
+  Image.InternalSubImages.Allocator = &Allocator;
+  Image.Data.Allocator = &Allocator;
 }
 
 auto
-::Finalize(image* Image)
+::Finalize(image& Image)
   -> void
 {
-  Reset(Image->Data);
-  Reset(Image->InternalSubImages);
+  Reset(Image.Data);
+  Reset(Image.InternalSubImages);
 }
 
 auto
-::Copy(image* Target, image const& Source)
+::Copy(image& Target, image const& Source)
   -> void
 {
   // Header is safe to copy completely
-  *Cast<image_header*>(Target) = Source;
+  MemCopy<image_header>(1, &Target, &Source);
 
-  Clear(Target->InternalSubImages);
-  Clear(Target->Data);
+  Clear(Target.InternalSubImages);
+  Clear(Target.Data);
 
-  Target->InternalSubImages += Slice(Source.InternalSubImages);
-  Target->Data += Slice(Source.Data);
+  Target.InternalSubImages += Slice(Source.InternalSubImages);
+  Target.Data += Slice(Source.Data);
 }
 
 auto
-::ImageNumBlocksX(image const* Image, uint32 MipLevel)
+::ImageNumBlocksX(image const& Image, uint32 MipLevel)
   -> uint32
 {
-  if(ImageFormatType(Image->Format) != image_format_type::BLOCK_COMPRESSED)
+  if(ImageFormatType(Image.Format) != image_format_type::BLOCK_COMPRESSED)
   {
     LogError("Number of blocks can only be retrieved for block compressed formats.");
     Assert(false);
@@ -90,10 +90,10 @@ auto
 }
 
 auto
-::ImageNumBlocksY(image const* Image, uint32 MipLevel)
+::ImageNumBlocksY(image const& Image, uint32 MipLevel)
   -> uint32
 {
-  if(ImageFormatType(Image->Format) != image_format_type::BLOCK_COMPRESSED)
+  if(ImageFormatType(Image.Format) != image_format_type::BLOCK_COMPRESSED)
   {
     LogError("Number of blocks can only be retrieved for block compressed formats.");
     Assert(false);
@@ -103,31 +103,31 @@ auto
 }
 
 auto
-::ImageDataSize(image const* Image)
+::ImageDataSize(image const& Image)
   -> uint32
 {
-  if(Image->Data.Num < 16)
+  if(Image.Data.Num < 16)
     return 0;
-  return Convert<uint32>(Image->Data.Num - 16);
+  return Convert<uint32>(Image.Data.Num - 16);
 }
 
 auto
-::ImageAllocateData(image* Image)
+::ImageAllocateData(image& Image)
   -> void
 {
-  const auto NumSubImages = Image->NumMipLevels * Image->NumFaces * Image->NumArrayIndices;
-  SetNum(Image->InternalSubImages, NumSubImages);
+  const auto NumSubImages = Image.NumMipLevels * Image.NumFaces * Image.NumArrayIndices;
+  SetNum(Image.InternalSubImages, NumSubImages);
 
   int DataSize = 0;
 
-  bool IsCompressed = ImageFormatType(Image->Format) == image_format_type::BLOCK_COMPRESSED;
-  uint32 BitsPerPixel = ImageFormatBitsPerPixel(Image->Format);
+  bool IsCompressed = ImageFormatType(Image.Format) == image_format_type::BLOCK_COMPRESSED;
+  uint32 BitsPerPixel = ImageFormatBitsPerPixel(Image.Format);
 
-  for (uint32 ArrayIndex = 0; ArrayIndex < Image->NumArrayIndices; ArrayIndex++)
+  for (uint32 ArrayIndex = 0; ArrayIndex < Image.NumArrayIndices; ArrayIndex++)
   {
-    for (uint32 Face = 0; Face < Image->NumFaces; Face++)
+    for (uint32 Face = 0; Face < Image.NumFaces; Face++)
     {
-      for (uint32 MipLevel = 0; MipLevel < Image->NumMipLevels; MipLevel++)
+      for (uint32 MipLevel = 0; MipLevel < Image.NumMipLevels; MipLevel++)
       {
         image::sub_image* SubImage = ImageInternalSubImage(Image, MipLevel, Face, ArrayIndex);
 
@@ -150,14 +150,14 @@ auto
     }
   }
 
-  SetNum(Image->Data, DataSize + 16);
+  SetNum(Image.Data, DataSize + 16);
 }
 
 auto
-::ImageRowPitch(image const* Image, uint32 MipLevel)
+::ImageRowPitch(image const& Image, uint32 MipLevel)
   -> uint32
 {
-  if(ImageFormatType(Image->Format) != image_format_type::LINEAR)
+  if(ImageFormatType(Image.Format) != image_format_type::LINEAR)
   {
     LogError("Row pitch can only be retrieved for linear formats.");
     Assert(false);
@@ -167,14 +167,14 @@ auto
 }
 
 auto
-::ImageDepthPitch(image const* Image, uint32 MipLevel)
+::ImageDepthPitch(image const& Image, uint32 MipLevel)
   -> uint32
 {
   return ImageInternalSubImage(Image, MipLevel, 0, 0)->DepthPitch;
 }
 
 auto
-::ImageDataOffSet(image const* Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
+::ImageDataOffSet(image const& Image, uint32 MipLevel, uint32 Face, uint32 ArrayIndex)
   -> uint32
 {
   return ImageInternalSubImage(Image, MipLevel, Face, ArrayIndex)->DataOffset;
@@ -203,7 +203,7 @@ ColorToPixel(color_linear const& Color, image_format Format, slice<float> OutPix
 }
 
 auto
-::ImageSetAsSolidColor(image* Image, color_linear const& Color, image_format Format)
+::ImageSetAsSolidColor(image& Image, color_linear const& Color, image_format Format)
   -> bool
 {
   if(!IsSupportedSolidColorFormat(Format))
@@ -211,17 +211,17 @@ auto
     LogError("Unsupported image format for use as solid color: %s", ImageFormatName(Format));
     return false;
   }
-  Image->Format = Format;
+  Image.Format = Format;
 
   fixed_block<4, float> Pixel;
   ColorToPixel(Color, Format, Slice(Pixel));
 
-  Image->Width  = 2;
-  Image->Height = 2;
+  Image.Width  = 2;
+  Image.Height = 2;
   ImageAllocateData(Image);
   float* DestPtr = ImageDataPointer<float>(Image);
 
-  auto const NumPixels = Image->Width * Image->Height;
+  auto const NumPixels = Image.Width * Image.Height;
   for(size_t PixelIndex = 0; PixelIndex < NumPixels; ++PixelIndex)
   {
     MemCopy<float>(4, DestPtr, &Pixel[0]);

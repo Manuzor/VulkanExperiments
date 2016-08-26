@@ -100,63 +100,58 @@ CORE_TEMPLATE_EXPORT(struct, array<input_slot_mapping>);
 class CORE_API input_context
 {
 public:
-  input_context* Parent;
+  input_context* Parent{};
   int UserIndex = -1; // -1 for no associated user, >= 0 for a specific user.
-  slice<char> Name; // Mostly for debugging. TODO: Use arc_string
+  slice<char> Name{}; // Mostly for debugging. TODO: Use arc_string
 
-  dictionary<input_id, input_slot> Slots;
-  dictionary<input_id, input_value_properties> ValueProperties;
-  array<input_slot_mapping> SlotMappings;
-  input_event ChangeEvent;
+  dictionary<input_id, input_slot> Slots{};
+  dictionary<input_id, input_value_properties> ValueProperties{};
+  array<input_slot_mapping> SlotMappings{};
+  input_event ChangeEvent{};
 
-  uint64 CurrentFrame;
+  uint64 CurrentFrame{};
 
   // TODO: Use arc_string here.
-  array<char> CharacterBuffer;
+  array<char> CharacterBuffer{};
 
   // Convenient indexing operator that returns nullptr or the ptr to the
   // input_slot that corresponds to SlotId.
   input_slot* operator[](input_id SlotId);
 
+  input_context(allocator_interface& Allocator);
   virtual ~input_context() = 0;
 };
 
 void CORE_API
-Init(input_context* Context, allocator_interface* Allocator);
-
-void CORE_API
-Finalize(input_context* Context);
-
-void CORE_API
-RegisterInputSlot(input_context* Context, input_type Type, input_id SlotId);
+RegisterInputSlot(input_context& Context, input_type Type, input_id SlotId);
 
 bool CORE_API
-AddInputSlotMapping(input_context* Context, input_id SourceSlotId, input_id TargetSlotId, float Scale = 1.0f);
+AddInputSlotMapping(input_context& Context, input_id SourceSlotId, input_id TargetSlotId, float Scale = 1.0f);
 
 bool CORE_API
-RemoveInputTrigger(input_context* Context, input_id SourceSlotId, input_id TargetSlotId);
+RemoveInputTrigger(input_context& Context, input_id SourceSlotId, input_id TargetSlotId);
 
 /// Overload for booleans.
 ///
 /// A boolean value is treated as \c 0.0f for \c false and \c 1.0f for \c true
 /// values.
 bool CORE_API
-UpdateInputSlotValue(input_context* Context, input_id TriggeringSlotId, bool NewValue);
+UpdateInputSlotValue(input_context& Context, input_id TriggeringSlotId, bool NewValue);
 
 /// Return: Will return $(D false) if the slot does not exist.
 bool CORE_API
-UpdateInputSlotValue(input_context* Context, input_id TriggeringSlotId, float NewValue);
+UpdateInputSlotValue(input_context& Context, input_id TriggeringSlotId, float NewValue);
 
 /// Applies special settings for the given input slot, if there are any, and
 /// returns an adjusted value.
 float CORE_API
-AttuneInputValue(input_context const* Context, input_id SlotId, float RawValue);
+AttuneInputValue(input_context const& Context, input_id SlotId, float RawValue);
 
 void CORE_API
-BeginInputFrame(input_context* Context);
+BeginInputFrame(input_context& Context);
 
 void CORE_API
-EndInputFrame(input_context* Context);
+EndInputFrame(input_context& Context);
 
 
 //

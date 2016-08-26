@@ -7,7 +7,7 @@
 /// \return Slice containing the new Ptr and Capacity.
 template<typename T>
 slice<T>
-ContainerReserve(allocator_interface* Allocator,
+ContainerReserve(allocator_interface& Allocator,
                  T* Ptr,
                  size_t CurrentNum,
                  size_t CurrentCapacity,

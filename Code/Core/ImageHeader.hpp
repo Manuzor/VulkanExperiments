@@ -20,14 +20,14 @@ struct image_header
 /// \brief Returns the image width for a given mip level, clamped to 1.
 CORE_API
 uint32
-ImageWidth(image_header const* Header, uint32 MipLevel = 0);
+ImageWidth(image_header const& Header, uint32 MipLevel = 0);
 
 /// \brief Returns the image height for a given mip level, clamped to 1.
 CORE_API
 uint32
-ImageHeight(image_header const* Header, uint32 MipLevel = 0);
+ImageHeight(image_header const& Header, uint32 MipLevel = 0);
 
 /// \brief Returns the image depth for a given mip level, clamped to 1.
 CORE_API
 uint32
-ImageDepth(image_header const* Header, uint32 MipLevel = 0);
+ImageDepth(image_header const& Header, uint32 MipLevel = 0);

@@ -109,13 +109,13 @@ CfgSourceParseEscaped(cfg_source* Source, cfg_parsing_context* Context,
 
 /// Convenience overload to accept a plain string instead of cfg_source.
 CFG_API bool
-CfgDocumentParseFromString(cfg_document* Document, slice<char const> SourceString, cfg_parsing_context* Context);
+CfgDocumentParseFromString(cfg_document& Document, slice<char const> SourceString, cfg_parsing_context* Context);
 
 CFG_API bool
-CfgDocumentParseFromSource(cfg_document* Document, cfg_source* Source, cfg_parsing_context* Context);
+CfgDocumentParseFromSource(cfg_document& Document, cfg_source* Source, cfg_parsing_context* Context);
 
 CFG_API bool
-CfgDocumentParseInnerNodes(cfg_document* Document, cfg_source* Source, cfg_parsing_context* Context,
+CfgDocumentParseInnerNodes(cfg_document& Document, cfg_source* Source, cfg_parsing_context* Context,
                            cfg_node** FirstNode);
 
 constexpr bool
@@ -137,26 +137,26 @@ CfgIsValidIdentifierMiddleChar(char Char)
 }
 
 CFG_API bool
-CfgDocumentParseIdentifier(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
+CfgDocumentParseIdentifier(cfg_document& Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
                            cfg_identifier* Result);
 
 CFG_API bool
-CfgDocumentParseNode(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
+CfgDocumentParseNode(cfg_document& Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
                      cfg_node** OutNode);
 
 
 CFG_API bool
-CfgDocumentParseIdentifier(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
+CfgDocumentParseIdentifier(cfg_document& Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
                            cfg_identifier* Result);
 
 CFG_API bool
-CfgDocumentParseLiteral(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
+CfgDocumentParseLiteral(cfg_document& Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
                         cfg_literal* OutLiteral);
 
 CFG_API bool
-CfgDocumentParseAttribute(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
+CfgDocumentParseAttribute(cfg_document& Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
                           cfg_attribute* OutAttribute);
 
 CFG_API bool
-CfgDocumentParseName(cfg_document* Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
+CfgDocumentParseName(cfg_document& Document, cfg_source* OriginalSource, cfg_parsing_context* Context,
                      cfg_identifier* OutName);

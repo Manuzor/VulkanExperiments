@@ -32,7 +32,7 @@ struct glsl_shader
 
 SHADER_COMPILER_API
 void
-Init(glsl_shader& GlslShader, allocator_interface* Allocator, glsl_shader_stage Stage);
+Init(glsl_shader& GlslShader, allocator_interface& Allocator, glsl_shader_stage Stage);
 
 SHADER_COMPILER_API
 void
@@ -45,7 +45,7 @@ struct spirv_shader
 
 SHADER_COMPILER_API
 void
-Init(spirv_shader& SpirvShader, allocator_interface* Allocator);
+Init(spirv_shader& SpirvShader, allocator_interface& Allocator);
 
 SHADER_COMPILER_API
 void
@@ -56,23 +56,23 @@ struct shader_compiler_context;
 
 SHADER_COMPILER_API
 shader_compiler_context*
-CreateShaderCompilerContext(allocator_interface* Allocator);
+CreateShaderCompilerContext(allocator_interface& Allocator);
 
 SHADER_COMPILER_API
 void
-DestroyShaderCompilerContext(allocator_interface* Allocator, shader_compiler_context* Context);
+DestroyShaderCompilerContext(allocator_interface& Allocator, shader_compiler_context* Context);
 
 SHADER_COMPILER_API
 bool
-CompileCfgToGlsl(shader_compiler_context* Context, cfg_node const* ShaderRoot,
-                 glsl_shader* GlslShader);
+CompileCfgToGlsl(shader_compiler_context& Context, cfg_node const& ShaderRoot,
+                 glsl_shader& GlslShader);
 
 SHADER_COMPILER_API
 bool
-CompileGlslToSpv(shader_compiler_context* Context, glsl_shader const* GlslShader,
-                 spirv_shader* SpirvShader);
+CompileGlslToSpv(shader_compiler_context& Context, glsl_shader const& GlslShader,
+                 spirv_shader& SpirvShader);
 
 SHADER_COMPILER_API
 bool
-CompileCfgToGlslAndSpv(shader_compiler_context* Context, cfg_node const* ShaderRoot,
-                       glsl_shader* GlslShader, spirv_shader* SpirvShader);
+CompileCfgToGlslAndSpv(shader_compiler_context& Context, cfg_node const& ShaderRoot,
+                       glsl_shader& GlslShader, spirv_shader& SpirvShader);

@@ -61,13 +61,17 @@ Reserve(dictionary<K, V>* Dict, size_t MinElementsToReserve)
   if(Dict->Capacity >= MinElementsToReserve)
     return;
 
-  auto NewKeys = ContainerReserve(Dict->Allocator,
+  // TODO: Default allocator for dictionary?
+  if(Dict->Allocator == nullptr)
+    return;
+
+  auto NewKeys = ContainerReserve(*Dict->Allocator,
                                   Dict->KeysPtr, Dict->Num,
                                   Dict->Capacity,
                                   MinElementsToReserve,
                                   DictionaryMinimumCapacity);
 
-  auto NewValues = ContainerReserve(Dict->Allocator,
+  auto NewValues = ContainerReserve(*Dict->Allocator,
                                     Dict->ValuesPtr, Dict->Num,
                                     Dict->Capacity,
                                     MinElementsToReserve,

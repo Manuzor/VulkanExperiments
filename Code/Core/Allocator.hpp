@@ -21,52 +21,52 @@ public:
 };
 
 template<typename T>
-slice<T>
-SliceAllocate(allocator_interface* Allocator, size_t Num)
-{
-  // TODO Alignment
-  enum { Alignment = __alignof(T) };
-  auto Memory = Allocator->Allocate(Num * sizeof(T), Alignment);
-  return Slice(Num, Reinterpret<T*>(Memory));
-}
-
-template<typename T>
-void
-SliceDeallocate(allocator_interface* Allocator, slice<T> Slice)
-{
-  Allocator->Deallocate(Slice.Ptr);
-}
-
-template<typename T>
 T*
-Allocate(allocator_interface* Allocator)
+Allocate(allocator_interface& Allocator)
 {
   // TODO Alignment
   enum { Alignment = __alignof(T) };
-  auto Memory = Allocator->Allocate(sizeof(T), Alignment);
+  auto Memory = Allocator.Allocate(sizeof(T), Alignment);
   auto Ptr = Reinterpret<T*>(Memory);
   return Ptr;
 }
 
 template<typename T>
 void
-Deallocate(allocator_interface* Allocator, T* Object)
+Deallocate(allocator_interface& Allocator, T* Object)
 {
-  Allocator->Deallocate(Object);
+  Allocator.Deallocate(Object);
+}
+
+template<typename T>
+slice<T>
+SliceAllocate(allocator_interface& Allocator, size_t Num)
+{
+  // TODO Alignment
+  enum { Alignment = __alignof(T) };
+  auto Memory = Allocator.Allocate(Num * sizeof(T), Alignment);
+  return Slice(Num, Reinterpret<T*>(Memory));
+}
+
+template<typename T>
+void
+SliceDeallocate(allocator_interface& Allocator, slice<T> Slice)
+{
+  Allocator.Deallocate(Slice.Ptr);
 }
 
 template<typename T, typename... ArgTypes>
 inline T*
-New(allocator_interface* Allocator, ArgTypes&&... Args)
+New(allocator_interface& Allocator, ArgTypes&&... Args)
 {
   auto Ptr = Allocate<T>(Allocator);
-  MemConstruct(1, Ptr, Forward<U>(Args)...);
+  MemConstruct(1, Ptr, Forward<ArgTypes>(Args)...);
   return Ptr;
 }
 
 template<typename T>
 inline void
-Delete(allocator_interface* Allocator, T* Ptr)
+Delete(allocator_interface& Allocator, T* Ptr)
 {
   MemDestruct(1, Ptr);
   Deallocate(Allocator, Ptr);
@@ -76,16 +76,13 @@ Delete(allocator_interface* Allocator, T* Ptr)
 /// of time in the scope it was created.
 ///
 /// \note The dereference operator (\c operator*) is overloaded to retrieve a
-///       pointer to an allocator interface (\c allocator_interface*).
-struct CORE_API temp_allocator
+///       reference to an allocator interface (\c allocator_interface&).
+struct CORE_API temp_allocator : public allocator_interface
 {
   temp_allocator();
-  temp_allocator(temp_allocator const&) = delete;
-  ~temp_allocator();
+  temp_allocator(temp_allocator const&) = delete; // No copy
+  virtual ~temp_allocator();
 
-  /// Get the pointer to the actual allocator interface.
-  allocator_interface*
-  operator *();
-
-  void* Impl;
+  virtual void* Allocate(size_t NumBytes, size_t Alignment) override;
+  virtual bool Deallocate(void* Memory) override;
 };

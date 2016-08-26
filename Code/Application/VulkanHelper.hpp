@@ -120,9 +120,9 @@ struct vulkan_renderable
 
   VkDescriptorSet DescriptorSet{};
 
-  virtual void PrepareForDrawing(struct vulkan* Vulkan);
+  virtual void PrepareForDrawing(vulkan& Vulkan);
 
-  virtual void Draw(struct vulkan* Vulkan,
+  virtual void Draw(vulkan& Vulkan,
                VkCommandBuffer CommandBuffer) = 0;
 };
 
@@ -149,8 +149,8 @@ struct vulkan_scene_object : public vulkan_renderable
 
   transform Transform{ IdentityTransform };
 
-  virtual void PrepareForDrawing(struct vulkan* Vulkan) override;
-  virtual void Draw(struct vulkan* Vulkan, VkCommandBuffer CommandBuffer) override;
+  virtual void PrepareForDrawing(vulkan& Vulkan) override;
+  virtual void Draw(vulkan& Vulkan, VkCommandBuffer CommandBuffer) override;
 };
 
 struct vulkan_debug_grid : public vulkan_renderable
@@ -164,8 +164,8 @@ struct vulkan_debug_grid : public vulkan_renderable
   vertex_buffer VertexBuffer{};
   index_buffer IndexBuffer{};
 
-  virtual void PrepareForDrawing(struct vulkan* Vulkan) override;
-  virtual void Draw(struct vulkan* Vulkan, VkCommandBuffer CommandBuffer) override;
+  virtual void PrepareForDrawing(vulkan& Vulkan) override;
+  virtual void Draw(vulkan& Vulkan, VkCommandBuffer CommandBuffer) override;
 };
 
 struct vulkan_queue_node
@@ -277,7 +277,7 @@ struct vulkan : public vulkan_instance_functions
   // Construction
   //
   vulkan() = default;
-  vulkan(allocator_interface* Allocator);
+  vulkan(allocator_interface& Allocator);
 };
 
 
@@ -286,61 +286,61 @@ struct vulkan : public vulkan_instance_functions
 //
 
 void
-Init(vulkan*              Vulkan,
-     allocator_interface* Allocator);
+Init(vulkan&              Vulkan,
+     allocator_interface& Allocator);
 
 void
-Finalize(vulkan* Vulkan);
+Finalize(vulkan& Vulkan);
 
 
 /// Loads the DLL and some crucial functions needed to create an instance.
 bool
-VulkanLoadDLL(vulkan* Vulkan);
+VulkanLoadDLL(vulkan& Vulkan);
 
 void
-VulkanLoadInstanceFunctions(vulkan* Vulkan);
+VulkanLoadInstanceFunctions(vulkan& Vulkan);
 
 vulkan_scene_object*
-VulkanCreateSceneObject(vulkan* Vulkan, slice<char const> Name);
+VulkanCreateSceneObject(vulkan& Vulkan, slice<char const> Name);
 
 void
-VulkanDestroySceneObject(vulkan*              Vulkan,
+VulkanDestroySceneObject(vulkan&              Vulkan,
                          vulkan_scene_object* SceneObject);
 
 vulkan_debug_grid*
-VulkanCreateDebugGrid(vulkan* Vulkan, slice<char const> Name);
+VulkanCreateDebugGrid(vulkan& Vulkan, slice<char const> Name);
 
 void
-VulkanDestroyDebugGrid(vulkan*            Vulkan,
+VulkanDestroyDebugGrid(vulkan&            Vulkan,
                        vulkan_debug_grid* SceneObject);
 
 enum class vulkan_force_linear_tiling : bool { No = false, Yes = true };
 
 bool
 VulkanUploadTexture(
-  vulkan const&              Vulkan,
+  vulkan&              Vulkan,
   VkCommandBuffer            CommandBuffer,
-  vulkan_texture2d*          Texture,
+  vulkan_texture2d&          Texture,
   vulkan_force_linear_tiling ForceLinearTiling = vulkan_force_linear_tiling::No,
   VkImageUsageFlags          ImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT
 );
 
 void
-VulkanSetQuadGeometry(vulkan*        Vulkan,
-                      vertex_buffer* VertexBuffer,
-                      index_buffer*  IndexBuffer);
+VulkanSetQuadGeometry(vulkan&        Vulkan,
+                      vertex_buffer& VertexBuffer,
+                      index_buffer&  IndexBuffer);
 
 void
-VulkanSetBoxGeometry(vulkan*        Vulkan,
-                     vertex_buffer* VertexBuffer,
-                     index_buffer*  IndexBuffer);
+VulkanSetBoxGeometry(vulkan&        Vulkan,
+                     vertex_buffer& VertexBuffer,
+                     index_buffer&  IndexBuffer);
 
 void
-VulkanSetDebugGridGeometry(vulkan*        Vulkan,
+VulkanSetDebugGridGeometry(vulkan&        Vulkan,
                            vec3           HalfExtents,
                            vec3_<uint>    NumSamples,
-                           vertex_buffer* VertexBuffer,
-                           index_buffer*  IndexBuffer);
+                           vertex_buffer& VertexBuffer,
+                           index_buffer&  IndexBuffer);
 
 #if 0
 void
@@ -354,7 +354,7 @@ VulkanPrepareSceneObjectForRendering(vulkan const*        Vulkan,
 //
 
 void
-VulkanLoadDeviceFunctions(vulkan const& Vulkan, vulkan_device* Device);
+VulkanLoadDeviceFunctions(vulkan& Vulkan, vulkan_device& Device);
 
 void
 VulkanSetImageLayout(vulkan_device const&    Device,
@@ -365,12 +365,12 @@ VulkanSetImageLayout(vulkan_device const&    Device,
                      VkImageLayout           NewImageLayout);
 
 void
-VulkanPrepareSetupCommandBuffer(vulkan* Vulkan);
+VulkanPrepareSetupCommandBuffer(vulkan& Vulkan);
 
 enum class flush_command_buffer { No, Yes };
 
 void
-VulkanCleanupSetupCommandBuffer(vulkan* Vulkan, flush_command_buffer Flush);
+VulkanCleanupSetupCommandBuffer(vulkan& Vulkan, flush_command_buffer Flush);
 
 #if 0
 bool
@@ -386,56 +386,55 @@ VulkanUploadImageToGpu(vulkan_device const& Device,
 //
 
 void
-Init(vulkan_swapchain*    Swapchain,
-     vulkan_device*       Device,
-     allocator_interface* Allocator);
+Init(vulkan_swapchain&    Swapchain,
+     allocator_interface& Allocator);
 
 void
-Finalize(vulkan_swapchain* Swapchain);
+Finalize(vulkan_swapchain& Swapchain);
 
 void
-VulkanSwapchainConnect(vulkan_swapchain* Swapchain,
-                       vulkan_device* Device,
-                       vulkan_surface* Surface);
+VulkanSwapchainConnect(vulkan_swapchain& Swapchain,
+                       vulkan_device& Device,
+                       vulkan_surface& Surface);
 
 bool
-VulkanPrepareSurface(vulkan const&   Vulkan,
-                     vulkan_surface* Surface,
+VulkanPrepareSurface(vulkan&   Vulkan,
+                     vulkan_surface& Surface,
                      HINSTANCE       ProcessHandle,
                      HWND            WindowHandle);
 
 void
-VulkanCleanupSurface(vulkan const&   Vulkan,
-                     vulkan_surface* Surface);
+VulkanCleanupSurface(vulkan&   Vulkan,
+                     vulkan_surface& Surface);
 
 bool
-VulkanPrepareSwapchain(vulkan const&     Vulkan,
-                       vulkan_swapchain* Swapchain,
-                       extent2_<uint>    Extents,
+VulkanPrepareSwapchain(vulkan&     Vulkan,
+                       vulkan_swapchain& Swapchain,
+                       extent2_<uint32>  Extents,
                        vsync             VSync);
 
 void
-VulkanCleanupSwapchain(vulkan const& Vulkan, vulkan_swapchain* Swapchain);
+VulkanCleanupSwapchain(vulkan& Vulkan, vulkan_swapchain& Swapchain);
 
 VkResult
 VulkanAcquireNextSwapchainImage(vulkan_swapchain const& Swapchain,
                                 VkSemaphore             PresentCompleteSemaphore,
-                                vulkan_swapchain_image* CurrentImage);
+                                vulkan_swapchain_image& CurrentImage);
 
 VkResult
-VulkanQueuePresent(vulkan_swapchain*      Swapchain,
+VulkanQueuePresent(vulkan_swapchain&      Swapchain,
                    VkQueue                Queue,
                    vulkan_swapchain_image ImageToPresent,
                    VkSemaphore            WaitSemaphore);
 
 bool
-VulkanPrepareDepth(vulkan*          Vulkan,
-                   vulkan_depth*    Depth,
+VulkanPrepareDepth(vulkan&          Vulkan,
+                   vulkan_depth&    Depth,
                    extent2_<uint32> Extents);
 
 void
-VulkanCleanupDepth(vulkan const& Vulkan,
-                   vulkan_depth* Depth);
+VulkanCleanupDepth(vulkan& Vulkan,
+                   vulkan_depth& Depth);
 
 
 //
@@ -467,37 +466,37 @@ enum class image_format
 ImageFormatFromVulkan(VkFormat VulkanFormat);
 
 void
-Init(vulkan_texture2d* Texture, allocator_interface* Allocator);
+Init(vulkan_texture2d& Texture, allocator_interface& Allocator);
 
 void
-Finalize(vulkan_texture2d* Texture);
+Finalize(vulkan_texture2d& Texture);
 
 
 void
-ImplVulkanCreateShaderBuffer(vulkan* Vulkan, vulkan_shader_buffer_header* ShaderBuffer, size_t NumBytesForBuffer, bool IsReadOnlyForShader);
+ImplVulkanCreateShaderBuffer(vulkan& Vulkan, vulkan_shader_buffer_header& ShaderBuffer, size_t NumBytesForBuffer, bool IsReadOnlyForShader);
 
 enum class is_read_only_for_shader : bool { No = false, Yes = true };
 
 template<typename T>
 void
-VulkanCreateShaderBuffer(vulkan* Vulkan, vulkan_shader_buffer<T>* ShaderBuffer, is_read_only_for_shader IsReadOnlyForShader)
+VulkanCreateShaderBuffer(vulkan& Vulkan, vulkan_shader_buffer<T>& ShaderBuffer, is_read_only_for_shader IsReadOnlyForShader)
 {
   ImplVulkanCreateShaderBuffer(Vulkan, ShaderBuffer, SizeOf<T>(), IsReadOnlyForShader == is_read_only_for_shader::Yes);
 }
 
 void
-VulkanEnsureIsReadyForDrawing(vulkan* Vulkan, vulkan_renderable* Renderable);
+VulkanEnsureIsReadyForDrawing(vulkan& Vulkan, vulkan_renderable& Renderable);
 
 void
 ImplVulkanUploadBufferData(vulkan_device const& Device, vulkan_shader_buffer_header const& ShaderBuffer, slice<void const> Data);
 
 template<typename Type>
 void
-VulkanUploadShaderBufferData(vulkan* Vulkan, vulkan_shader_buffer<Type> const& ShaderBuffer)
+VulkanUploadShaderBufferData(vulkan& Vulkan, vulkan_shader_buffer<Type> const& ShaderBuffer)
 {
   auto Data = Slice(1, &ShaderBuffer.Data);
   auto RawData = SliceReinterpret<void const>(Data);
-  ImplVulkanUploadBufferData(Vulkan->Device,
+  ImplVulkanUploadBufferData(Vulkan.Device,
                              ShaderBuffer,
                              RawData);
 }

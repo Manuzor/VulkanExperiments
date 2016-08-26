@@ -42,11 +42,11 @@ CORE_API extern log_data* GlobalLog;
 
 CORE_API
 void
-Init(log_data* Log, allocator_interface* Allocator);
+Init(log_data& Log, allocator_interface& Allocator);
 
 CORE_API
 void
-Finalize(log_data* Log);
+Finalize(log_data& Log);
 
 CORE_API
 void

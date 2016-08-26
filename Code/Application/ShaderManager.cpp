@@ -18,11 +18,11 @@ struct compiled_shader
 };
 
 static compiled_shader*
-CreateCompiledShader(allocator_interface* Allocator)
+CreateCompiledShader(allocator_interface& Allocator)
 {
   auto CompiledShader = Allocate<compiled_shader>(Allocator);
   MemConstruct(1, CompiledShader);
-  Init(&CompiledShader->Cfg, Allocator);
+  Init(CompiledShader->Cfg, Allocator);
   Init(CompiledShader->GlslVertexShader, Allocator, glsl_shader_stage::Vertex);
   Init(CompiledShader->SpirvVertexShader, Allocator);
   Init(CompiledShader->GlslFragmentShader, Allocator, glsl_shader_stage::Fragment);
@@ -31,13 +31,13 @@ CreateCompiledShader(allocator_interface* Allocator)
 }
 
 static void
-DestroyCompiledShader(allocator_interface* Allocator, compiled_shader* CompiledShader)
+DestroyCompiledShader(allocator_interface& Allocator, compiled_shader* CompiledShader)
 {
   Finalize(CompiledShader->SpirvFragmentShader);
   Finalize(CompiledShader->GlslFragmentShader);
   Finalize(CompiledShader->SpirvVertexShader);
   Finalize(CompiledShader->GlslVertexShader);
-  Finalize(&CompiledShader->Cfg);
+  Finalize(CompiledShader->Cfg);
   Deallocate(Allocator, CompiledShader);
 }
 
@@ -49,23 +49,26 @@ struct shader_manager
 };
 
 auto
-::CreateShaderManager(allocator_interface* Allocator)
+::CreateShaderManager(allocator_interface& Allocator)
   -> shader_manager*
 {
   auto Manager = New<shader_manager>(Allocator);
-  Manager->Allocator = Allocator;
+  Manager->Allocator = &Allocator;
   Manager->CompilerContext = CreateShaderCompilerContext(Allocator);
-  Manager->CompiledShaders.Allocator = Allocator;
+  Manager->CompiledShaders.Allocator = &Allocator;
   return Manager;
 }
 
 auto
-::DestroyShaderManager(allocator_interface* Allocator, shader_manager* Manager)
+::DestroyShaderManager(allocator_interface& Allocator, shader_manager* Manager)
   -> void
 {
+  if(Manager == nullptr)
+    return;
+
   for(auto CompiledShader : Slice(Manager->CompiledShaders))
   {
-    DestroyCompiledShader(Manager->Allocator, CompiledShader);
+    DestroyCompiledShader(*Manager->Allocator, CompiledShader);
   }
 
   DestroyShaderCompilerContext(Allocator, Manager->CompilerContext);
@@ -113,15 +116,14 @@ ReadFileContentIntoArray(char const* FileName, array<uint8>* Array, log_data* Lo
 }
 
 static compiled_shader*
-LoadAndCompileShader(shader_manager* ShaderManager, slice<char const> FileName,
+LoadAndCompileShader(shader_manager& ShaderManager, slice<char const> FileName,
                      log_data* Log)
 {
   // Make a copy of FileName to ensure it's zero terminated.
   arc_string FileNameString{ FileName };
   auto InputFilePath = AsConst(Slice(FileNameString));
 
-  temp_allocator TempAllocator{};
-  allocator_interface* Allocator = *TempAllocator;
+  temp_allocator Allocator{};
 
   array<uint8> Content{ Allocator };
   if(!ReadFileContentIntoArray(InputFilePath.Ptr, &Content, Log))
@@ -140,7 +142,7 @@ LoadAndCompileShader(shader_manager* ShaderManager, slice<char const> FileName,
     // TODO: Supply the GlobalLog here as soon as the cfg parser code is more robust.
     cfg_parsing_context ParsingContext{ InputFilePath, Log };
 
-    if(!CfgDocumentParseFromString(&CompiledShader->Cfg, Slice(CompiledShader->CfgSource), &ParsingContext))
+    if(!CfgDocumentParseFromString(CompiledShader->Cfg, Slice(CompiledShader->CfgSource), &ParsingContext))
     {
       LogError(Log, "Failed to parse cfg.");
       return nullptr;
@@ -165,8 +167,8 @@ LoadAndCompileShader(shader_manager* ShaderManager, slice<char const> FileName,
     // Compile to GLSL
     //
     LogBeginScope("Compiling vertex shader from Cfg to GLSL");
-    bool const CompiledGLSL = CompileCfgToGlsl(ShaderManager->CompilerContext, VertexShaderNode,
-                                               &CompiledShader->GlslVertexShader);
+    bool const CompiledGLSL = CompileCfgToGlsl(*ShaderManager.CompilerContext, *VertexShaderNode,
+                                               CompiledShader->GlslVertexShader);
     LogEndScope("Finished compiling vertex shader from Cfg to GLSL");
 
     //
@@ -175,8 +177,8 @@ LoadAndCompileShader(shader_manager* ShaderManager, slice<char const> FileName,
     if(CompiledGLSL)
     {
       LogBeginScope("Compiling vertex shader from GLSL to SPIR-V");
-      bool const CompiledSpv = CompileGlslToSpv(ShaderManager->CompilerContext, &CompiledShader->GlslVertexShader,
-                                                &CompiledShader->SpirvVertexShader);
+      bool const CompiledSpv = CompileGlslToSpv(*ShaderManager.CompilerContext, CompiledShader->GlslVertexShader,
+                                                CompiledShader->SpirvVertexShader);
       LogEndScope("Finished compiling vertex shader from GLSL to SPIR-V");
     }
   }
@@ -191,8 +193,8 @@ LoadAndCompileShader(shader_manager* ShaderManager, slice<char const> FileName,
     // Compile to GLSL
     //
     LogBeginScope("Compiling fragment shader from Cfg to GLSL");
-    bool const CompiledGLSL = CompileCfgToGlsl(ShaderManager->CompilerContext, FragmentShaderNode,
-                                               &CompiledShader->GlslFragmentShader);
+    bool const CompiledGLSL = CompileCfgToGlsl(*ShaderManager.CompilerContext, *FragmentShaderNode,
+                                               CompiledShader->GlslFragmentShader);
     LogEndScope("Finished compiling fragment shader from Cfg to GLSL");
 
     //
@@ -201,26 +203,23 @@ LoadAndCompileShader(shader_manager* ShaderManager, slice<char const> FileName,
     if(CompiledGLSL)
     {
       LogBeginScope("Compiling fragment shader from GLSL to SPIR-V");
-      bool const CompiledSpv = CompileGlslToSpv(ShaderManager->CompilerContext, &CompiledShader->GlslFragmentShader,
-                                                &CompiledShader->SpirvFragmentShader);
+      bool const CompiledSpv = CompileGlslToSpv(*ShaderManager.CompilerContext, CompiledShader->GlslFragmentShader,
+                                                CompiledShader->SpirvFragmentShader);
       LogEndScope("Finished compiling fragment shader from GLSL to SPIR-V");
     }
   }
 
-  ShaderManager->CompiledShaders += CompiledShader;
+  ShaderManager.CompiledShaders += CompiledShader;
 
   return CompiledShader;
 }
 
 auto
-::GetCompiledShader(shader_manager* Manager, slice<char const> FileName,
+::GetCompiledShader(shader_manager& Manager, slice<char const> FileName,
                     log_data* Log)
   -> compiled_shader*
 {
-  if(Manager == nullptr)
-    return nullptr;
-
-  for(auto CompiledShader : Slice(Manager->CompiledShaders))
+  for(auto CompiledShader : Slice(Manager.CompiledShaders))
   {
     if(Slice(CompiledShader->Id) == FileName)
     {
@@ -232,25 +231,25 @@ auto
 }
 
 auto
-::HasShaderStage(compiled_shader* CompiledShader, shader_stage Stage)
+::HasShaderStage(compiled_shader& CompiledShader, shader_stage Stage)
   -> bool
 {
   switch(Stage)
   {
-    case shader_stage::Vertex:   return CompiledShader->SpirvVertexShader.Code.Num > 0;
-    case shader_stage::Fragment: return CompiledShader->SpirvFragmentShader.Code.Num > 0;
+    case shader_stage::Vertex:   return CompiledShader.SpirvVertexShader.Code.Num > 0;
+    case shader_stage::Fragment: return CompiledShader.SpirvFragmentShader.Code.Num > 0;
     default: return false;
   }
 }
 
 auto
-::GetGlslShader(compiled_shader* CompiledShader, shader_stage Stage)
+::GetGlslShader(compiled_shader& CompiledShader, shader_stage Stage)
   -> glsl_shader*
 {
   switch(Stage)
   {
-    case shader_stage::Vertex:   return &CompiledShader->GlslVertexShader;
-    case shader_stage::Fragment: return &CompiledShader->GlslFragmentShader;
+    case shader_stage::Vertex:   return &CompiledShader.GlslVertexShader;
+    case shader_stage::Fragment: return &CompiledShader.GlslFragmentShader;
     default:
       break;
   }
@@ -261,13 +260,13 @@ auto
 }
 
 auto
-::GetSpirvShader(compiled_shader* CompiledShader, shader_stage Stage)
+::GetSpirvShader(compiled_shader& CompiledShader, shader_stage Stage)
   -> spirv_shader*
 {
   switch(Stage)
   {
-    case shader_stage::Vertex:   return &CompiledShader->SpirvVertexShader;
-    case shader_stage::Fragment: return &CompiledShader->SpirvFragmentShader;
+    case shader_stage::Vertex:   return &CompiledShader.SpirvVertexShader;
+    case shader_stage::Fragment: return &CompiledShader.SpirvFragmentShader;
     default:
       break;
   }
@@ -308,7 +307,7 @@ MapShaderTypeNameToFormatAndSize(slice<char const> TypeName, VkFormat* Format, u
 }
 
 auto
-::GenerateVertexInputDescriptions(compiled_shader* CompiledShader,
+::GenerateVertexInputDescriptions(compiled_shader& CompiledShader,
                                   VkVertexInputBindingDescription const& InputBinding,
                                   array<VkVertexInputAttributeDescription>& InputAttributes)
   -> void
@@ -316,14 +315,8 @@ auto
   // Note: this procedure assumes the shader code was compiled successfully
   //       before and is valid.
 
-  if(CompiledShader == nullptr)
-  {
-    LogError("Invalid CompiledShader ptr.");
-    return;
-  }
-
   cfg_node* VertexShaderNode{};
-  for(auto Node = CompiledShader->Cfg.Root->FirstChild;
+  for(auto Node = CompiledShader.Cfg.Root->FirstChild;
       Node != nullptr;
       Node = Node->Next)
   {
@@ -365,8 +358,7 @@ auto
     int Location;
   };
 
-  temp_allocator TempAllocator{};
-  allocator_interface* Allocator = *TempAllocator;
+  temp_allocator Allocator{};
   array<input_decl> Decls{ Allocator };
 
   for(auto Node = InputNode->FirstChild;
@@ -450,17 +442,11 @@ GetDescriptorTypeFromName(slice<char const> DescriptorName)
 }
 
 auto
-::GetDescriptorTypeCounts(compiled_shader* CompiledShader,
-                          dictionary<VkDescriptorType, uint32>* DescriptorCounts)
+::GetDescriptorTypeCounts(compiled_shader& CompiledShader,
+                          dictionary<VkDescriptorType, uint32>& DescriptorCounts)
   -> void
 {
-  if(CompiledShader == nullptr)
-  {
-    LogError("Invalid CompiledShader ptr.");
-    return;
-  }
-
-  for(auto Node = CompiledShader->Cfg.Root->FirstChild;
+  for(auto Node = CompiledShader.Cfg.Root->FirstChild;
       Node != nullptr;
       Node = Node->Next)
   {
@@ -471,7 +457,7 @@ auto
       auto DescriptorType = GetDescriptorTypeFromName(Descriptor->Name.Value);
       if(DescriptorType != VK_DESCRIPTOR_TYPE_MAX_ENUM)
       {
-        ++*GetOrCreate(DescriptorCounts, DescriptorType);
+        ++*GetOrCreate(&DescriptorCounts, DescriptorType);
       }
       else
       {
@@ -483,22 +469,15 @@ auto
 }
 
 auto
-::GetDescriptorSetLayoutBindings(compiled_shader* CompiledShader,
-                                 array<VkDescriptorSetLayoutBinding>* LayoutBindings)
+::GetDescriptorSetLayoutBindings(compiled_shader& CompiledShader,
+                                 array<VkDescriptorSetLayoutBinding>& LayoutBindings)
   -> void
 {
-  if(CompiledShader == nullptr)
-  {
-    LogError("Invalid CompiledShader ptr.");
-    return;
-  }
+  temp_allocator Allocator{};
 
-  temp_allocator TempAllocator{};
-  allocator_interface* Allocator = *TempAllocator;
+  scoped_dictionary<uint32, VkDescriptorSetLayoutBinding> BindingSet{ &Allocator };
 
-  scoped_dictionary<uint32, VkDescriptorSetLayoutBinding> BindingSet{ Allocator };
-
-  for(auto ShaderNode = CompiledShader->Cfg.Root->FirstChild;
+  for(auto ShaderNode = CompiledShader.Cfg.Root->FirstChild;
       ShaderNode != nullptr;
       ShaderNode = ShaderNode->Next)
   {
@@ -539,5 +518,5 @@ auto
     }
   }
 
-  *LayoutBindings += Values(&BindingSet);
+  LayoutBindings += Values(&BindingSet);
 }

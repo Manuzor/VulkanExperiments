@@ -94,8 +94,20 @@ auto
 // input_context
 //
 
+input_context::input_context(allocator_interface& Allocator)
+  : SlotMappings(Allocator)
+  , CharacterBuffer(Allocator)
+{
+  Init(&this->Slots,           &Allocator);
+  Init(&this->ValueProperties, &Allocator);
+  Init(&this->ChangeEvent,     &Allocator);
+}
+
 input_context::~input_context()
 {
+  Finalize(&this->ChangeEvent);
+  Finalize(&this->ValueProperties);
+  Finalize(&this->Slots);
 }
 
 input_slot*
@@ -112,43 +124,21 @@ input_context::operator[](input_id SlotId)
 }
 
 auto
-::Init(input_context* Context, allocator_interface* Allocator)
+::RegisterInputSlot(input_context& Context, input_type Type, input_id SlotId)
   -> void
 {
-  Init(&Context->Slots,           Allocator);
-  Init(&Context->ValueProperties, Allocator);
-  Context->SlotMappings.Allocator = Allocator;
-  Init(&Context->ChangeEvent,     Allocator);
-  Context->CharacterBuffer.Allocator = Allocator;
-}
-
-auto
-::Finalize(input_context* Context)
-  -> void
-{
-  Reset(Context->CharacterBuffer);
-  Finalize(&Context->ChangeEvent);
-  Reset(Context->SlotMappings);
-  Finalize(&Context->ValueProperties);
-  Finalize(&Context->Slots);
-}
-
-auto
-::RegisterInputSlot(input_context* Context, input_type Type, input_id SlotId)
-  -> void
-{
-  auto Slot = GetOrCreate(&Context->Slots, SlotId);
+  auto Slot = GetOrCreate(&Context.Slots, SlotId);
   Assert(Slot);
 
   Slot->Type = Type;
 }
 
 auto
-::AddInputSlotMapping(input_context* Context, input_id SourceSlotId, input_id TargetSlotId, float Scale)
+::AddInputSlotMapping(input_context& Context, input_id SourceSlotId, input_id TargetSlotId, float Scale)
   -> bool
 {
   // TODO(Manu): Eliminate duplicates.
-  auto NewSlotMapping = &Expand(Context->SlotMappings);
+  auto NewSlotMapping = &Expand(Context.SlotMappings);
   NewSlotMapping->SourceSlotId = SourceSlotId;
   NewSlotMapping->TargetSlotId = TargetSlotId;
   NewSlotMapping->Scale = Scale;
@@ -157,7 +147,7 @@ auto
 }
 
 auto
-::RemoveInputTrigger(input_context* Context, input_id SourceSlotId, input_id TargetSlotId)
+::RemoveInputTrigger(input_context& Context, input_id SourceSlotId, input_id TargetSlotId)
   -> bool
 {
   // TODO(Manu): Implement
@@ -169,7 +159,7 @@ auto
 /// A boolean value is treated as $(D 0.0f) for $(D false) and $(D 1.0f) for
 /// $(D true) values.
 auto
-::UpdateInputSlotValue(input_context* Context, input_id TriggeringSlotId, bool NewValue)
+::UpdateInputSlotValue(input_context& Context, input_id TriggeringSlotId, bool NewValue)
   -> bool
 {
   return UpdateInputSlotValue(Context, TriggeringSlotId, NewValue ? 1.0f : 0.0f);
@@ -177,23 +167,23 @@ auto
 
 /// Return: Will return $(D false) if the slot does not exist.
 auto
-::UpdateInputSlotValue(input_context* Context, input_id TriggeringSlotId, float NewValue)
+::UpdateInputSlotValue(input_context& Context, input_id TriggeringSlotId, float NewValue)
   -> bool
 {
-  auto TriggeringSlot = Get(&Context->Slots, TriggeringSlotId);
+  auto TriggeringSlot = Get(&Context.Slots, TriggeringSlotId);
   if(TriggeringSlot == nullptr)
     return false;
 
   float const AttunedValue = AttuneInputValue(Context, TriggeringSlotId, NewValue);
 
-  TriggeringSlot->Frame = Context->CurrentFrame;
+  TriggeringSlot->Frame = Context.CurrentFrame;
   TriggeringSlot->Value = AttunedValue;
 
   //
   // Apply input mapping
   //
 
-  for(auto& Mapping : Slice(Context->SlotMappings))
+  for(auto& Mapping : Slice(Context.SlotMappings))
   {
     if(Mapping.SourceSlotId == TriggeringSlotId)
     {
@@ -208,12 +198,12 @@ auto
 /// Applies special settings for the given input slot, if there are any, and
 /// returns an adjusted value.
 auto
-::AttuneInputValue(input_context const* Context, input_id SlotId, float RawValue)
+::AttuneInputValue(input_context const& Context, input_id SlotId, float RawValue)
   -> float
 {
   float NewValue = RawValue;
 
-  auto Properties = Get(&Context->ValueProperties, SlotId);
+  auto Properties = Get(&Context.ValueProperties, SlotId);
   if(Properties == nullptr)
     return RawValue;
 
@@ -239,28 +229,28 @@ auto
 }
 
 auto
-::BeginInputFrame(input_context* Context)
+::BeginInputFrame(input_context& Context)
   -> void
 {
   // Context will never happen...
-  Assert(Context->CurrentFrame < IntMaxValue<decltype(Context->CurrentFrame)>());
-  Context->CurrentFrame++;
+  Assert(Context.CurrentFrame < IntMaxValue<decltype(Context.CurrentFrame)>());
+  Context.CurrentFrame++;
 
-  Clear(Context->CharacterBuffer);
+  Clear(Context.CharacterBuffer);
 }
 
 auto
-::EndInputFrame(input_context* Context)
+::EndInputFrame(input_context& Context)
   -> void
 {
-  auto Ids = Keys(&Context->Slots);
-  auto Slots = Values(&Context->Slots);
-  for(size_t Index = 0; Index < Context->Slots.Num; ++Index)
+  auto Ids = Keys(&Context.Slots);
+  auto Slots = Values(&Context.Slots);
+  for(size_t Index = 0; Index < Context.Slots.Num; ++Index)
   {
     auto Id = Ids[Index];
     auto Slot = &Slots[Index];
 
-    if(Slot->Frame < Context->CurrentFrame)
+    if(Slot->Frame < Context.CurrentFrame)
     {
       if(Slot->Type == input_type::Action)
       {
@@ -270,7 +260,7 @@ auto
       continue;
     }
 
-    Context->ChangeEvent(Id, Slot);
+    Context.ChangeEvent(Id, Slot);
   }
 }
 

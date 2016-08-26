@@ -10,21 +10,21 @@
 CORE_API log_data* GlobalLog = nullptr;
 
 auto
-::Init(log_data* Log, allocator_interface* Allocator)
+::Init(log_data& Log, allocator_interface& Allocator)
   -> void
 {
-  Log->MessageBuffer.Allocator = Allocator;
-  Log->TempBuffer.Allocator = Allocator;
-  Log->Sinks.Allocator = Allocator;
+  Log.MessageBuffer.Allocator = &Allocator;
+  Log.TempBuffer.Allocator = &Allocator;
+  Log.Sinks.Allocator = &Allocator;
 }
 
 auto
-::Finalize(log_data* Log)
+::Finalize(log_data& Log)
   -> void
 {
-  Reset(Log->MessageBuffer);
-  Reset(Log->TempBuffer);
-  Reset(Log->Sinks);
+  Reset(Log.MessageBuffer);
+  Reset(Log.TempBuffer);
+  Reset(Log.Sinks);
 }
 
 auto
