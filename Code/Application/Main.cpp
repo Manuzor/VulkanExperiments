@@ -39,8 +39,8 @@ ThisExeDir()
     fixed_block<256, char> RawBuffer;
 
     // TODO: Handle return value
-    DWORD Result = GetModuleFileNameA(nullptr, &RawBuffer[0], RawBuffer.Num);
-    auto FullPath = SliceFromString(&RawBuffer[0]);
+    DWORD Result = GetModuleFileNameA(nullptr, First(RawBuffer), RawBuffer.Num);
+    auto FullPath = SliceFromString(First(RawBuffer));
 
     slice<char const> Directory;
     ExtractPathDirectoryAndFileName(FullPath, &Directory, nullptr);
@@ -775,7 +775,7 @@ ImplVulkanCreateGraphicsPipeline(vulkan& Vulkan,
   auto DynamicState = InitStruct<VkPipelineDynamicStateCreateInfo>();
   {
     DynamicState.dynamicStateCount = Cast<uint32>(DynamicStatesBlock.Num);
-    DynamicState.pDynamicStates = &DynamicStatesBlock[0];
+    DynamicState.pDynamicStates = First(DynamicStatesBlock);
   }
 
   auto GraphicsPipelineCreateInfo = InitStruct<VkGraphicsPipelineCreateInfo>();
@@ -1039,7 +1039,7 @@ static void VulkanCreateFramebuffers(vulkan& Vulkan)
   {
     FramebufferCreateInfo.renderPass = Vulkan.RenderPass;
     FramebufferCreateInfo.attachmentCount = Cast<uint32>(Attachments.Num);
-    FramebufferCreateInfo.pAttachments = &Attachments[0];
+    FramebufferCreateInfo.pAttachments = First(Attachments);
     FramebufferCreateInfo.width = Vulkan.Swapchain.Extent.Width;
     FramebufferCreateInfo.height = Vulkan.Swapchain.Extent.Height;
     FramebufferCreateInfo.layers = 1;
@@ -1266,8 +1266,7 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
 
   auto const& Device = Vulkan.Device;
 
-  fixed_block<2, VkClearValue> ClearValuesBlock;
-  auto ClearValues = Slice(ClearValuesBlock);
+  fixed_block<2, VkClearValue> ClearValues;
 
   // Regular clear color.
   SliceCopy(Slice(ClearValues[0].color.float32),
@@ -1283,7 +1282,7 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
     RenderPassBeginInfo.renderArea.extent.width = Vulkan.Swapchain.Extent.Width;
     RenderPassBeginInfo.renderArea.extent.height = Vulkan.Swapchain.Extent.Height;
     RenderPassBeginInfo.clearValueCount = Cast<uint32>(ClearValues.Num);
-    RenderPassBeginInfo.pClearValues = ClearValues.Ptr;
+    RenderPassBeginInfo.pClearValues = First(ClearValues);
   }
 
   auto BeginCommandBufferInfo = InitStruct<VkCommandBufferBeginInfo>();
