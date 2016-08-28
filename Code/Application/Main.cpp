@@ -1607,8 +1607,8 @@ struct frame_time_stats
     time FrameTime;
   };
 
-  sample MinSample{};
-  sample MaxSample{};
+  sample FastestSample{};
+  sample SlowestSample{};
   array<sample> Samples;
 
   size_t MaxNumSamples{};
@@ -1624,8 +1624,8 @@ struct frame_time_stats
 static void
 PrintFrameTimeStats(frame_time_stats const& FrameTimeStats, log_data* Log)
 {
-  frame_time_stats::sample MinSample{ Seconds(1e20f), Seconds(1e20f), Seconds(1e20f) };
-  frame_time_stats::sample MaxSample{};
+  frame_time_stats::sample FastestSample{ Seconds(1e20f), Seconds(1e20f), Seconds(1e20f) };
+  frame_time_stats::sample SlowestSample{};
   frame_time_stats::sample AverageSample{};
 
   for(auto& Sample : Slice(FrameTimeStats.Samples))
@@ -1634,12 +1634,12 @@ PrintFrameTimeStats(frame_time_stats const& FrameTimeStats, log_data* Log)
     AverageSample.GpuTime += Sample.GpuTime;
     AverageSample.FrameTime += Sample.FrameTime;
 
-    MinSample.CpuTime = Min(Sample.CpuTime, MinSample.CpuTime);
-    MinSample.GpuTime = Min(Sample.GpuTime, MinSample.GpuTime);
-    MinSample.FrameTime = Min(Sample.FrameTime, MinSample.FrameTime);
-    MaxSample.CpuTime = Max(Sample.CpuTime, MaxSample.CpuTime);
-    MaxSample.GpuTime = Max(Sample.GpuTime, MaxSample.GpuTime);
-    MaxSample.FrameTime = Max(Sample.FrameTime, MaxSample.FrameTime);
+    FastestSample.CpuTime = Min(Sample.CpuTime, FastestSample.CpuTime);
+    FastestSample.GpuTime = Min(Sample.GpuTime, FastestSample.GpuTime);
+    FastestSample.FrameTime = Min(Sample.FrameTime, FastestSample.FrameTime);
+    SlowestSample.CpuTime = Max(Sample.CpuTime, SlowestSample.CpuTime);
+    SlowestSample.GpuTime = Max(Sample.GpuTime, SlowestSample.GpuTime);
+    SlowestSample.FrameTime = Max(Sample.FrameTime, SlowestSample.FrameTime);
   }
 
   AverageSample.CpuTime /= Convert<double>(FrameTimeStats.Samples.Num);
@@ -1648,19 +1648,19 @@ PrintFrameTimeStats(frame_time_stats const& FrameTimeStats, log_data* Log)
 
   LogBeginScope("Frame Time Stats (%u samples)", FrameTimeStats.Samples.Num);
   {
-    LogInfo(Log, "Min     (%3.u FPS) Frame: %f s, CPU: %f s, GPU: %f s",
-            Round<uint64>(1.0f / TimeAsSeconds(MinSample.FrameTime)),
-            TimeAsSeconds(MinSample.FrameTime),
-            TimeAsSeconds(MinSample.CpuTime),
-            TimeAsSeconds(MinSample.GpuTime));
+    LogInfo(Log, "Fastest Frame: (%4.u FPS) %fs, CPU: %fs, GPU: %fs",
+            Round<uint64>(1.0f / TimeAsSeconds(FastestSample.FrameTime)),
+            TimeAsSeconds(FastestSample.FrameTime),
+            TimeAsSeconds(FastestSample.CpuTime),
+            TimeAsSeconds(FastestSample.GpuTime));
 
-    LogInfo(Log, "Max     (%3.u FPS) Frame: %f s, CPU: %f s, GPU: %f s",
-            Round<uint64>(1.0f / TimeAsSeconds(MaxSample.FrameTime)),
-            TimeAsSeconds(MaxSample.FrameTime),
-            TimeAsSeconds(MaxSample.CpuTime),
-            TimeAsSeconds(MaxSample.GpuTime));
+    LogInfo(Log, "Slowest Frame: (%4.u FPS) %fs, CPU: %fs, GPU: %fs",
+            Round<uint64>(1.0f / TimeAsSeconds(SlowestSample.FrameTime)),
+            TimeAsSeconds(SlowestSample.FrameTime),
+            TimeAsSeconds(SlowestSample.CpuTime),
+            TimeAsSeconds(SlowestSample.GpuTime));
 
-    LogInfo(Log, "Average (%3.u FPS) Frame: %f s, CPU: %f s, GPU: %f s",
+    LogInfo(Log, "Average Frame: (%4.u FPS) %fs, CPU: %fs, GPU: %fs",
             Round<uint64>(1.0f / TimeAsSeconds(AverageSample.FrameTime)),
             TimeAsSeconds(AverageSample.FrameTime),
             TimeAsSeconds(AverageSample.CpuTime),
@@ -1804,7 +1804,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       LogBeginScope("Preparing swapchain for the first time.");
 
       ++CurrentExitCode;
-      if(!VulkanPrepareSwapchain(Vulkan, Vulkan.Swapchain, WindowSetup.ClientExtents, vsync::Off))
+      if(!VulkanPrepareSwapchain(Vulkan, Vulkan.Swapchain, WindowSetup.ClientExtents, vsync::On))
       {
         LogEndScope("Failed to prepare initial swapchain.");
         return CurrentExitCode;
@@ -2263,6 +2263,29 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         Sample.GpuTime = FrameTimeOnGpu;
         Sample.FrameTime = CurrentFrameTime;
         AddFrameTimeSample(FrameTimeStats, Sample);
+      }
+
+      time const IdealFrameTime(Seconds(1 / 60.0f));
+      time const AcceptableFrameTime(2 * IdealFrameTime);
+      time const BadFrameTime(2 * AcceptableFrameTime);
+
+      if(CurrentFrameTime > IdealFrameTime)
+      {
+        double const CurrentSeconds = TimeAsSeconds(CurrentFrameTime);
+        uint64 const CurrentFramesPerSecond = Round<uint64>(1.0 / CurrentSeconds);
+
+        if(CurrentFrameTime > BadFrameTime)
+        {
+          LogWarning("Unacceptably slow frame: %fs (%u FPS)", CurrentSeconds, CurrentFramesPerSecond);
+        }
+        else if(CurrentFrameTime > AcceptableFrameTime)
+        {
+          LogInfo("Unusually slow frame: %fs (%u FPS)", CurrentSeconds, CurrentFramesPerSecond);
+        }
+        else
+        {
+          LogInfo("Slow frame: %fs (%u FPS)", CurrentSeconds, CurrentFramesPerSecond);
+        }
       }
     }
 

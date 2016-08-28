@@ -118,7 +118,7 @@ ConsumeAndReadInto(slice<void const>* Data, slice<void> Result)
     return 0;
 
   // Blit the data over.
-  MemCopyBytes(Amount, Result.Ptr, Data->Ptr);
+  MemCopyBytes(Bytes(Amount), Result.Ptr, Data->Ptr);
 
   // Trim the data.
   *Data = Slice(*Data, Amount, Data->Num);

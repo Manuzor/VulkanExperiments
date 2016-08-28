@@ -9,14 +9,14 @@ class CORE_API allocator_interface
 public:
   virtual ~allocator_interface() {}
 
-  virtual void* Allocate(size_t NumBytes, size_t Alignment) = 0;
+  virtual void* Allocate(memory_size Size, size_t Alignment) = 0;
   virtual bool Deallocate(void* Memory) = 0;
 };
 
 class CORE_API mallocator : public allocator_interface
 {
 public:
-  virtual void* Allocate(size_t NumBytes, size_t Alignment) override;
+  virtual void* Allocate(memory_size Size, size_t Alignment) override;
   virtual bool Deallocate(void* Memory) override;
 };
 
@@ -26,7 +26,7 @@ Allocate(allocator_interface& Allocator)
 {
   // TODO Alignment
   enum { Alignment = __alignof(T) };
-  auto Memory = Allocator.Allocate(sizeof(T), Alignment);
+  auto Memory = Allocator.Allocate(SizeOf<T>(), Alignment);
   auto Ptr = Reinterpret<T*>(Memory);
   return Ptr;
 }
@@ -44,7 +44,7 @@ SliceAllocate(allocator_interface& Allocator, size_t Num)
 {
   // TODO Alignment
   enum { Alignment = __alignof(T) };
-  auto Memory = Allocator.Allocate(Num * sizeof(T), Alignment);
+  auto Memory = Allocator.Allocate(Num * SizeOf<T>(), Alignment);
   return Slice(Num, Reinterpret<T*>(Memory));
 }
 
@@ -83,6 +83,6 @@ struct CORE_API temp_allocator : public allocator_interface
   temp_allocator(temp_allocator const&) = delete; // No copy
   virtual ~temp_allocator();
 
-  virtual void* Allocate(size_t NumBytes, size_t Alignment) override;
+  virtual void* Allocate(memory_size Size, size_t Alignment) override;
   virtual bool Deallocate(void* Memory) override;
 };
