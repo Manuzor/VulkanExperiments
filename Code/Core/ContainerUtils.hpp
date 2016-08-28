@@ -29,12 +29,15 @@ ContainerReserve(allocator_interface& Allocator,
 
   Assert(NewAllocatedMemory.Num == BytesToReserve);
 
-  // Move from the old memory.
-  SliceMoveConstruct(NewUsedMemory, OldUsedMemory);
+  if(OldUsedMemory)
+  {
+    // Move from the old memory.
+    SliceMoveConstruct(NewUsedMemory, OldUsedMemory);
 
-  // Destruct and free the old memory.
-  SliceDestruct(OldUsedMemory);
-  SliceDeallocate(Allocator, OldAllocatedMemory);
+    // Destruct and free the old memory.
+    SliceDestruct(OldUsedMemory);
+    SliceDeallocate(Allocator, OldAllocatedMemory);
+  }
 
   return NewAllocatedMemory;
 }

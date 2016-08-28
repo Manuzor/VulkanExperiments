@@ -230,13 +230,15 @@ void
 Reset(array<T>& Array)
 {
   SliceDestruct(Slice(Array));
-  if(Array.Allocator)
+  if(Array.Allocator && Array.Capacity > 0)
   {
     SliceDeallocate(*Array.Allocator, AllocatedMemory(Array));
     Array.Capacity = 0;
-    Array.Num = 0;
-    Array.Ptr = nullptr;
   }
+
+  // Just to make sure.
+  Array.Num = 0;
+  Array.Ptr = nullptr;
 }
 
 // TODO: Make this use BeginIndex and EndIndex instead?

@@ -217,6 +217,38 @@ auto
 }
 
 auto
+::StrInternalData(arc_string& String)
+  -> array<char>&
+{
+  Assert(StrIsInitialized(String));
+  return String.Internal->Data;
+}
+
+auto
+::StrInternalData(arc_string const& String)
+  -> array<char> const&
+{
+  Assert(StrIsInitialized(String));
+  return String.Internal->Data;
+}
+
+void
+StrInvalidateInternalData(arc_string& String)
+{
+  // TODO: Do more stuff here?
+  StrEnsureZeroTerminated(String);
+}
+
+auto
+::StrCapacity(arc_string const& String)
+  -> size_t
+{
+  if(StrIsInitialized(String))
+    return String.Internal->Data.Capacity;
+  return 0;
+}
+
+auto
 ::StrNumBytes(arc_string const& String)
   -> size_t
 {

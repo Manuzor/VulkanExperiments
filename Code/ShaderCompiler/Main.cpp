@@ -198,15 +198,13 @@ ParseCommandLineOptions(slice<char const*> Args, cmd_options* Options)
 int
 main(int NumArgs, char const* Args[])
 {
-  mallocator Mallocator = {};
+  mallocator Mallocator{};
   allocator_interface& Allocator = Mallocator;
 
   //
   // Set up a logger
   //
-  log_data Log = {};
-  Init(Log, Allocator);
-  Defer [&](){ Finalize(Log); };
+  log_data Log{};
   {
     auto DefaultSinkSlots = ExpandBy(Log.Sinks, 2);
     DefaultSinkSlots[0] = GetStdoutLogSink(stdout_log_sink_enable_prefixes::No);

@@ -79,6 +79,36 @@ CORE_API
 void
 StrEnsureZeroTerminated(arc_string& String);
 
+/// Use at your own risk!
+///
+/// It is recommended to call StrEnsureUnique before using the data.
+///
+/// Call StrInvalidateInternalData when you've modified the internal data.
+CORE_API
+array<char>&
+StrInternalData(arc_string& String);
+
+/// Use at your own risk!
+///
+/// It is recommended to call StrEnsureUnique before using the data.
+///
+/// \note There's no need to call StrInvalidateInternalData since you don't
+/// \have write access to the data.
+CORE_API
+array<char> const&
+StrInternalData(arc_string const& String);
+
+/// Call this to trigger some internal string operations to ensure state
+/// consistency within the string.
+CORE_API
+void
+StrInvalidateInternalData(arc_string& String);
+
+/// The amount of bytes available to this string.
+CORE_API
+size_t
+StrCapacity(arc_string const& String);
+
 CORE_API
 size_t
 StrNumBytes(arc_string const& String);

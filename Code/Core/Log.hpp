@@ -3,6 +3,7 @@
 #include "CoreAPI.hpp"
 #include "Allocator.hpp"
 #include "Array.hpp"
+#include "String.hpp"
 
 #include <functional>
 
@@ -32,21 +33,12 @@ CORE_TEMPLATE_EXPORT(struct, array<log_sink>);
 
 struct CORE_API log_data
 {
-  array<char> MessageBuffer;
-  array<char> TempBuffer;
+  arc_string MessageBuffer;
   array<log_sink> Sinks;
   int Indentation;
 };
 
 CORE_API extern log_data* GlobalLog;
-
-CORE_API
-void
-Init(log_data& Log, allocator_interface& Allocator);
-
-CORE_API
-void
-Finalize(log_data& Log);
 
 CORE_API
 void
@@ -56,25 +48,16 @@ CORE_API
 void
 LogDedent(log_data* Log, int By = 1);
 
-/// Globally log a string literal or zero terminated string.
-CORE_API
-void
-LogMessageDispatch(log_level LogLevel, char const* Message, ...);
 
-/// Globally log a string slice.
+/// Log with the GlobalLog
 CORE_API
 void
-LogMessageDispatch(log_level LogLevel, slice<char const> Message, ...);
+LogMessageDispatch(log_level LogLevel, arc_string Message, ...);
 
-/// Log a string literal or zero terminated string with the given log.
+/// Log with the given log_data instance.
 CORE_API
 void
-LogMessageDispatch(log_level LogLevel, log_data* Log, char const* Message, ...);
-
-/// Log a string slice with the given log.
-CORE_API
-void
-LogMessageDispatch(log_level LogLevel, log_data* Log, slice<char const> Message, ...);
+LogMessageDispatch(log_level LogLevel, log_data* Log, arc_string Message, ...);
 
 #define LogBeginScope(...) LogMessageDispatch(log_level::ScopeBegin, __VA_ARGS__)
 #define LogEndScope(...)   LogMessageDispatch(log_level::ScopeEnd,   __VA_ARGS__)

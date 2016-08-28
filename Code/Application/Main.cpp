@@ -1696,11 +1696,11 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
   allocator_interface* AllocatorPtr = &Allocator;
 
   log_data Log{};
-  Init(Log, Allocator);
-  Defer [&](){ Finalize(Log); };
-  auto SinkSlots = ExpandBy(Log.Sinks, 2);
-  SinkSlots[0] = GetStdoutLogSink(stdout_log_sink_enable_prefixes::Yes);
-  SinkSlots[1] = log_sink(VisualStudioLogSink);
+  {
+    auto SinkSlots = ExpandBy(Log.Sinks, 2);
+    SinkSlots[0] = GetStdoutLogSink(stdout_log_sink_enable_prefixes::Yes);
+    SinkSlots[1] = log_sink(VisualStudioLogSink);
+  }
 
   GlobalLog = &Log;
   Defer [=](){ GlobalLog = nullptr; };
