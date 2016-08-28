@@ -447,6 +447,9 @@ VulkanEnumName(VkFormat Format);
 char const*
 VulkanEnumName(VkColorSpaceKHR ColorSpace);
 
+char const*
+VulkanEnumName(VkPresentModeKHR Format);
+
 uint32
 VulkanDetermineMemoryTypeIndex(VkPhysicalDeviceMemoryProperties const& MemoryProperties,
                                uint32                                  TypeBits,

@@ -395,12 +395,7 @@ auto
   // Select a present mode
   //
 
-  // VK_PRESENT_MODE_FIFO_KHR must always be present, as per the vulkan spec.
-  VkPresentModeKHR SwapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
-
-  // If v-sync is not requested, try to find a mailbox mode if present. It's
-  // the lowest latency non-tearing present mode available.
-  if(VSync == vsync::Off)
+  VkPresentModeKHR SwapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
   {
     // Fetch available present modes
 
@@ -408,26 +403,50 @@ auto
     VulkanVerify(Vulkan.vkGetPhysicalDeviceSurfacePresentModesKHR(Vulkan.Gpu.GpuHandle, SurfaceHandle, &PresentModeCount, nullptr));
 
     array<VkPresentModeKHR> PresentModes;
-    ExpandBy(PresentModes, PresentModeCount);
+    SetNum(PresentModes, PresentModeCount);
 
     VulkanVerify(Vulkan.vkGetPhysicalDeviceSurfacePresentModesKHR(Vulkan.Gpu.GpuHandle, SurfaceHandle, &PresentModeCount, PresentModes.Ptr));
 
-    // Find a mailbox or immediate mode (in that order of preference).
+    bool const AllowFifoRelaxedWhenVSyncIsOff = false;
+
     for(auto Candidate : Slice(PresentModes))
     {
-      if(Candidate == VK_PRESENT_MODE_MAILBOX_KHR)
+      switch(Candidate)
       {
-        SwapchainPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-        break;
-      }
+        case VK_PRESENT_MODE_MAILBOX_KHR:
+        {
+          // Always accept mailbox if VSync is requested.
+          if(VSync == vsync::On)
+          {
+            SwapchainPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+          }
+        } break;
 
-      Assert(SwapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR);
-      if(Candidate == VK_PRESENT_MODE_IMMEDIATE_KHR)
-      {
-        SwapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+        case VK_PRESENT_MODE_FIFO_KHR:
+        {
+          // Accept only if we don't have mailbox already and VSync is requested.
+          if(VSync == vsync::On && SwapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR)
+          {
+            SwapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+          }
+        } break;
+
+        case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
+        {
+          if(VSync == vsync::Off && !AllowFifoRelaxedWhenVSyncIsOff)
+            break;
+
+          // Accept only if we don't have either mailbox or regular FIFO already. VSync setting is ignored.
+          if(SwapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR && SwapchainPresentMode != VK_PRESENT_MODE_FIFO_KHR)
+          {
+            SwapchainPresentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+          }
+        } break;
       }
     }
   }
+
+  LogInfo("Swapchain present mode: %s", VulkanEnumName(SwapchainPresentMode));
 
   // Save VSync setting.
   Swapchain.VSync = VSync;
@@ -1268,7 +1287,7 @@ auto
     case VK_FORMAT_ASTC_12x12_UNORM_BLOCK:     return "VK_FORMAT_ASTC_12x12_UNORM_BLOCK";
     case VK_FORMAT_ASTC_12x12_SRGB_BLOCK:      return "VK_FORMAT_ASTC_12x12_SRGB_BLOCK";
 
-    default: return "<UNKNOWN>";
+    default: return "<VkFormat UNKNOWN>";
   }
 }
 
@@ -1279,7 +1298,21 @@ auto
   switch(ColorSpace)
   {
     case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR: return "VK_COLOR_SPACE_SRGB_NONLINEAR_KHR";
-    default: return "<UNKNOWN>";
+    default: return "<VkColorSpaceKHR UNKNOWN>";
+  }
+}
+
+auto
+::VulkanEnumName(VkPresentModeKHR PresentMode)
+  -> char const*
+{
+  switch(PresentMode)
+  {
+    case VK_PRESENT_MODE_IMMEDIATE_KHR:    return "VK_PRESENT_MODE_IMMEDIATE_KHR";
+    case VK_PRESENT_MODE_MAILBOX_KHR:      return "VK_PRESENT_MODE_MAILBOX_KHR";
+    case VK_PRESENT_MODE_FIFO_KHR:         return "VK_PRESENT_MODE_FIFO_KHR";
+    case VK_PRESENT_MODE_FIFO_RELAXED_KHR: return "VK_PRESENT_MODE_FIFO_RELAXED_KHR";
+    default: return "<VkPresentModeKHR UNKNOWN>";
   }
 }
 

@@ -257,13 +257,7 @@ constexpr bool
 IsPOD() { return impl_is_pod<T>::Value; }
 
 
-template<typename NumberType> struct impl_negate;
-template<> struct impl_negate<float>  { static constexpr float  Do(float  Value) { return -Value; } };
-template<> struct impl_negate<double> { static constexpr double Do(double Value) { return -Value; } };
-template<> struct impl_negate<int8>   { static constexpr int8   Do(int8  Value)  { return -Value; } };
-template<> struct impl_negate<int16>  { static constexpr int16  Do(int16 Value)  { return -Value; } };
-template<> struct impl_negate<int32>  { static constexpr int32  Do(int32 Value)  { return -Value; } };
-template<> struct impl_negate<int64>  { static constexpr int64  Do(int64 Value)  { return -Value; } };
+template<typename NumberType> struct impl_negate { static constexpr NumberType Do(NumberType Value) { return -Value; } };
 template<> struct impl_negate<uint8>  { static constexpr uint8  Do(uint8  Value) { return  Value; } };
 template<> struct impl_negate<uint16> { static constexpr uint16 Do(uint16 Value) { return  Value; } };
 template<> struct impl_negate<uint32> { static constexpr uint32 Do(uint32 Value) { return  Value; } };
@@ -275,6 +269,31 @@ Negate(NumberType Value)
 {
   return impl_negate<NumberType>::Do(Value);
 }
+
+template<typename T>
+struct impl_is_integer_type { static bool const Value = false; };
+template<> struct impl_is_integer_type<uint8>  { static bool const Value = true; };
+template<> struct impl_is_integer_type< int8>  { static bool const Value = true; };
+template<> struct impl_is_integer_type<uint16> { static bool const Value = true; };
+template<> struct impl_is_integer_type< int16> { static bool const Value = true; };
+template<> struct impl_is_integer_type<uint32> { static bool const Value = true; };
+template<> struct impl_is_integer_type< int32> { static bool const Value = true; };
+template<> struct impl_is_integer_type<uint64> { static bool const Value = true; };
+template<> struct impl_is_integer_type< int64> { static bool const Value = true; };
+
+template<typename T>
+constexpr bool IsIntegerType() { return impl_is_integer_type<T>::Value; }
+
+template<typename T>
+struct impl_is_float_type { static bool const Value = false; };
+template<> struct impl_is_float_type<float>  { static bool const Value = true; };
+template<> struct impl_is_float_type<double> { static bool const Value = true; };
+
+template<typename T>
+constexpr bool IsFloatType() { return impl_is_float_type<T>::Value; }
+
+template<typename T>
+constexpr bool IsNumberType() { return IsFloatType<T>() || IsIntegerType<T>(); }
 
 /// Get the number of bits of a given type.
 ///
@@ -299,7 +318,7 @@ template<typename T>
 constexpr T
 IntMinValue()
 {
-  return IntIsSigned<T>() ? Negate(T(1) << (NumBits<T>() - 1))
+  return IntIsSigned<T>() ? Negate(T(T(1) << (NumBits<T>() - 1)))
                           : T(0);
 }
 
@@ -480,14 +499,25 @@ template<typename t_type>
 constexpr t_type
 Sign(t_type I)
 {
-  return (I > 0) ? t_type(1) : (I < 0) ? t_type(-1) : t_type(0);
+  return t_type(I > 0 ? 1 : I < 0 ? -1 : 0);
 }
+
+template<typename T> struct impl_abs { static constexpr T Do(T Value) { return Sign(Value) * Value; } };
+template<> struct impl_abs<uint8>  { static constexpr uint8  Do(uint8  Value) { return Value; } };
+template<> struct impl_abs<uint16> { static constexpr uint16 Do(uint16 Value) { return Value; } };
+template<> struct impl_abs<uint32> { static constexpr uint32 Do(uint32 Value) { return Value; } };
+template<> struct impl_abs<uint64> { static constexpr uint64 Do(uint64 Value) { return Value; } };
+template<> struct impl_abs<int8>  { static inline int8  Do(int8  Value) { return Value < 0 ? -Value : Value; } };
+template<> struct impl_abs<int16> { static inline int16 Do(int16 Value) { return Value < 0 ? -Value : Value; } };
+template<> struct impl_abs<int32> { static inline int32 Do(int32 Value) { return Value < 0 ? -Value : Value; } };
+template<> struct impl_abs<int64> { static inline int64 Do(int64 Value) { return Value < 0 ? -Value : Value; } };
 
 template<typename t_type>
 constexpr t_type
-Abs(t_type I)
+Abs(t_type Value)
 {
-  return Sign(I) * I;
+  return impl_abs<t_type>::Do(Value);
+  // return Sign(I) * I;
 }
 
 template<typename t_a_type, typename t_b_type>
@@ -553,6 +583,114 @@ Sqrt(T Value) { return (ReturnType)Sqrt((double)Value); }
 
 float
 InvSqrt(float Value);
+
+//
+// RoundDown
+//
+template<typename OutputType, typename InputType> struct impl_round_down
+{
+  static inline OutputType
+  Do(InputType Value)
+  {
+    return Convert<OutputType>(std::floor(Value));
+  }
+};
+
+/// Also known as the floor-function.
+template<typename OutputType, typename InputType>
+inline OutputType
+RoundDown(InputType Value)
+{
+  return impl_round_down<OutputType, InputType>::Do(Value);
+}
+
+//
+// RoundUp
+//
+template<typename OutputType, typename InputType> struct impl_round_up
+{
+  static inline OutputType
+  Do(InputType Value)
+  {
+    return Convert<OutputType>(std::ceil(Value));
+  }
+};
+
+/// Also known as the ceil-function.
+template<typename OutputType, typename InputType>
+inline OutputType
+RoundUp(InputType Value)
+{
+  return impl_round_up<OutputType, InputType>::Do(Value);
+}
+
+
+//
+// RoundTowardsZero
+//
+template<typename OutputType, typename InputType> struct impl_round_towards_zero
+{
+  static inline OutputType
+  Do(InputType Value)
+  {
+    return Value > 0 ? RoundDown<OutputType>(Value) : RoundUp<OutputType>(Value);
+  }
+};
+
+/// Round towards zero.
+///
+/// Equivalent to \code Value > 0 ? RoundDown(Value) : RoundUp(Value) \endcode
+template<typename OutputType, typename InputType>
+inline OutputType
+RoundTowardsZero(InputType Value)
+{
+  return impl_round_towards_zero<OutputType, InputType>::Do(Value);
+}
+
+
+//
+// RoundAwayFromZero
+//
+template<typename OutputType, typename InputType> struct impl_round_away_from_zero
+{
+  static inline OutputType
+  Do(InputType Value)
+  {
+    return Value > 0 ? RoundUp<OutputType>(Value) : RoundDown<OutputType>(Value);
+  }
+};
+
+/// Round away from zero.
+///
+/// Equivalent to \code Value > 0 ? RoundUp(Value) : RoundDown(Value) \endcode
+template<typename OutputType, typename InputType>
+inline OutputType
+RoundAwayFromZero(InputType Value)
+{
+  return impl_round_away_from_zero<OutputType, InputType>::Do(Value);
+}
+
+
+//
+// Round
+//
+template<typename OutputType, typename InputType> struct impl_round
+{
+  static inline OutputType
+  Do(InputType Value)
+  {
+    return RoundDown<OutputType>(Value + InputType(0.5f));
+  }
+};
+
+/// Round to the nearest integral value.
+template<typename OutputType, typename InputType>
+inline OutputType
+Round(InputType Value)
+{
+  return impl_round<OutputType, InputType>::Do(Value);
+}
+
 
 // Project a value from [LowerBound, UpperBound] to [0, 1]
 // Example:

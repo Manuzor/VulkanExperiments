@@ -1648,17 +1648,20 @@ PrintFrameTimeStats(frame_time_stats const& FrameTimeStats, log_data* Log)
 
   LogBeginScope("Frame Time Stats (%u samples)", FrameTimeStats.Samples.Num);
   {
-    LogInfo(Log, "Min     Frame|CPU|GPU: %f|%f|%f",
+    LogInfo(Log, "Min     (%3.u FPS) Frame: %f s, CPU: %f s, GPU: %f s",
+            Round<uint64>(1.0f / TimeAsSeconds(MinSample.FrameTime)),
             TimeAsSeconds(MinSample.FrameTime),
             TimeAsSeconds(MinSample.CpuTime),
             TimeAsSeconds(MinSample.GpuTime));
 
-    LogInfo(Log, "Max     Frame|CPU|GPU: %f|%f|%f",
+    LogInfo(Log, "Max     (%3.u FPS) Frame: %f s, CPU: %f s, GPU: %f s",
+            Round<uint64>(1.0f / TimeAsSeconds(MaxSample.FrameTime)),
             TimeAsSeconds(MaxSample.FrameTime),
             TimeAsSeconds(MaxSample.CpuTime),
             TimeAsSeconds(MaxSample.GpuTime));
 
-    LogInfo(Log, "Average Frame|CPU|GPU: %f|%f|%f",
+    LogInfo(Log, "Average (%3.u FPS) Frame: %f s, CPU: %f s, GPU: %f s",
+            Round<uint64>(1.0f / TimeAsSeconds(AverageSample.FrameTime)),
             TimeAsSeconds(AverageSample.FrameTime),
             TimeAsSeconds(AverageSample.CpuTime),
             TimeAsSeconds(AverageSample.GpuTime));
@@ -1801,7 +1804,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       LogBeginScope("Preparing swapchain for the first time.");
 
       ++CurrentExitCode;
-      if(!VulkanPrepareSwapchain(Vulkan, Vulkan.Swapchain, WindowSetup.ClientExtents, vsync::On))
+      if(!VulkanPrepareSwapchain(Vulkan, Vulkan.Swapchain, WindowSetup.ClientExtents, vsync::Off))
       {
         LogEndScope("Failed to prepare initial swapchain.");
         return CurrentExitCode;
