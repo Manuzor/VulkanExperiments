@@ -10,15 +10,14 @@ void*
 mallocator::Allocate(memory_size Size, size_t Alignment)
 {
   auto Ptr = ::malloc(Size);
-  printf("mallocator: Allocated 0x%Ix with %.03fKiB (%.03fMiB)\n",
-         Reinterpret<size_t>(Ptr), ToKiB(Size), ToMiB(Size));
+  // printf("mallocator: Allocated 0x%Ix with %.03fKiB (%.03fMiB)\n", Reinterpret<size_t>(Ptr), ToKiB(Size), ToMiB(Size));
   return Ptr;
 }
 
 bool
 mallocator::Deallocate(void* Memory)
 {
-  printf("mallocator: Deallocating 0x%Ix\n", Reinterpret<size_t>(Memory));
+  // printf("mallocator: Deallocating 0x%Ix\n", Reinterpret<size_t>(Memory));
   ::free(Memory);
   return true;
 }
