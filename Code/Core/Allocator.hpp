@@ -3,21 +3,42 @@
 #include "CoreAPI.hpp"
 #include <Backbone.hpp>
 
+const size_t GlobalDefaultAlignment = 16;
 
+#if DEBUG
+  size_t CORE_API
+  CheckedAlignment(size_t Alignment);
+#else
+  constexpr size_t
+  CheckedAlignment(size_t Alignment)
+  {
+    return Alignment == 0 ? GlobalDefaultAlignment : Alignment;
+  }
+#endif
+
+
+/// \note Alignment arguments must always be a power of two or 0 (if you don't care).
+/// \see CheckedAlignment()
 class CORE_API allocator_interface
 {
 public:
   virtual ~allocator_interface() {}
 
   virtual void* Allocate(memory_size Size, size_t Alignment) = 0;
-  virtual bool Deallocate(void* Memory) = 0;
+  virtual void Deallocate(void* Memory) = 0;
+
+  virtual bool Resize(void* Ptr, memory_size NewSize) { return false; }
+
+  virtual memory_size AllocationSize(void* Ptr) { return Bytes(0); }
 };
 
 class CORE_API mallocator : public allocator_interface
 {
 public:
   virtual void* Allocate(memory_size Size, size_t Alignment) override;
-  virtual bool Deallocate(void* Memory) override;
+  virtual void Deallocate(void* Memory) override;
+  virtual bool Resize(void* Ptr, memory_size NewSize) override;
+  virtual memory_size AllocationSize(void* Ptr) override;
 };
 
 template<typename T>
@@ -84,5 +105,6 @@ struct CORE_API temp_allocator : public allocator_interface
   virtual ~temp_allocator();
 
   virtual void* Allocate(memory_size Size, size_t Alignment) override;
-  virtual bool Deallocate(void* Memory) override;
+  virtual void Deallocate(void* Memory) override;
+  virtual bool Resize(void* Ptr, memory_size NewSize) override;
 };
