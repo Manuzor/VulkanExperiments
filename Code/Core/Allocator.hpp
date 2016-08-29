@@ -5,7 +5,7 @@
 
 const size_t GlobalDefaultAlignment = 16;
 
-#if DEBUG
+#if defined(DEBUG)
   size_t CORE_API
   CheckedAlignment(size_t Alignment);
 #else

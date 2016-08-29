@@ -155,7 +155,7 @@ Win32CreateWindow(allocator_interface& Allocator, window_setup const* Args,
   auto const WindowHeight = WindowRect.bottom - WindowRect.top;
   WindowHandle = CreateWindowExA(WindowStyleEx,             // _In_     DWORD     dwExStyle
                                  WindowClass.lpszClassName, // _In_opt_ LPCWSTR   lpClassName
-                                 "The Title Text",          // _In_opt_ LPCWSTR   lpWindowName
+                                 "Vulkan Experiments",      // _In_opt_ LPCWSTR   lpWindowName
                                  WindowStyle,               // _In_     DWORD     dwStyle
                                  WindowX, WindowY,          // _In_     int       X, Y
                                  WindowWidth, WindowHeight, // _In_     int       nWidth, nHeight
@@ -2269,11 +2269,11 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
       time const AcceptableFrameTime(2 * IdealFrameTime);
       time const BadFrameTime(2 * AcceptableFrameTime);
 
+      double const CurrentSeconds = TimeAsSeconds(CurrentFrameTime);
+      uint64 const CurrentFramesPerSecond = Round<uint64>(1.0 / CurrentSeconds);
+
       if(CurrentFrameTime > IdealFrameTime)
       {
-        double const CurrentSeconds = TimeAsSeconds(CurrentFrameTime);
-        uint64 const CurrentFramesPerSecond = Round<uint64>(1.0 / CurrentSeconds);
-
         if(CurrentFrameTime > BadFrameTime)
         {
           LogWarning("Unacceptably slow frame: %fs (%u FPS)", CurrentSeconds, CurrentFramesPerSecond);
@@ -2287,6 +2287,12 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
           LogInfo("Slow frame: %fs (%u FPS)", CurrentSeconds, CurrentFramesPerSecond);
         }
       }
+
+#if defined(DEBUG)
+      char WindowTextBuffer[sizeof("Vulkan Experiments (0000FPS)")];
+      sprintf_s(WindowTextBuffer, "Vulkan Experiments (%4lluFPS)", CurrentFramesPerSecond);
+      SetWindowTextA(Window->WindowHandle, WindowTextBuffer);
+#endif
     }
 
     PrintFrameTimeStats(FrameTimeStats, GlobalLog);

@@ -9,7 +9,7 @@
 // TODO: Move this somewhere central. Maybe on the commandline?
 #define PLATFORM_WINDOWS 1
 
-#if DEBUG
+#if defined(DEBUG)
 
 auto
 ::CheckedAlignment(size_t Alignment)

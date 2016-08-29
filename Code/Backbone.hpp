@@ -43,7 +43,7 @@
   #define BoundsCheck(...) NoOp
 #endif
 
-#ifdef DEBUG
+#if defined(DEBUG)
   #define BB_Debugging 1
 #endif
 
@@ -208,6 +208,7 @@ constexpr uint64 SetBit(uint64 Bits, uint64 Position) { return Bits | (uint64(1)
 constexpr uint64 UnsetBit(uint64 Bits, uint64 Position) { return Bits & ~(uint64(1) << Position); }
 constexpr bool IsBitSet(uint64 Bits, uint64 Position) { return !!(Bits & (uint64(1) << Position)); }
 
+constexpr bool IsPowerOfTwo(size_t Value) { return Value < 1 ? false : (Value & (Value - 1)) == 0; }
 
 //
 // ================
