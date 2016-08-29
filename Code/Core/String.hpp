@@ -6,6 +6,18 @@
 RESERVE_PREFIX(Str);
 
 
+// Forward declaration of internally used type.
+class string_allocator;
+
+CORE_API
+allocator_interface*
+StringDefaultAllocator();
+
+CORE_API
+void
+SetStringDefaultAllocator(allocator_interface* Allocator);
+
+
 /// \note If no allocator is supplied to this string, the default string
 /// \allocator will be used.
 /// \note ARC: Automatic Reference Counting

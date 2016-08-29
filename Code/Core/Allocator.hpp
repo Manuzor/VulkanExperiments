@@ -45,9 +45,7 @@ template<typename T>
 T*
 Allocate(allocator_interface& Allocator)
 {
-  // TODO Alignment
-  enum { Alignment = __alignof(T) };
-  auto Memory = Allocator.Allocate(SizeOf<T>(), Alignment);
+  auto Memory = Allocator.Allocate(SizeOf<T>(), alignof(T));
   auto Ptr = Reinterpret<T*>(Memory);
   return Ptr;
 }
@@ -63,9 +61,7 @@ template<typename T>
 slice<T>
 SliceAllocate(allocator_interface& Allocator, size_t Num)
 {
-  // TODO Alignment
-  enum { Alignment = __alignof(T) };
-  auto Memory = Allocator.Allocate(Num * SizeOf<T>(), Alignment);
+  auto Memory = Allocator.Allocate(Num * SizeOf<T>(), alignof(T));
   return Slice(Num, Reinterpret<T*>(Memory));
 }
 
