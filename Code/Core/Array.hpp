@@ -29,6 +29,7 @@ struct array
   size_t Capacity{};
   size_t Num{};
   T* Ptr{};
+  bool CanGrow = true;
 
 
   array() = default;
@@ -99,9 +100,15 @@ EnsureInitialized(array<T>& Array)
 }
 
 template<typename T>
-void
+bool
 Reserve(array<T>& Array, size_t MinBytesToReserve)
 {
+  if(Array.Capacity >= MinBytesToReserve)
+    return true;
+
+  if(!Array.CanGrow)
+    return false;
+
   EnsureInitialized(Array);
   auto NewAllocatedMemory = ContainerReserve(*Array.Allocator,
                                              Array.Ptr, Array.Num,
@@ -112,6 +119,7 @@ Reserve(array<T>& Array, size_t MinBytesToReserve)
   // Update array members.
   Array.Ptr = NewAllocatedMemory.Ptr;
   Array.Capacity = NewAllocatedMemory.Num;
+  return true;
 }
 
 template<typename T>
@@ -121,7 +129,9 @@ ExpandBy(array<T>& Array, size_t Amount)
   if(Amount == 0)
     return {};
 
-  Reserve(Array, Array.Num + Amount);
+  if(!Reserve(Array, Array.Num + Amount))
+    return {};
+
   auto const BeginIndex = Array.Num;
   Array.Num += Amount;
   auto const EndIndex = Array.Num;
@@ -141,7 +151,9 @@ template<typename T, typename U>
 void
 Append(array<T>& Array, U const& Item)
 {
-  Reserve(Array, Array.Num + 1);
+  if(!Reserve(Array, Array.Num + 1))
+    return;
+
   auto const Index = Array.Num;
   ++Array.Num;
   auto NewPtr = &Array.Ptr[Index];
@@ -162,7 +174,9 @@ Append(array<T>& Array, slice<U const> More)
   if(More.Num == 0)
     return;
 
-  Reserve(Array, Array.Num + More.Num);
+  if(!Reserve(Array, Array.Num + More.Num))
+    return;
+
   auto const BeginIndex = Array.Num;
   Array.Num += More.Num;
   auto const EndIndex = Array.Num;
