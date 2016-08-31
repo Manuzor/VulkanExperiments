@@ -134,7 +134,7 @@ static void
 ImplStdoutLogSink_WithPrefixes(log_sink_args Args)
 {
   #if defined(BB_Platform_Windows)
-    auto const ConsoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    auto const ConsoleHandle = GetStdHandle(STD_ERROR_HANDLE);
 
     CONSOLE_SCREEN_BUFFER_INFO CurrentConsoleInfo;
     GetConsoleScreenBufferInfo(ConsoleHandle, &CurrentConsoleInfo);
@@ -178,27 +178,27 @@ ImplStdoutLogSink_WithPrefixes(log_sink_args Args)
   #else
     switch(Args.LogLevel)
     {
-      case log_level::Info:       printf("Ifo"); break;
-      case log_level::Warning:    printf("Wrn"); break;
-      case log_level::Error:      printf("Err"); break;
-      case log_level::ScopeBegin: printf(">>>"); break;
-      case log_level::ScopeEnd:   printf("<<<"); break;
+      case log_level::Info:       fprintf(stderr, "Ifo"); break;
+      case log_level::Warning:    fprintf(stderr, "Wrn"); break;
+      case log_level::Error:      fprintf(stderr, "Err"); break;
+      case log_level::ScopeBegin: fprintf(stderr, ">>>"); break;
+      case log_level::ScopeEnd:   fprintf(stderr, "<<<"); break;
     }
 
     if(Args.Message)
     {
-      printf(": ");
+      fprintf(stderr, ": ");
 
       while(Args.Indentation > 0)
       {
-        printf("  ");
+        fprintf(stderr, "  ");
         --Args.Indentation;
       }
 
-      printf("%*s", Cast<int>(Args.Message.Num), Args.Message.Ptr);
+      fprintf(stderr, "%*s", Cast<int>(Args.Message.Num), Args.Message.Ptr);
     }
 
-    printf("\n");
+    fprintf(stderr, "\n");
   #endif
 }
 
@@ -206,7 +206,7 @@ static void
 ImplStdoutLogSink_WithoutPrefixes(log_sink_args Args)
 {
   #if defined(BB_Platform_Windows)
-    auto const ConsoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    auto const ConsoleHandle = GetStdHandle(STD_ERROR_HANDLE);
 
     CONSOLE_SCREEN_BUFFER_INFO CurrentConsoleInfo;
     GetConsoleScreenBufferInfo(ConsoleHandle, &CurrentConsoleInfo);
@@ -241,14 +241,14 @@ ImplStdoutLogSink_WithoutPrefixes(log_sink_args Args)
     {
       while(Args.Indentation > 0)
       {
-        printf("  ");
+        fprintf(stderr, "  ");
         --Args.Indentation;
       }
 
-      printf("%*s", Cast<int>(Args.Message.Num), Args.Message.Ptr);
+      fprintf(stderr, "%*s", Cast<int>(Args.Message.Num), Args.Message.Ptr);
     }
 
-    printf("\n");
+    fprintf(stderr, "\n");
   #endif
 }
 
