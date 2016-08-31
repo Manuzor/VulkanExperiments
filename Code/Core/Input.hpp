@@ -1,375 +1,562 @@
 #pragma once
 
 #include "CoreAPI.hpp"
+#include "String.hpp"
 #include <Backbone.hpp>
 
-#include "Array.hpp"
-#include "Dictionary.hpp"
-#include "Event.hpp"
 
-using input_id = slice<char const>;
-
-/// Creates an input_id from a C-string.
-CORE_API
-input_id
-InputId(char const* InputName);
-
-/// Creates an input_id from a string literal.
-template<size_t N>
-input_id constexpr
-InputId(char const(&InputName)[N]) { return SliceFromString(InputName); }
+RESERVE_PREFIX(Input);
 
 enum class input_type
 {
   INVALID,
+
+  /// Has a persistent floating point state.
+  Axis,
 
   /// Only valid for a single frame.
   Action,
 
   /// Has a persistent on/off state.
   Button,
-
-  /// Has a persistent floating point state.
-  Axis,
 };
 
-struct CORE_API input_slot
-{
-  /// The type of this slot.
-  input_type Type;
+/// The handle to an input slot.
+DefineOpaqueHandle(input_slot);
 
-  /// The value of the slot.
-  ///
-  /// Interpretation depends on the $(D Type) of this slot.
-  /// Note(Manu): Consider using the property functions below as they do type
-  /// checking for you and express the purpose more clearly.
-  float Value;
+/// Sets the value of the given slot regardless of its type.
+CORE_API
+float
+InputGetSlotValueUnchecked(input_slot SlotHandle);
 
-  /// The frame in which this value was updated.
-  uint64 Frame;
-};
-
+/// Sets the value of the given slot regardless of its type.
 CORE_API
 bool
-ButtonIsUp(input_slot const* Slot);
-
-CORE_API
-void
-SetButtonIsUp(input_slot* Slot, bool Value);
-
-CORE_API
-bool
-ButtonIsDown(input_slot const* Slot);
-
-CORE_API
-void
-SetButtonIsDown(input_slot* Slot, bool NewValue);
+InputSetSlotValueUnchecked(input_slot SlotHandle,
+                           float NewValue);
 
 CORE_API
 float
-AxisValue(input_slot const* Slot);
+InputActionValue(input_slot SlotHandle);
 
 CORE_API
 void
-SetAxisValue(input_slot* Slot, float NewValue);
+InputSetActionValue(input_slot SlotHandle, float NewValue);
 
 CORE_API
 float
-ActionValue(input_slot const* Slot);
-
-void CORE_API
-SetActionValue(input_slot* Slot, float NewValue);
-
-struct CORE_API input_value_properties
-{
-  float PositiveDeadZone = 0.0f; // [0 .. 1]
-  float NegativeDeadZone = 0.0f; // [0 .. 1]
-  float Sensitivity = 1.0f;
-  float Exponent = 1.0f;
-};
+InputAxisValue(input_slot SlotHandle);
 
 CORE_API
 void
-SetDeadZones(input_value_properties* Properties, float BothValues);
+InputSetAxisValue(input_slot SlotHandle, float NewValue);
 
-// Sample signature: void Listener(input_id SlotId, input_slot Slot)
-using input_event = event<input_id, input_slot*>;
-
-/// Used internally by input_context
-struct input_slot_mapping
-{
-  input_id SourceSlotId; // When this slots' value is changed, the TargetSlotId will be changed.
-  input_id TargetSlotId; // This is the slot which value will be changed if SourceSlotId's value changes.
-  float Scale;           // A factor used when mapping slots.
-};
-
-CORE_TEMPLATE_EXPORT(struct, array<input_slot_mapping>);
-
-// TODO(Manu): Implement ActionEvent so that users can listen to a specific action.
-class CORE_API input_context
-{
-public:
-  input_context* Parent{};
-  int UserIndex = -1; // -1 for no associated user, >= 0 for a specific user.
-  slice<char> Name{}; // Mostly for debugging. TODO: Use arc_string
-
-  dictionary<input_id, input_slot> Slots{};
-  dictionary<input_id, input_value_properties> ValueProperties{};
-  array<input_slot_mapping> SlotMappings{};
-  input_event ChangeEvent{};
-
-  uint64 CurrentFrame{};
-
-  // TODO: Use arc_string here.
-  array<char> CharacterBuffer{};
-
-  // Convenient indexing operator that returns nullptr or the ptr to the
-  // input_slot that corresponds to SlotId.
-  input_slot* operator[](input_id SlotId);
-
-  input_context(allocator_interface& Allocator);
-  virtual ~input_context() = 0;
-};
-
+/// Whether the button is currently being held down.
 CORE_API
-input_slot*
-GetInputSlot(input_context& Context, input_id SlotId);
+bool
+InputButtonIsDown(input_slot SlotHandle);
+
+/// Whether the button is currently not held down.
+CORE_API
+bool
+InputButtonIsUp(input_slot SlotHandle);
+
+/// Whether the button was pressed in this input frame.
+CORE_API
+bool
+InputButtonWasPressed(input_slot SlotHandle);
+
+/// Whether the button was released in this input frame.
+CORE_API
+bool
+InputButtonWasReleased(input_slot SlotHandle);
 
 CORE_API
 void
-RegisterInputSlot(input_context& Context, input_type Type, input_id SlotId);
+InputSetButton(input_slot SlotHandle, bool IsDown);
 
-CORE_API
-bool
-AddInputSlotMapping(input_context& Context, input_id SourceSlotId, input_id TargetSlotId, float Scale = 1.0f);
 
-CORE_API
-bool
-RemoveInputTrigger(input_context& Context, input_id SourceSlotId, input_id TargetSlotId);
-
-/// Overload for booleans.
-///
-/// A boolean value is treated as \c 0.0f for \c false and \c 1.0f for \c true
-/// values.
-CORE_API
-bool
-UpdateInputSlotValue(input_context& Context, input_id TriggeringSlotId, bool NewValue);
-
-/// Return: Will return $(D false) if the slot does not exist.
-CORE_API
-bool
-UpdateInputSlotValue(input_context& Context, input_id TriggeringSlotId, float NewValue);
-
-/// Applies special settings for the given input slot, if there are any, and
-/// returns an adjusted value.
 CORE_API
 float
-AttuneInputValue(input_context const& Context, input_id SlotId, float RawValue);
+InputPositiveDeadZone(input_slot SlotHandle);
 
 CORE_API
 void
-BeginInputFrame(input_context& Context);
+InputSetPositiveDeadZone(input_slot SlotHandle, float NewValue);
+
+CORE_API
+float
+InputNegativeDeadZone(input_slot SlotHandle);
 
 CORE_API
 void
-EndInputFrame(input_context& Context);
+InputSetNegativeDeadZone(input_slot SlotHandle, float NewValue);
+
+inline void
+InputSetDeadZone(input_slot SlotHandle, float BothValues)
+{
+  InputSetPositiveDeadZone(SlotHandle, BothValues);
+  InputSetNegativeDeadZone(SlotHandle, BothValues);
+}
+
+CORE_API
+float
+InputSensitivity(input_slot SlotHandle);
+
+CORE_API
+void
+InputSetSensitivity(input_slot SlotHandle, float NewValue);
+
+CORE_API
+float
+InputExponent(input_slot SlotHandle);
+
+CORE_API
+void
+InputSetExponent(input_slot SlotHandle, float NewValue);
+
+
+
+DefineOpaqueHandle(input_context);
+
+CORE_API
+input_context
+InputCreateContext(allocator_interface* Allocator);
+
+CORE_API
+void
+InputDestroyContext(allocator_interface* Allocator, input_context ContextHandle);
+
+CORE_API
+input_slot
+InputGetSlot(input_context ContextHandle, arc_string SlotName);
+
+CORE_API
+input_slot
+InputRegisterSlot(input_context ContextHandle, input_type SlotType, arc_string SlotName);
+
+/// Maps changes done to \a SlotHandleFrom to \a SlotHandleTo, applying the given \a Scale.
+CORE_API
+bool
+InputAddSlotMapping(input_slot SlotHandleFrom,
+                    input_slot SlotHandleTo,
+                    float Scale = 1.0f);
+
+CORE_API
+bool
+InputRemoveSlotMapping(input_slot SlotHandleFrom,
+                       input_slot SlotHandleTo);
+
+CORE_API
+array<char>*
+InputGetCharacterBuffer(input_context ContextHandle);
+
+CORE_API
+void
+InputSetUserIndex(input_context ContextHandle, int UserIndex);
+
+CORE_API
+int
+InputGetUserIndex(input_context ContextHandle);
+
+CORE_API
+void
+InputBeginFrame(input_context ContextHandle);
+
+CORE_API
+void
+InputEndFrame(input_context ContextHandle);
 
 
 //
 // System Input Slots.
 //
-
-namespace x_input
+struct input_x_input_slots
 {
-  CORE_API extern input_id Unknown;
+  input_slot Unknown;
 
   //
   // Buttons
   //
-  CORE_API extern input_id DPadUp;
-  CORE_API extern input_id DPadDown;
-  CORE_API extern input_id DPadLeft;
-  CORE_API extern input_id DPadRight;
-  CORE_API extern input_id Start;
-  CORE_API extern input_id Back;
-  CORE_API extern input_id LeftThumb;
-  CORE_API extern input_id RightThumb;
-  CORE_API extern input_id LeftBumper;
-  CORE_API extern input_id RightBumper;
-  CORE_API extern input_id A;
-  CORE_API extern input_id B;
-  CORE_API extern input_id X;
-  CORE_API extern input_id Y;
+  input_slot DPadUp;
+  input_slot DPadDown;
+  input_slot DPadLeft;
+  input_slot DPadRight;
+  input_slot Start;
+  input_slot Back;
+  input_slot LeftThumb;
+  input_slot RightThumb;
+  input_slot LeftBumper;
+  input_slot RightBumper;
+  input_slot A;
+  input_slot B;
+  input_slot X;
+  input_slot Y;
 
   //
   // Axes
   //
-  CORE_API extern input_id LeftTrigger;
-  CORE_API extern input_id RightTrigger;
-  CORE_API extern input_id XLeftStick;
-  CORE_API extern input_id YLeftStick;
-  CORE_API extern input_id XRightStick;
-  CORE_API extern input_id YRightStick;
+  input_slot LeftTrigger;
+  input_slot RightTrigger;
+  input_slot XLeftStick;
+  input_slot YLeftStick;
+  input_slot XRightStick;
+  input_slot YRightStick;
 };
 
-namespace mouse
+struct input_mouse_slots
 {
-  CORE_API extern input_id Unknown;
+  input_slot Unknown;
 
   //
   // Buttons
   //
-  CORE_API extern input_id LeftButton;
-  CORE_API extern input_id MiddleButton;
-  CORE_API extern input_id RightButton;
-  CORE_API extern input_id ExtraButton1;
-  CORE_API extern input_id ExtraButton2;
+  input_slot LeftButton;
+  input_slot MiddleButton;
+  input_slot RightButton;
+  input_slot ExtraButton1;
+  input_slot ExtraButton2;
 
   //
   // Axes
   //
-  CORE_API extern input_id XPosition;
-  CORE_API extern input_id YPosition;
+  input_slot XPosition;
+  input_slot YPosition;
 
   //
   // Actions
   //
-  CORE_API extern input_id XDelta;
-  CORE_API extern input_id YDelta;
-  CORE_API extern input_id VerticalWheelDelta;
-  CORE_API extern input_id HorizontalWheelDelta;
-  CORE_API extern input_id LeftButton_DoubleClick;
-  CORE_API extern input_id MiddleButton_DoubleClick;
-  CORE_API extern input_id RightButton_DoubleClick;
-  CORE_API extern input_id ExtraButton1_DoubleClick;
-  CORE_API extern input_id ExtraButton2_DoubleClick;
-}
+  input_slot XDelta;
+  input_slot YDelta;
+  input_slot VerticalWheelDelta;
+  input_slot HorizontalWheelDelta;
+  input_slot LeftButton_DoubleClick;
+  input_slot MiddleButton_DoubleClick;
+  input_slot RightButton_DoubleClick;
+  input_slot ExtraButton1_DoubleClick;
+  input_slot ExtraButton2_DoubleClick;
+};
 
-namespace keyboard
+struct input_keyboard_slots
 {
-  CORE_API extern input_id Unknown;
+  input_slot Unknown;
 
-  CORE_API extern input_id Escape;
-  CORE_API extern input_id Space;
-  CORE_API extern input_id Tab;
-  CORE_API extern input_id LeftShift;
-  CORE_API extern input_id LeftControl;
-  CORE_API extern input_id LeftAlt;
-  CORE_API extern input_id LeftSystem;
-  CORE_API extern input_id RightShift;
-  CORE_API extern input_id RightControl;
-  CORE_API extern input_id RightAlt;
-  CORE_API extern input_id RightSystem;
-  CORE_API extern input_id Shift;   // Either left or right
-  CORE_API extern input_id Control; // Either left or right
-  CORE_API extern input_id Alt;     // Either left or right
-  CORE_API extern input_id System;  // Either left or right
-  CORE_API extern input_id Application;
-  CORE_API extern input_id Backspace;
-  CORE_API extern input_id Return;
+  input_slot Escape;
+  input_slot Space;
+  input_slot Tab;
+  input_slot LeftShift;
+  input_slot LeftControl;
+  input_slot LeftAlt;
+  input_slot LeftSystem;
+  input_slot RightShift;
+  input_slot RightControl;
+  input_slot RightAlt;
+  input_slot RightSystem;
+  input_slot Shift;
+  input_slot Control;
+  input_slot Alt;
+  input_slot System;
+  input_slot Application;
+  input_slot Backspace;
+  input_slot Return;
 
-  CORE_API extern input_id Insert;
-  CORE_API extern input_id Delete;
-  CORE_API extern input_id Home;
-  CORE_API extern input_id End;
-  CORE_API extern input_id PageUp;
-  CORE_API extern input_id PageDown;
+  input_slot Insert;
+  input_slot Delete;
+  input_slot Home;
+  input_slot End;
+  input_slot PageUp;
+  input_slot PageDown;
 
-  CORE_API extern input_id Up;
-  CORE_API extern input_id Down;
-  CORE_API extern input_id Left;
-  CORE_API extern input_id Right;
+  input_slot Up;
+  input_slot Down;
+  input_slot Left;
+  input_slot Right;
 
   //
   // Digit Keys
   //
-  CORE_API extern input_id Digit_0;
-  CORE_API extern input_id Digit_1;
-  CORE_API extern input_id Digit_2;
-  CORE_API extern input_id Digit_3;
-  CORE_API extern input_id Digit_4;
-  CORE_API extern input_id Digit_5;
-  CORE_API extern input_id Digit_6;
-  CORE_API extern input_id Digit_7;
-  CORE_API extern input_id Digit_8;
-  CORE_API extern input_id Digit_9;
+  input_slot Digit_0;
+  input_slot Digit_1;
+  input_slot Digit_2;
+  input_slot Digit_3;
+  input_slot Digit_4;
+  input_slot Digit_5;
+  input_slot Digit_6;
+  input_slot Digit_7;
+  input_slot Digit_8;
+  input_slot Digit_9;
 
   //
   // Numpad
   //
-  CORE_API extern input_id Numpad_Add;
-  CORE_API extern input_id Numpad_Subtract;
-  CORE_API extern input_id Numpad_Multiply;
-  CORE_API extern input_id Numpad_Divide;
-  CORE_API extern input_id Numpad_Decimal;
-  CORE_API extern input_id Numpad_Enter;
+  input_slot Numpad_Add;
+  input_slot Numpad_Subtract;
+  input_slot Numpad_Multiply;
+  input_slot Numpad_Divide;
+  input_slot Numpad_Decimal;
+  input_slot Numpad_Enter;
 
-  CORE_API extern input_id Numpad_0;
-  CORE_API extern input_id Numpad_1;
-  CORE_API extern input_id Numpad_2;
-  CORE_API extern input_id Numpad_3;
-  CORE_API extern input_id Numpad_4;
-  CORE_API extern input_id Numpad_5;
-  CORE_API extern input_id Numpad_6;
-  CORE_API extern input_id Numpad_7;
-  CORE_API extern input_id Numpad_8;
-  CORE_API extern input_id Numpad_9;
+  input_slot Numpad_0;
+  input_slot Numpad_1;
+  input_slot Numpad_2;
+  input_slot Numpad_3;
+  input_slot Numpad_4;
+  input_slot Numpad_5;
+  input_slot Numpad_6;
+  input_slot Numpad_7;
+  input_slot Numpad_8;
+  input_slot Numpad_9;
 
   //
   // F-Keys
   //
-  CORE_API extern input_id F1;
-  CORE_API extern input_id F2;
-  CORE_API extern input_id F3;
-  CORE_API extern input_id F4;
-  CORE_API extern input_id F5;
-  CORE_API extern input_id F6;
-  CORE_API extern input_id F7;
-  CORE_API extern input_id F8;
-  CORE_API extern input_id F9;
-  CORE_API extern input_id F10;
-  CORE_API extern input_id F11;
-  CORE_API extern input_id F12;
-  CORE_API extern input_id F13;
-  CORE_API extern input_id F14;
-  CORE_API extern input_id F15;
-  CORE_API extern input_id F16;
-  CORE_API extern input_id F17;
-  CORE_API extern input_id F18;
-  CORE_API extern input_id F19;
-  CORE_API extern input_id F20;
-  CORE_API extern input_id F21;
-  CORE_API extern input_id F22;
-  CORE_API extern input_id F23;
-  CORE_API extern input_id F24;
+  input_slot F1;
+  input_slot F2;
+  input_slot F3;
+  input_slot F4;
+  input_slot F5;
+  input_slot F6;
+  input_slot F7;
+  input_slot F8;
+  input_slot F9;
+  input_slot F10;
+  input_slot F11;
+  input_slot F12;
+  input_slot F13;
+  input_slot F14;
+  input_slot F15;
+  input_slot F16;
+  input_slot F17;
+  input_slot F18;
+  input_slot F19;
+  input_slot F20;
+  input_slot F21;
+  input_slot F22;
+  input_slot F23;
+  input_slot F24;
 
   //
   // Keys
   //
-  CORE_API extern input_id A;
-  CORE_API extern input_id B;
-  CORE_API extern input_id C;
-  CORE_API extern input_id D;
-  CORE_API extern input_id E;
-  CORE_API extern input_id F;
-  CORE_API extern input_id G;
-  CORE_API extern input_id H;
-  CORE_API extern input_id I;
-  CORE_API extern input_id J;
-  CORE_API extern input_id K;
-  CORE_API extern input_id L;
-  CORE_API extern input_id M;
-  CORE_API extern input_id N;
-  CORE_API extern input_id O;
-  CORE_API extern input_id P;
-  CORE_API extern input_id Q;
-  CORE_API extern input_id R;
-  CORE_API extern input_id S;
-  CORE_API extern input_id T;
-  CORE_API extern input_id U;
-  CORE_API extern input_id V;
-  CORE_API extern input_id W;
-  CORE_API extern input_id X;
-  CORE_API extern input_id Y;
-  CORE_API extern input_id Z;
+  input_slot A;
+  input_slot B;
+  input_slot C;
+  input_slot D;
+  input_slot E;
+  input_slot F;
+  input_slot G;
+  input_slot H;
+  input_slot I;
+  input_slot J;
+  input_slot K;
+  input_slot L;
+  input_slot M;
+  input_slot N;
+  input_slot O;
+  input_slot P;
+  input_slot Q;
+  input_slot R;
+  input_slot S;
+  input_slot T;
+  input_slot U;
+  input_slot V;
+  input_slot W;
+  input_slot X;
+  input_slot Y;
+  input_slot Z;
+};
+
+namespace input_x_input_slot_names
+{
+  constexpr char const* const Unknown = "XInput_Unknown";
+
+  //
+  // Buttons
+  //
+  constexpr char const* const DPadUp      = "XInput_DPadUp";
+  constexpr char const* const DPadDown    = "XInput_DPadDown";
+  constexpr char const* const DPadLeft    = "XInput_DPadLeft";
+  constexpr char const* const DPadRight   = "XInput_DPadRight";
+  constexpr char const* const Start       = "XInput_Start";
+  constexpr char const* const Back        = "XInput_Back";
+  constexpr char const* const LeftThumb   = "XInput_LeftThumb";
+  constexpr char const* const RightThumb  = "XInput_RightThumb";
+  constexpr char const* const LeftBumper  = "XInput_LeftBumper";
+  constexpr char const* const RightBumper = "XInput_RightBumper";
+  constexpr char const* const A           = "XInput_A";
+  constexpr char const* const B           = "XInput_B";
+  constexpr char const* const X           = "XInput_X";
+  constexpr char const* const Y           = "XInput_Y";
+
+  //
+  // Axes
+  //
+  constexpr char const* const LeftTrigger  = "XInput_LeftTrigger";
+  constexpr char const* const RightTrigger = "XInput_RightTrigger";
+  constexpr char const* const XLeftStick   = "XInput_XLeftStick";
+  constexpr char const* const YLeftStick   = "XInput_YLeftStick";
+  constexpr char const* const XRightStick  = "XInput_XRightStick";
+  constexpr char const* const YRightStick  = "XInput_YRightStick";
+}
+
+namespace input_mouse_slot_names
+{
+  constexpr char const* const Unknown = "Mouse_Unknown";
+
+  //
+  // Buttons
+  //
+  constexpr char const* const LeftButton   = "Mouse_LeftButton";
+  constexpr char const* const MiddleButton = "Mouse_MiddleButton";
+  constexpr char const* const RightButton  = "Mouse_RightButton";
+  constexpr char const* const ExtraButton1 = "Mouse_ExtraButton1";
+  constexpr char const* const ExtraButton2 = "Mouse_ExtraButton2";
+
+  //
+  // Axes
+  //
+  constexpr char const* const XPosition = "Mouse_XPosition";
+  constexpr char const* const YPosition = "Mouse_YPosition";
+
+  //
+  // Actions
+  //
+  constexpr char const* const XDelta                   = "Mouse_XDelta";
+  constexpr char const* const YDelta                   = "Mouse_YDelta";
+  constexpr char const* const VerticalWheelDelta       = "Mouse_VerticalWheelDelta";
+  constexpr char const* const HorizontalWheelDelta     = "Mouse_HorizontalWheelDelta";
+  constexpr char const* const LeftButton_DoubleClick   = "Mouse_LeftButton_DoubleClick";
+  constexpr char const* const MiddleButton_DoubleClick = "Mouse_MiddleButton_DoubleClick";
+  constexpr char const* const RightButton_DoubleClick  = "Mouse_RightButton_DoubleClick";
+  constexpr char const* const ExtraButton1_DoubleClick = "Mouse_ExtraButton1_DoubleClick";
+  constexpr char const* const ExtraButton2_DoubleClick = "Mouse_ExtraButton2_DoubleClick";
+}
+
+namespace input_keyboard_slot_names
+{
+  constexpr char const* const Unknown = "Keyboard_Unknown";
+
+  constexpr char const* const Escape       = "Keyboard_Escape";
+  constexpr char const* const Space        = "Keyboard_Space";
+  constexpr char const* const Tab          = "Keyboard_Tab";
+  constexpr char const* const LeftShift    = "Keyboard_LeftShift";
+  constexpr char const* const LeftControl  = "Keyboard_LeftControl";
+  constexpr char const* const LeftAlt      = "Keyboard_LeftAlt";
+  constexpr char const* const LeftSystem   = "Keyboard_LeftSystem";
+  constexpr char const* const RightShift   = "Keyboard_RightShift";
+  constexpr char const* const RightControl = "Keyboard_RightControl";
+  constexpr char const* const RightAlt     = "Keyboard_RightAlt";
+  constexpr char const* const RightSystem  = "Keyboard_RightSystem";
+  constexpr char const* const Shift        = "Keyboard_Shift";   // Either left or right
+  constexpr char const* const Control      = "Keyboard_Control"; // Either left or right
+  constexpr char const* const Alt          = "Keyboard_Alt";     // Either left or right
+  constexpr char const* const System       = "Keyboard_System";  // Either left or right
+  constexpr char const* const Application  = "Keyboard_Application";
+  constexpr char const* const Backspace    = "Keyboard_Backspace";
+  constexpr char const* const Return       = "Keyboard_Return";
+
+  constexpr char const* const Insert   = "Keyboard_Insert";
+  constexpr char const* const Delete   = "Keyboard_Delete";
+  constexpr char const* const Home     = "Keyboard_Home";
+  constexpr char const* const End      = "Keyboard_End";
+  constexpr char const* const PageUp   = "Keyboard_PageUp";
+  constexpr char const* const PageDown = "Keyboard_PageDown";
+
+  constexpr char const* const Up    = "Keyboard_Up";
+  constexpr char const* const Down  = "Keyboard_Down";
+  constexpr char const* const Left  = "Keyboard_Left";
+  constexpr char const* const Right = "Keyboard_Right";
+
+  //
+  // Digit Keys
+  //
+  constexpr char const* const Digit_0  = "Keyboard_Digit_0";
+  constexpr char const* const Digit_1  = "Keyboard_Digit_1";
+  constexpr char const* const Digit_2  = "Keyboard_Digit_2";
+  constexpr char const* const Digit_3  = "Keyboard_Digit_3";
+  constexpr char const* const Digit_4  = "Keyboard_Digit_4";
+  constexpr char const* const Digit_5  = "Keyboard_Digit_5";
+  constexpr char const* const Digit_6  = "Keyboard_Digit_6";
+  constexpr char const* const Digit_7  = "Keyboard_Digit_7";
+  constexpr char const* const Digit_8  = "Keyboard_Digit_8";
+  constexpr char const* const Digit_9  = "Keyboard_Digit_9";
+
+  //
+  // Numpad
+  //
+  constexpr char const* const Numpad_Add      = "Keyboard_Numpad_Add";
+  constexpr char const* const Numpad_Subtract = "Keyboard_Numpad_Subtract";
+  constexpr char const* const Numpad_Multiply = "Keyboard_Numpad_Multiply";
+  constexpr char const* const Numpad_Divide   = "Keyboard_Numpad_Divide";
+  constexpr char const* const Numpad_Decimal  = "Keyboard_Numpad_Decimal";
+  constexpr char const* const Numpad_Enter    = "Keyboard_Numpad_Enter";
+
+  constexpr char const* const Numpad_0 = "Keyboard_Numpad_0";
+  constexpr char const* const Numpad_1 = "Keyboard_Numpad_1";
+  constexpr char const* const Numpad_2 = "Keyboard_Numpad_2";
+  constexpr char const* const Numpad_3 = "Keyboard_Numpad_3";
+  constexpr char const* const Numpad_4 = "Keyboard_Numpad_4";
+  constexpr char const* const Numpad_5 = "Keyboard_Numpad_5";
+  constexpr char const* const Numpad_6 = "Keyboard_Numpad_6";
+  constexpr char const* const Numpad_7 = "Keyboard_Numpad_7";
+  constexpr char const* const Numpad_8 = "Keyboard_Numpad_8";
+  constexpr char const* const Numpad_9 = "Keyboard_Numpad_9";
+
+  //
+  // F-Keys
+  //
+  constexpr char const* const F1  = "Keyboard_F1";
+  constexpr char const* const F2  = "Keyboard_F2";
+  constexpr char const* const F3  = "Keyboard_F3";
+  constexpr char const* const F4  = "Keyboard_F4";
+  constexpr char const* const F5  = "Keyboard_F5";
+  constexpr char const* const F6  = "Keyboard_F6";
+  constexpr char const* const F7  = "Keyboard_F7";
+  constexpr char const* const F8  = "Keyboard_F8";
+  constexpr char const* const F9  = "Keyboard_F9";
+  constexpr char const* const F10 = "Keyboard_F10";
+  constexpr char const* const F11 = "Keyboard_F11";
+  constexpr char const* const F12 = "Keyboard_F12";
+  constexpr char const* const F13 = "Keyboard_F13";
+  constexpr char const* const F14 = "Keyboard_F14";
+  constexpr char const* const F15 = "Keyboard_F15";
+  constexpr char const* const F16 = "Keyboard_F16";
+  constexpr char const* const F17 = "Keyboard_F17";
+  constexpr char const* const F18 = "Keyboard_F18";
+  constexpr char const* const F19 = "Keyboard_F19";
+  constexpr char const* const F20 = "Keyboard_F20";
+  constexpr char const* const F21 = "Keyboard_F21";
+  constexpr char const* const F22 = "Keyboard_F22";
+  constexpr char const* const F23 = "Keyboard_F23";
+  constexpr char const* const F24 = "Keyboard_F24";
+
+  //
+  // Keys
+  //
+  constexpr char const* const A = "Keyboard_A";
+  constexpr char const* const B = "Keyboard_B";
+  constexpr char const* const C = "Keyboard_C";
+  constexpr char const* const D = "Keyboard_D";
+  constexpr char const* const E = "Keyboard_E";
+  constexpr char const* const F = "Keyboard_F";
+  constexpr char const* const G = "Keyboard_G";
+  constexpr char const* const H = "Keyboard_H";
+  constexpr char const* const I = "Keyboard_I";
+  constexpr char const* const J = "Keyboard_J";
+  constexpr char const* const K = "Keyboard_K";
+  constexpr char const* const L = "Keyboard_L";
+  constexpr char const* const M = "Keyboard_M";
+  constexpr char const* const N = "Keyboard_N";
+  constexpr char const* const O = "Keyboard_O";
+  constexpr char const* const P = "Keyboard_P";
+  constexpr char const* const Q = "Keyboard_Q";
+  constexpr char const* const R = "Keyboard_R";
+  constexpr char const* const S = "Keyboard_S";
+  constexpr char const* const T = "Keyboard_T";
+  constexpr char const* const U = "Keyboard_U";
+  constexpr char const* const V = "Keyboard_V";
+  constexpr char const* const W = "Keyboard_W";
+  constexpr char const* const X = "Keyboard_X";
+  constexpr char const* const Y = "Keyboard_Y";
+  constexpr char const* const Z = "Keyboard_Z";
 }

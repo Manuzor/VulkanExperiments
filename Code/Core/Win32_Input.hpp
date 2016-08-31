@@ -27,43 +27,39 @@ struct CORE_API x_input_dll
 
 CORE_API
 bool
-Win32LoadXInput(x_input_dll& XInput, log_data* Log = nullptr);
+Win32LoadXInput(x_input_dll* XInput, log_data* Log = nullptr);
 
-
-class CORE_API win32_input_context : public input_context
-{
-public:
-  fixed_block<XUSER_MAX_COUNT, XINPUT_STATE> XInputPreviousState{};
-
-  win32_input_context(allocator_interface& Allocator);
-  virtual ~win32_input_context();
-};
 
 CORE_API
 bool
 Win32ProcessInputMessage(HWND WindowHandle, UINT Message, WPARAM WParam, LPARAM LParam,
-                         win32_input_context& Input,
+                         input_context ContextHandle,
+                         input_keyboard_slots* Keyboard,
+                         input_mouse_slots* Mouse,
                          log_data* Log = nullptr);
 
 CORE_API
-slice<input_id>
-Win32VirtualKeyToInputId(WPARAM VKCode, LPARAM lParam, slice<input_id> Buffer);
+slice<char const*>
+Win32VirtualKeyToInputId(WPARAM VKCode, LPARAM lParam, slice<char const*> Buffer);
 
 CORE_API
 void
-Win32PollXInput(x_input_dll& XInput, win32_input_context& Input);
+Win32PollXInput(x_input_dll* XInput, input_context ContextHandle, input_x_input_slots* Slots);
 
 CORE_API
 void
-Win32RegisterAllMouseSlots(win32_input_context& Context,
+Win32RegisterMouseSlots(input_context ContextHandle,
+                        input_mouse_slots* Mouse,
+                        log_data* Log = nullptr);
+
+CORE_API
+void
+Win32RegisterXInputSlots(input_context ContextHandle,
+                         input_x_input_slots* XInput,
+                         log_data* Log = nullptr);
+
+CORE_API
+void
+Win32RegisterKeyboardSlots(input_context ContextHandle,
+                           input_keyboard_slots* Keyboard,
                            log_data* Log = nullptr);
-
-CORE_API
-void
-Win32RegisterAllXInputSlots(win32_input_context& Context,
-                            log_data* Log = nullptr);
-
-CORE_API
-void
-Win32RegisterAllKeyboardSlots(win32_input_context& Context,
-                              log_data* Log = nullptr);

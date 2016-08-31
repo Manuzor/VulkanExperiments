@@ -82,7 +82,9 @@ struct window
   HWND WindowHandle;
   extent2_<uint32> ClientExtents;
 
-  win32_input_context* Input;
+  input_context Input;
+  input_keyboard_slots* Keyboard;
+  input_mouse_slots* Mouse;
   vulkan* Vulkan;
 };
 
@@ -1577,23 +1579,20 @@ void Win32MessagePump()
   }
 }
 
-struct
+struct my_input_slots
 {
-  input_id const Quit  = InputId("Quit");
-  input_id const Depth = InputId("Depth");
+  input_slot Quit;
+  input_slot Depth;
 
-  struct
-  {
-    input_id const MoveForward = InputId("MoveForward");
-    input_id const MoveRight   = InputId("MoveRight");
-    input_id const MoveUp      = InputId("MoveUp");
-    input_id const RelYaw      = InputId("RelYaw");
-    input_id const RelPitch    = InputId("RelPitch");
-    input_id const AbsYaw      = InputId("AbsYaw");
-    input_id const AbsPitch    = InputId("AbsPitch");
-    input_id const Reset       = InputId("Reset");
-  } Camera;
-} MyInputSlots;
+  input_slot CamMoveForward;
+  input_slot CamMoveRight;
+  input_slot CamMoveUp;
+  input_slot CamRelYaw;
+  input_slot CamRelPitch;
+  input_slot CamAbsYaw;
+  input_slot CamAbsPitch;
+  input_slot CamReset;
+};
 
 struct frame_time_sample
 {
@@ -1687,6 +1686,73 @@ AddFrameTimeSample(frame_time_stats& Stats, frame_time_stats::sample Sample)
   Stats.NumSamples = Min(Stats.NumSamples + 1, Stats.MaxNumSamples);
 }
 
+void
+PrepareInputSlots(input_context         Context,
+                  my_input_slots*       MyInputSlots,
+                  input_x_input_slots*  XInput,
+                  input_mouse_slots*    Mouse,
+                  input_keyboard_slots* Keyboard)
+{
+  // Let's pretend the system is user 0 for now.
+  InputSetUserIndex(Context, 0);
+
+  Win32RegisterXInputSlots(Context, XInput, GlobalLog);
+  Win32RegisterMouseSlots(Context, Mouse, GlobalLog);
+  Win32RegisterKeyboardSlots(Context, Keyboard, GlobalLog);
+
+  //
+  // Input Mappings
+  //
+  MyInputSlots->Quit = InputRegisterSlot(Context, input_type::Button, "Quit");
+  InputAddSlotMapping(Keyboard->Escape, MyInputSlots->Quit);
+  InputAddSlotMapping(XInput->Start, MyInputSlots->Quit);
+
+  MyInputSlots->Depth = InputRegisterSlot(Context, input_type::Axis, "Depth");
+  InputAddSlotMapping(Keyboard->Up, MyInputSlots->Depth, -1);
+  InputAddSlotMapping(Keyboard->Down, MyInputSlots->Depth, 1);
+  InputSetSensitivity(MyInputSlots->Depth, 0.005f);
+
+  MyInputSlots->CamMoveForward = InputRegisterSlot(Context, input_type::Axis, "CamMoveForward");
+  InputAddSlotMapping(XInput->YLeftStick, MyInputSlots->CamMoveForward);
+  InputAddSlotMapping(Keyboard->W, MyInputSlots->CamMoveForward,  1);
+  InputAddSlotMapping(Keyboard->S, MyInputSlots->CamMoveForward, -1);
+
+  MyInputSlots->CamMoveRight = InputRegisterSlot(Context, input_type::Axis, "CamMoveRight");
+  InputAddSlotMapping(XInput->XLeftStick, MyInputSlots->CamMoveRight);
+  InputAddSlotMapping(Keyboard->D, MyInputSlots->CamMoveRight,  1);
+  InputAddSlotMapping(Keyboard->A, MyInputSlots->CamMoveRight, -1);
+
+  MyInputSlots->CamMoveUp = InputRegisterSlot(Context, input_type::Axis, "CamMoveUp");
+  InputAddSlotMapping(XInput->LeftTrigger,  MyInputSlots->CamMoveUp,  1);
+  InputAddSlotMapping(XInput->RightTrigger, MyInputSlots->CamMoveUp, -1);
+  InputAddSlotMapping(Keyboard->E, MyInputSlots->CamMoveUp,  1);
+  InputAddSlotMapping(Keyboard->Q, MyInputSlots->CamMoveUp, -1);
+  InputSetExponent(MyInputSlots->CamMoveUp, 3.0f);
+
+  MyInputSlots->CamRelYaw = InputRegisterSlot(Context, input_type::Axis, "CamRelYaw");
+  InputAddSlotMapping(XInput->XRightStick, MyInputSlots->CamRelYaw);
+  InputAddSlotMapping(Keyboard->Left,  MyInputSlots->CamRelYaw, -1);
+  InputAddSlotMapping(Keyboard->Right, MyInputSlots->CamRelYaw, 1);
+
+  MyInputSlots->CamRelPitch = InputRegisterSlot(Context, input_type::Axis, "CamRelPitch");
+  InputAddSlotMapping(XInput->YRightStick, MyInputSlots->CamRelPitch, -1);
+  InputAddSlotMapping(Keyboard->Up,   MyInputSlots->CamRelPitch, -1);
+  InputAddSlotMapping(Keyboard->Down, MyInputSlots->CamRelPitch, 1);
+
+  float const CameraMouseSensitivity = 0.01f;
+
+  MyInputSlots->CamAbsYaw = InputRegisterSlot(Context, input_type::Action, "CamAbsYaw");
+  InputAddSlotMapping(Mouse->XDelta, MyInputSlots->CamAbsYaw);
+  InputSetSensitivity(MyInputSlots->CamAbsYaw, CameraMouseSensitivity);
+
+  MyInputSlots->CamAbsPitch = InputRegisterSlot(Context, input_type::Action, "CamAbsPitch");
+  InputAddSlotMapping(Mouse->YDelta, MyInputSlots->CamAbsPitch);
+  InputSetSensitivity(MyInputSlots->CamAbsPitch, CameraMouseSensitivity);
+
+  MyInputSlots->CamReset = InputRegisterSlot(Context, input_type::Button, "CamReset");
+  InputAddSlotMapping(Keyboard->R, MyInputSlots->CamReset);
+}
+
 enum class exit_code : int
 {
   Success = 0,
@@ -1776,6 +1842,10 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
     if(!VulkanChooseAndSetupPhysicalDevices(Vulkan))
       return exit_code::NoVulkanGpu;
 
+
+    //
+    // Create a Win32 window
+    //
     window_setup WindowSetup{};
     WindowSetup.ProcessHandle = ProcessHandle;
     WindowSetup.WindowClassName = "VulkanExperimentsWindowClass";
@@ -1787,6 +1857,7 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
       return exit_code::FailedCreatingWindow;
 
     Defer [&](){ Win32DestroyWindow(Allocator, Window); };
+
 
     //
     // Surface
@@ -1896,88 +1967,24 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
     LogInfo("Vulkan initialization finished!");
     Defer [](){ LogInfo("Shutting down..."); };
 
-
     //
     // Input Setup
     //
-    x_input_dll XInput{};
-    Win32LoadXInput(XInput, GlobalLog);
+    my_input_slots MyInputSlots;
+    x_input_dll XInputDll{};
+    Win32LoadXInput(&XInputDll, GlobalLog);
 
-    auto InputContext = New<win32_input_context>(Allocator, Allocator);
-    Assert(InputContext);
-    Defer [=](){ Delete(*AllocatorPtr, InputContext); };
+    auto SystemInput = InputCreateContext(&Allocator);
+    Defer [&](){ InputDestroyContext(&Allocator, SystemInput); };
 
-    auto& SystemInput = *InputContext;
-    {
-      // Let's pretend the system is user 0 for now.
-      SystemInput.UserIndex = 0;
+    input_x_input_slots XInput{};
+    input_mouse_slots Mouse{};
+    input_keyboard_slots Keyboard{};
+    PrepareInputSlots(SystemInput, &MyInputSlots, &XInput, &Mouse, &Keyboard);
 
-      Win32RegisterAllMouseSlots(SystemInput, GlobalLog);
-      Win32RegisterAllXInputSlots(SystemInput, GlobalLog);
-      Win32RegisterAllKeyboardSlots(SystemInput, GlobalLog);
-
-      //
-      // Input Mappings
-      //
-      RegisterInputSlot(SystemInput, input_type::Button, MyInputSlots.Quit);
-      AddInputSlotMapping(SystemInput, keyboard::Escape, MyInputSlots.Quit);
-      AddInputSlotMapping(SystemInput, x_input::Start, MyInputSlots.Quit);
-
-      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Depth);
-      AddInputSlotMapping(SystemInput, keyboard::Up, MyInputSlots.Depth, -1);
-      AddInputSlotMapping(SystemInput, keyboard::Down, MyInputSlots.Depth, 1);
-      auto DepthSlotProperties = GetOrCreate(&SystemInput.ValueProperties, MyInputSlots.Depth);
-      DepthSlotProperties->Sensitivity = 0.005f;
-
-      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.MoveForward);
-      AddInputSlotMapping(SystemInput, x_input::YLeftStick, MyInputSlots.Camera.MoveForward);
-      AddInputSlotMapping(SystemInput, keyboard::W, MyInputSlots.Camera.MoveForward,  1);
-      AddInputSlotMapping(SystemInput, keyboard::S, MyInputSlots.Camera.MoveForward, -1);
-
-      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.MoveRight);
-      AddInputSlotMapping(SystemInput, x_input::XLeftStick, MyInputSlots.Camera.MoveRight);
-      AddInputSlotMapping(SystemInput, keyboard::D, MyInputSlots.Camera.MoveRight,  1);
-      AddInputSlotMapping(SystemInput, keyboard::A, MyInputSlots.Camera.MoveRight, -1);
-
-      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.MoveUp);
-      AddInputSlotMapping(SystemInput, x_input::LeftTrigger,  MyInputSlots.Camera.MoveUp,  1);
-      AddInputSlotMapping(SystemInput, x_input::RightTrigger, MyInputSlots.Camera.MoveUp, -1);
-      AddInputSlotMapping(SystemInput, keyboard::E, MyInputSlots.Camera.MoveUp,  1);
-      AddInputSlotMapping(SystemInput, keyboard::Q, MyInputSlots.Camera.MoveUp, -1);
-      auto MoveUpSlotProperties = GetOrCreate(&SystemInput.ValueProperties, MyInputSlots.Camera.MoveUp);
-      MoveUpSlotProperties->Exponent = 3.0f;
-
-      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.RelYaw);
-      AddInputSlotMapping(SystemInput, x_input::XRightStick, MyInputSlots.Camera.RelYaw);
-      AddInputSlotMapping(SystemInput, keyboard::Left,  MyInputSlots.Camera.RelYaw, 1);
-      AddInputSlotMapping(SystemInput, keyboard::Right, MyInputSlots.Camera.RelYaw, -1);
-
-      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.RelPitch);
-      AddInputSlotMapping(SystemInput, x_input::YRightStick, MyInputSlots.Camera.RelPitch, -1);
-      AddInputSlotMapping(SystemInput, keyboard::Up,   MyInputSlots.Camera.RelPitch, -1);
-      AddInputSlotMapping(SystemInput, keyboard::Down, MyInputSlots.Camera.RelPitch, 1);
-
-      float const CameraMouseSensitivity = 0.01f;
-
-      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.AbsYaw);
-      AddInputSlotMapping(SystemInput, mouse::XDelta, MyInputSlots.Camera.AbsYaw);
-      {
-        auto SlotProperties = GetOrCreate(&SystemInput.ValueProperties, MyInputSlots.Camera.AbsYaw);
-        SlotProperties->Sensitivity = CameraMouseSensitivity;
-      }
-
-      RegisterInputSlot(SystemInput, input_type::Axis, MyInputSlots.Camera.AbsPitch);
-      AddInputSlotMapping(SystemInput, mouse::YDelta, MyInputSlots.Camera.AbsPitch);
-      {
-        auto SlotProperties = GetOrCreate(&SystemInput.ValueProperties, MyInputSlots.Camera.AbsPitch);
-        SlotProperties->Sensitivity = CameraMouseSensitivity;
-      }
-
-      RegisterInputSlot(SystemInput, input_type::Button, MyInputSlots.Camera.Reset);
-      AddInputSlotMapping(SystemInput, keyboard::R, MyInputSlots.Camera.Reset);
-
-      Window->Input = &SystemInput;
-    }
+    Window->Input = SystemInput;
+    Window->Mouse = &Mouse;
+    Window->Keyboard = &Keyboard;
 
 
     //
@@ -2177,62 +2184,56 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
       StopwatchStart(&FrameTimer);
       StopwatchStart(&PerfTimer);
 
-      BeginInputFrame(SystemInput);
+      InputBeginFrame(SystemInput);
       {
         Win32MessagePump();
-        Win32PollXInput(XInput, SystemInput);
+        Win32PollXInput(&XInputDll, SystemInput, &XInput);
       }
-      EndInputFrame(SystemInput);
+      InputEndFrame(SystemInput);
 
       //
       // Check for Quit requests
       //
-      if(ButtonIsDown(SystemInput[keyboard::Alt]) &&
-         ButtonIsDown(SystemInput[keyboard::F4]))
+      if(InputButtonIsDown(Keyboard.Alt) &&
+         InputButtonWasPressed(Keyboard.F4))
       {
         quick_exit(0);
       }
 
-      if(ButtonIsDown(SystemInput[MyInputSlots.Quit]))
+      if(InputButtonWasPressed(MyInputSlots.Quit))
       {
         ::GlobalRunning = false;
         break;
       }
 
-      if(input_slot* Slot = GetInputSlot(SystemInput, keyboard::P))
+      if(InputButtonWasPressed(Keyboard.P))
       {
-        if(ButtonIsDown(Slot) && Slot->Frame == SystemInput.CurrentFrame)
-        {
-          PrintFrameTimeStats(FrameTimeStats, GlobalLog);
-        }
+        PrintFrameTimeStats(FrameTimeStats, GlobalLog);
       }
 
-      //Vulkan.DepthStencilValue = Clamp(Vulkan.DepthStencilValue + AxisValue(SystemInput[MyInputSlots.Depth]), 0.8f, 1.0f);
+      //Vulkan.DepthStencilValue = Clamp(Vulkan.DepthStencilValue + InputAxisValue(SystemInput[MyInputSlots.Depth]), 0.8f, 1.0f);
 
       //
       // Update camera
       //
       {
-        auto ForwardMovement = AxisValue(SystemInput[MyInputSlots.Camera.MoveForward]);
-        auto RightMovement = AxisValue(SystemInput[MyInputSlots.Camera.MoveRight]);
-        auto UpMovement = AxisValue(SystemInput[MyInputSlots.Camera.MoveUp]);
+        auto ForwardMovement = InputAxisValue(MyInputSlots.CamMoveForward);
+        auto RightMovement = InputAxisValue(MyInputSlots.CamMoveRight);
+        auto UpMovement = InputAxisValue(MyInputSlots.CamMoveUp);
         Cam.Transform.Translation += Cam.MovementSpeed * DeltaSeconds * (
           ForwardVector(Cam.Transform) * ForwardMovement +
           RightVector(Cam.Transform)   * RightMovement +
           UpVector(Cam.Transform)      * UpMovement
         );
 
-        Cam.InputYaw += AxisValue(SystemInput[MyInputSlots.Camera.RelYaw]) * Cam.RotationSpeed * DeltaSeconds;
-        Cam.InputYaw += AxisValue(SystemInput[MyInputSlots.Camera.AbsYaw]);
-        Cam.InputPitch += AxisValue(SystemInput[MyInputSlots.Camera.RelPitch]) * Cam.RotationSpeed * DeltaSeconds;
-        Cam.InputPitch += AxisValue(SystemInput[MyInputSlots.Camera.AbsPitch]);
+        Cam.InputYaw += InputAxisValue(MyInputSlots.CamRelYaw) * Cam.RotationSpeed * DeltaSeconds;
+        Cam.InputYaw += InputActionValue(MyInputSlots.CamAbsYaw);
+        Cam.InputPitch += InputAxisValue(MyInputSlots.CamRelPitch) * Cam.RotationSpeed * DeltaSeconds;
+        Cam.InputPitch += InputActionValue(MyInputSlots.CamAbsPitch);
 
-        if(input_slot* Slot = GetInputSlot(SystemInput, keyboard::T))
+        if(InputButtonWasPressed(Keyboard.T))
         {
-          if(ButtonIsDown(Slot) && Slot->Frame == SystemInput.CurrentFrame)
-          {
-            AutoCamera = !AutoCamera;
-          }
+          AutoCamera = !AutoCamera;
         }
 
         if(AutoCamera)
@@ -2244,7 +2245,7 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
                                  Quaternion(RightVector3, Radians(Cam.InputPitch));
         SafeNormalize(&Cam.Transform.Rotation);
 
-        if(ButtonIsDown(SystemInput[MyInputSlots.Camera.Reset]))
+        if(InputButtonWasPressed(MyInputSlots.CamReset))
         {
           Cam.Transform = IdentityTransform;
           Cam.InputYaw = 0;
@@ -2382,7 +2383,8 @@ Win32MainWindowCallback(HWND WindowHandle, UINT Message,
     if(Window->Input)
     {
       // TODO(Manu): Deal with the return value?
-      Win32ProcessInputMessage(WindowHandle, Message, WParam, LParam, *Window->Input);
+      Win32ProcessInputMessage(WindowHandle, Message, WParam, LParam,
+                               Window->Input, Window->Keyboard, Window->Mouse);
     }
   }
   else if(Message == WM_SIZE)
