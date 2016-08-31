@@ -71,7 +71,7 @@ StringBenchmark(arc_string const& String)
   }
 }
 
-TEST_CASE("String Benchmark", "[String][Benchmark]")
+TEST_CASE("String Benchmark", "[String][.Benchmark]")
 {
   SECTION("Default string allocator.")
   {
