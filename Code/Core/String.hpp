@@ -201,3 +201,31 @@ StrConcat(slice<char const> More, arc_string const& String);
 inline arc_string operator +(char const* StringPtr, arc_string const& String)     { return StrConcat(SliceFromString(StringPtr), String); }
 inline arc_string operator +(slice<char const> Content, arc_string const& String) { return StrConcat(Content, String); }
 inline arc_string operator +(slice<char> Content, arc_string const& String)       { return StrConcat(AsConst(Content), String); }
+
+CORE_API
+bool
+StrAreEqual(arc_string const& A, arc_string const& B);
+
+CORE_API
+bool
+StrAreEqual(arc_string const& A, slice<char const> B);
+
+CORE_API
+bool
+StrAreEqual(slice<char const> A, arc_string const& B);
+
+inline bool operator ==(arc_string const& A, arc_string const& B) { return StrAreEqual(A, B); }
+inline bool operator ==(arc_string const& A, slice<char const> B) { return StrAreEqual(A, B); }
+inline bool operator ==(slice<char const> A, arc_string const& B) { return StrAreEqual(A, B); }
+inline bool operator ==(arc_string const& A, slice<char      > B) { return StrAreEqual(A, AsConst(B)); }
+inline bool operator ==(slice<char      > A, arc_string const& B) { return StrAreEqual(AsConst(A), B); }
+inline bool operator ==(arc_string const& A, char const* B)       { return StrAreEqual(A, SliceFromString(B)); }
+inline bool operator ==(char const* A,       arc_string const& B) { return StrAreEqual(SliceFromString(A), B); }
+
+inline bool operator !=(arc_string const& A, arc_string const& B) { return !(A == B); }
+inline bool operator !=(arc_string const& A, slice<char const> B) { return !(A == B); }
+inline bool operator !=(slice<char const> A, arc_string const& B) { return !(A == B); }
+inline bool operator !=(arc_string const& A, slice<char      > B) { return !(A == B); }
+inline bool operator !=(slice<char      > A, arc_string const& B) { return !(A == B); }
+inline bool operator !=(arc_string const& A, char const* B)       { return !(A == B); }
+inline bool operator !=(char const* A,       arc_string const& B) { return !(A == B); }

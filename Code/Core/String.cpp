@@ -441,6 +441,7 @@ arc_string::operator=(arc_string const& Copy)
   if(this->Internal != Copy.Internal)
   {
     StrReleaseRef(this->Allocator, this->Internal);
+    this->Allocator = Copy.Allocator;
     this->Internal = Copy.Internal;
     StrAddRef(this->Internal);
   }
@@ -453,6 +454,7 @@ arc_string::operator=(arc_string&& Copy)
   if(this->Internal != Copy.Internal)
   {
     StrReleaseRef(this->Allocator, this->Internal);
+    this->Allocator = Copy.Allocator;
     this->Internal = Copy.Internal;
     Copy.Internal = nullptr;
   }
@@ -705,4 +707,11 @@ auto
   auto Copy = String;
   StrPrepend(Copy, More);
   return Copy;
+}
+
+auto
+::StrAreEqual(arc_string const& A, arc_string const& B)
+  -> bool
+{
+  return Slice(A) == Slice(B);
 }
