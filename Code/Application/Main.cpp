@@ -463,7 +463,7 @@ VulkanChooseAndSetupPhysicalDevices(vulkan& Vulkan)
 }
 
 static bool
-VulkanInitializeGraphics(vulkan& Vulkan, HINSTANCE ProcessHandle, HWND WindowHandle)
+VulkanInitializeGraphics(vulkan& Vulkan)
 {
   //
   // Create Logical Device
@@ -1687,10 +1687,35 @@ AddFrameTimeSample(frame_time_stats& Stats, frame_time_stats::sample Sample)
   Stats.NumSamples = Min(Stats.NumSamples + 1, Stats.MaxNumSamples);
 }
 
-int
-WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
-        LPSTR CommandLine, int ShowCode)
+enum class exit_code : int
 {
+  Success = 0,
+
+  NoVulkanDll = 1,
+  FailedCreatingVulkanInstance = 2,
+  NoVulkanGpu = 3,
+  FailedCreatingWindow = 4,
+  FailedPreparingVulkanSurface = 5,
+  FailedInitializingVulkanForGraphics = 6,
+  FailedPreparingVulkanSwapchain = 7,
+  FailedPreparingVulkanDepth = 8,
+};
+
+static exit_code
+ApplicationEntryPoint(HINSTANCE ProcessHandle)
+{
+  // Whether to show the current FPS in the window title text.
+  bool ShowFpsInWindowTitle = false;
+  DebugCode(ShowFpsInWindowTitle = true);
+
+  // Whether to enable vsync.
+  vsync VSync = vsync::On;
+
+  // Whether to enable Vulkan validation layers or not.
+  // Note that validation drains quite some performance.
+  vulkan_enable_validation VulkanValidation = vulkan_enable_validation::Yes;
+
+
   int CurrentExitCode = 0;
 
   Win32SetupConsole("Vulkan Experiments Console");
@@ -1730,13 +1755,11 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     Init(Vulkan, Allocator);
     Defer [=](){ Finalize(*VulkanPtr); };
 
-    ++CurrentExitCode;
     if(!VulkanLoadDLL(Vulkan))
-      return CurrentExitCode;
+      return exit_code::NoVulkanDll;
 
-    ++CurrentExitCode;
-    if(!VulkanCreateInstance(Vulkan, vulkan_enable_validation::Yes))
-      return CurrentExitCode;
+    if(!VulkanCreateInstance(Vulkan, VulkanValidation))
+      return exit_code::FailedCreatingVulkanInstance;
     Defer [=](){ VulkanDestroyInstance(*VulkanPtr); };
 
     VulkanLoadInstanceFunctions(Vulkan);
@@ -1744,20 +1767,18 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     VulkanSetupDebugging(Vulkan);
     Defer [=](){ VulkanCleanupDebugging(*VulkanPtr); };
 
-    ++CurrentExitCode;
     if(!VulkanChooseAndSetupPhysicalDevices(Vulkan))
-      return CurrentExitCode;
+      return exit_code::NoVulkanGpu;
 
     window_setup WindowSetup{};
-    WindowSetup.ProcessHandle = Instance;
+    WindowSetup.ProcessHandle = ProcessHandle;
     WindowSetup.WindowClassName = "VulkanExperimentsWindowClass";
     WindowSetup.ClientExtents.Width = 1280;
     WindowSetup.ClientExtents.Height = 720;
     auto Window = Win32CreateWindow(Allocator, &WindowSetup);
 
-    ++CurrentExitCode;
     if(Window == nullptr)
-      return CurrentExitCode;
+      return exit_code::FailedCreatingWindow;
 
     Defer [&](){ Win32DestroyWindow(Allocator, Window); };
 
@@ -1767,11 +1788,10 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     {
       LogBeginScope("Preparing OS surface.");
 
-      ++CurrentExitCode;
-      if(!VulkanPrepareSurface(Vulkan, Vulkan.Surface, Instance, Window->WindowHandle))
+      if(!VulkanPrepareSurface(Vulkan, Vulkan.Surface, ProcessHandle, Window->WindowHandle))
       {
         LogEndScope("Surface creation failed.");
-        return CurrentExitCode;
+        return exit_code::FailedPreparingVulkanSurface;
       }
 
       LogEndScope("OS surface successfully created.");
@@ -1785,11 +1805,10 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     {
       LogBeginScope("Initializing Vulkan for graphics.");
 
-      ++CurrentExitCode;
-      if(!VulkanInitializeGraphics(Vulkan, Instance, Window->WindowHandle))
+      if(!VulkanInitializeGraphics(Vulkan))
       {
         LogEndScope("Vulkan initialization failed.");
-        return CurrentExitCode;
+        return exit_code::FailedInitializingVulkanForGraphics;
       }
 
       LogEndScope("Vulkan successfully initialized.");
@@ -1807,11 +1826,10 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     {
       LogBeginScope("Preparing swapchain for the first time.");
 
-      ++CurrentExitCode;
-      if(!VulkanPrepareSwapchain(Vulkan, Vulkan.Swapchain, WindowSetup.ClientExtents, vsync::On))
+      if(!VulkanPrepareSwapchain(Vulkan, Vulkan.Swapchain, WindowSetup.ClientExtents, VSync))
       {
         LogEndScope("Failed to prepare initial swapchain.");
-        return CurrentExitCode;
+        return exit_code::FailedPreparingVulkanSwapchain;
       }
 
       Vulkan.IsPrepared = true;
@@ -1835,11 +1853,10 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
     {
       LogBeginScope("Preparing depth.");
 
-      ++CurrentExitCode;
       if(!VulkanPrepareDepth(Vulkan, Vulkan.Depth, Vulkan.Swapchain.Extent))
       {
         LogEndScope("Failed preparing depth.");
-        return CurrentExitCode;
+        return exit_code::FailedPreparingVulkanDepth;
       }
 
       LogEndScope("Finished preparing depth.");
@@ -2292,17 +2309,26 @@ WinMain(HINSTANCE Instance, HINSTANCE PreviousINstance,
         }
       }
 
-#if defined(DEBUG)
-      char WindowTextBuffer[sizeof("Vulkan Experiments (0000FPS)")];
-      sprintf_s(WindowTextBuffer, "Vulkan Experiments (%4lluFPS)", CurrentFramesPerSecond);
-      SetWindowTextA(Window->WindowHandle, WindowTextBuffer);
-#endif
+      if(ShowFpsInWindowTitle)
+      {
+        char WindowTextBuffer[sizeof("Vulkan Experiments (0000FPS)")];
+        sprintf_s(WindowTextBuffer, "Vulkan Experiments (%4lluFPS)", CurrentFramesPerSecond);
+        SetWindowTextA(Window->WindowHandle, WindowTextBuffer);
+      }
     }
 
     PrintFrameTimeStats(FrameTimeStats, GlobalLog);
   }
 
-  return 0;
+  return exit_code::Success;
+}
+
+int
+WinMain(HINSTANCE Instance, HINSTANCE PreviousInstance,
+        LPSTR CommandLine, int ShowCode)
+{
+  exit_code ExitCode = ApplicationEntryPoint(Instance);
+  return (int)ExitCode;
 }
 
 LRESULT
