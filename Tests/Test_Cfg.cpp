@@ -123,12 +123,12 @@ TEST_CASE("Cfg: Parse simple document", "[Cfg]")
   cfg_parsing_context Context{ "Cfg Test 5"_S, GlobalLog };
 
   cfg_document Document{};
-  Init(&Document, &Allocator);
-  Defer [&](){ Finalize(&Document); };
+  Init(Document, Allocator);
+  Defer [&](){ Finalize(Document); };
 
   SECTION("String value")
   {
-    CfgDocumentParseFromString(&Document, "foo \"bar\""_S, &Context);
+    CfgDocumentParseFromString(Document, "foo \"bar\""_S, &Context);
 
     auto Node = Document.Root->FirstChild;
     REQUIRE( Node != nullptr );
@@ -140,7 +140,7 @@ TEST_CASE("Cfg: Parse simple document", "[Cfg]")
 
   SECTION("Number value")
   {
-    CfgDocumentParseFromString(&Document, "answer 42"_S, &Context);
+    CfgDocumentParseFromString(Document, "answer 42"_S, &Context);
 
     auto Node = Document.Root->FirstChild;
     REQUIRE( Node != nullptr );
@@ -157,10 +157,10 @@ TEST_CASE("Cfg: Parse simple document with attributes", "[Cfg]")
   cfg_parsing_context Context{ "Cfg Test 6"_S, GlobalLog };
 
   cfg_document Document{};
-  Init(&Document, &Allocator);
-  Defer [&](){ Finalize(&Document); };
+  Init(Document, Allocator);
+  Defer [&](){ Finalize(Document); };
 
-  CfgDocumentParseFromString(&Document, "foo \"bar\" baz=\"qux\""_S, &Context);
+  CfgDocumentParseFromString(Document, "foo \"bar\" baz=\"qux\""_S, &Context);
 
   auto Node = Document.Root->FirstChild;
   REQUIRE( Node != nullptr );
@@ -182,10 +182,10 @@ TEST_CASE("Cfg: Parse simple document with multiple nodes", "[Cfg]")
   cfg_parsing_context Context{ "Cfg Test 7"_S, GlobalLog };
 
   cfg_document Document{};
-  Init(&Document, &Allocator);
-  Defer [&](){ Finalize(&Document); };
+  Init(Document, Allocator);
+  Defer [&](){ Finalize(Document); };
 
-  CfgDocumentParseFromString(&Document, Source, &Context);
+  CfgDocumentParseFromString(Document, Source, &Context);
 
   auto Node = Document.Root->FirstChild;
   REQUIRE( Node != nullptr );
@@ -213,10 +213,10 @@ TEST_CASE("Cfg: Parse simple document with child nodes", "[Cfg]")
   cfg_parsing_context Context{ "Cfg Test 8"_S, GlobalLog };
 
   cfg_document Document{};
-  Init(&Document, &Allocator);
-  Defer [&](){ Finalize(&Document); };
+  Init(Document, Allocator);
+  Defer [&](){ Finalize(Document); };
 
-  CfgDocumentParseFromString(&Document, Source, &Context);
+  CfgDocumentParseFromString(Document, Source, &Context);
 
   auto Node = Document.Root->FirstChild;
   REQUIRE( Node != nullptr );
@@ -246,7 +246,7 @@ TEST_CASE("Cfg: Parse document from file", "[Cfg]")
 
   auto FileName = "../Tests/TestData/Full.cfg";
 
-  array<uint8> FileContent{ &Allocator };
+  array<uint8> FileContent{ Allocator };
   if(!ReadFileContentIntoArray(FileContent, FileName))
   {
     FAIL( FileName << ": Unable to find file. Wrong working directory?" );
@@ -255,10 +255,10 @@ TEST_CASE("Cfg: Parse document from file", "[Cfg]")
   cfg_parsing_context Context{ SliceFromString(FileName), GlobalLog };
 
   cfg_document Document{};
-  Init(&Document, &Allocator);
-  Defer [&](){ Finalize(&Document); };
+  Init(Document, Allocator);
+  Defer [&](){ Finalize(Document); };
 
-  CfgDocumentParseFromString(&Document, SliceReinterpret<char const>(Slice(FileContent)), &Context);
+  CfgDocumentParseFromString(Document, SliceReinterpret<char const>(Slice(FileContent)), &Context);
 
   //
   // The actual test

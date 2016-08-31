@@ -38,6 +38,7 @@ public:
   // Ctor
   //
   arc_string() = default;
+  arc_string(allocator_interface& Allocator);
 
   arc_string(char const* StringPtr);
   arc_string(char const* StringPtr, allocator_interface& Allocator);

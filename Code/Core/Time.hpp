@@ -4,11 +4,9 @@
 
 #include <Backbone.hpp>
 
-
-struct time
-{
-  double InternalData;
-};
+// TODO: Change the name of this struct to something else as it might conflict
+// with std stuff.
+struct time { double InternalData; };
 
 constexpr time operator + (time   A, time   B) { return { A.InternalData + B.InternalData }; }
 inline    void operator +=(time&  A, time   B) { A.InternalData += B.InternalData; }

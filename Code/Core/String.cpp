@@ -5,6 +5,9 @@
 
 static char MutableEmptyString[] = { '\0' };
 
+#define STR_LOG(...) NoOp
+// #define STR_LOG(...) printf(__VA_ARGS__)
+
 class string_allocator : public allocator_interface
 {
   static_assert(alignof(arc_string::internal) != alignof(char),
@@ -49,22 +52,22 @@ public:
   virtual void* Allocate(memory_size Size, size_t Alignment)
   {
     Assert(Size > 0);
-    printf("string_allocator: ");
+    STR_LOG("string_allocator: ");
 
     void* Result{};
 
-    Defer [&](){ printf("Ptr: 0x%zx\n", Reinterpret<size_t>(Result)); };
+    Defer [&](){ STR_LOG("Ptr: 0x%zx\n", Reinterpret<size_t>(Result)); };
 
     //
     // Handle string data allocation
     //
     if(Alignment == 1)
     {
-      printf("Allocating data ");
+      STR_LOG("Allocating data ");
 
       if(Size > STRING_DATA_BUCKET_SIZE)
       {
-        printf("using base allocator because the size is too big (%.3fKiB). ", ToKiB(Size));
+        STR_LOG("using base allocator because the size is too big (%.3fKiB). ", ToKiB(Size));
 
         Result = this->BaseAllocator->Allocate(Size, Alignment);
         return Result;
@@ -73,14 +76,14 @@ public:
       auto NewBucket = GetFreeDataBucket();
       if(NewBucket)
       {
-        printf("using bucket. ");
+        STR_LOG("using bucket. ");
 
         NewBucket->AllocatedData = Slice(NewBucket->Data, 0, ToBytes(Size));
         Result = NewBucket->AllocatedData.Ptr;
         return Result;
       }
 
-      printf("using base allocator because there's no free bucket. ");
+      STR_LOG("using base allocator because there's no free bucket. ");
 
       // Out of internal memory. Use the base allocator now.
       Result = this->BaseAllocator->Allocate(Size, Alignment);
@@ -93,12 +96,12 @@ public:
     if(Alignment == alignof(arc_string::internal))
     {
       Assert(Size == SizeOf<arc_string::internal>());
-      printf("Allocating internal ");
+      STR_LOG("Allocating internal ");
 
       auto NewBucket = GetFreeInternalBucket();
       if(NewBucket)
       {
-        printf("using bucket. ");
+        STR_LOG("using bucket. ");
 
         NewBucket->IsFree = false;
         Result = &NewBucket->Data;
@@ -111,14 +114,14 @@ public:
     }
 
     // Unrecognized allocation. Use the base allocator for it.
-    printf("Unrecognized allocation. ");
+    STR_LOG("Unrecognized allocation. ");
     Result = this->BaseAllocator->Allocate(Size, Alignment);
     return Result;
   }
 
   virtual void Deallocate(void* Ptr)
   {
-    printf("string_allocator: Deallocation: 0x%zx ", Reinterpret<size_t>(Ptr));
+    STR_LOG("string_allocator: Deallocation: 0x%zx ", Reinterpret<size_t>(Ptr));
 
     if(Ptr == nullptr)
       return;
@@ -129,7 +132,7 @@ public:
     auto InternalBucket = MapToInternalBucket(Ptr);
     if(InternalBucket)
     {
-      printf("is an internal bucket.\n");
+      STR_LOG("is an internal bucket.\n");
       // Double free?
       Assert(!InternalBucket->IsFree);
 
@@ -143,7 +146,7 @@ public:
     auto DataBucket = MapToDataBucket(Ptr);
     if(DataBucket)
     {
-      printf("is a data bucket.\n");
+      STR_LOG("is a data bucket.\n");
 
       // Double free?
       Assert(!!DataBucket->AllocatedData);
@@ -155,7 +158,7 @@ public:
     //
     // Handle all other deallocations
     //
-    printf("is something allocated with the base allocator.\n");
+    STR_LOG("is something allocated with the base allocator.\n");
     this->BaseAllocator->Deallocate(Ptr);
   }
 
@@ -168,16 +171,7 @@ public:
       return false;
 
     //
-    // Handle resizing of arc_string::internal
-    //
-    if(MapToInternalBucket(Ptr) != nullptr)
-    {
-      Assert(NewSize == alignof(arc_string::internal));
-      return true;
-    }
-
-    //
-    // Handle resizing of string data.
+    // Only support resizing of string data (not internals) right now.
     //
     auto DataBucket = MapToDataBucket(Ptr);
     if(DataBucket)
@@ -301,13 +295,18 @@ auto
   if(GlobalStringDefaultAllocator == nullptr)
   {
     static mallocator BaseAllocator{};
-    static string_allocator* TheAllocator{};
-    if(TheAllocator == nullptr)
-    {
-      TheAllocator = ::Allocate<string_allocator>(BaseAllocator);
-      MemConstruct(1, TheAllocator, BaseAllocator);
-    }
-    GlobalStringDefaultAllocator = TheAllocator;
+
+    #if 1
+      static string_allocator* TheAllocator{};
+      if(TheAllocator == nullptr)
+      {
+        TheAllocator = ::Allocate<string_allocator>(BaseAllocator);
+        MemConstruct(1, TheAllocator, BaseAllocator);
+      }
+      GlobalStringDefaultAllocator = TheAllocator;
+    #else
+      GlobalStringDefaultAllocator = &BaseAllocator;
+    #endif
   }
   return GlobalStringDefaultAllocator;
 }
@@ -373,6 +372,11 @@ StrReleaseRef(allocator_interface* Allocator, arc_string::internal* Internal)
   {
     DestroyInternal(*Allocator, Internal);
   }
+}
+
+arc_string::arc_string(allocator_interface& Allocator)
+  : Allocator{ &Allocator }
+{
 }
 
 arc_string::arc_string(arc_string const& Copy)

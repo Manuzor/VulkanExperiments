@@ -113,18 +113,17 @@ static char const ExpectedGlslFragmentShader[] =
 
 TEST_CASE("Shader Compiler", "[ShaderCompiler]")
 {
-  test_allocator TestAllocator{};
-  allocator_interface* Allocator = &TestAllocator;
+  test_allocator Allocator{};
 
   cfg_document Document{};
-  Init(&Document, Allocator);
-  Defer [&](){ Finalize(&Document); };
+  Init(Document, Allocator);
+  Defer [&](){ Finalize(Document); };
 
   {
     // TODO: Supply the GlobalLog here as soon as the cfg parser code is more robust.
     cfg_parsing_context Context{ "Shader Compiler Test"_S, nullptr };
 
-    bool const ParsedDocumentSuccessfully = CfgDocumentParseFromString(&Document, SliceFromString(CfgSource), &Context);
+    bool const ParsedDocumentSuccessfully = CfgDocumentParseFromString(Document, SliceFromString(CfgSource), &Context);
     REQUIRE( ParsedDocumentSuccessfully );
   }
 
@@ -141,7 +140,7 @@ TEST_CASE("Shader Compiler", "[ShaderCompiler]")
   REQUIRE( FragmentShaderNode != nullptr );
 
   auto Context = CreateShaderCompilerContext(Allocator);
-  Defer [=](){ DestroyShaderCompilerContext(Allocator, Context); };
+  Defer [&](){ DestroyShaderCompilerContext(Allocator, Context); };
 
   //
   // Vertex Shader
@@ -150,7 +149,7 @@ TEST_CASE("Shader Compiler", "[ShaderCompiler]")
   Init(GlslVertexShader, Allocator, glsl_shader_stage::Vertex);
   Defer [&](){ Finalize(GlslVertexShader); };
 
-  bool const CompiledGlslVertexShader = CompileCfgToGlsl(Context, VertexShaderNode, &GlslVertexShader);
+  bool const CompiledGlslVertexShader = CompileCfgToGlsl(*Context, *VertexShaderNode, GlslVertexShader);
   REQUIRE( CompiledGlslVertexShader );
 
   REQUIRE( Slice(GlslVertexShader.EntryPoint) == "main"_S );
@@ -164,7 +163,7 @@ TEST_CASE("Shader Compiler", "[ShaderCompiler]")
   Init(GlslFragmentShader, Allocator, glsl_shader_stage::Fragment);
   Defer [&](){ Finalize(GlslFragmentShader); };
 
-  bool const CompiledGlslFragmentShader = CompileCfgToGlsl(Context, FragmentShaderNode, &GlslFragmentShader);
+  bool const CompiledGlslFragmentShader = CompileCfgToGlsl(*Context, *FragmentShaderNode, GlslFragmentShader);
   REQUIRE( CompiledGlslFragmentShader );
 
   REQUIRE( Slice(GlslFragmentShader.EntryPoint) == "main"_S );

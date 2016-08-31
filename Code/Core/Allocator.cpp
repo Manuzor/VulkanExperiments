@@ -50,17 +50,6 @@ mallocator::Deallocate(void* Memory)
   #endif
 }
 
-bool
-mallocator::Resize(void* Ptr, memory_size NewSize)
-{
-  #if PLATFORM_WINDOWS
-    return _expand(Ptr, ToBytes(NewSize)) != nullptr;
-  #else
-    Assert(0);
-    return false;
-  #endif
-}
-
 memory_size
 mallocator::AllocationSize(void* Ptr)
 {

@@ -11,23 +11,28 @@ ContainerReserve(allocator_interface& Allocator,
                  T* Ptr,
                  size_t CurrentNum,
                  size_t CurrentCapacity,
-                 size_t MinBytesToReserve,
+                 size_t MinNumToReserve,
                  size_t MinimumCapacity)
 {
-  // TODO: Replace with something like NextMultipleOf(Max(MinBytesToReserve, MinimumCapacity), MinimumCapacity)
-  size_t BytesToReserve = MinimumCapacity;
-  while(BytesToReserve < MinBytesToReserve)
-    BytesToReserve *= 2;
+  // TODO: Replace with something like NextMultipleOf(Max(MinNumToReserve, MinimumCapacity), MinimumCapacity)
+  size_t NumToReserve = MinimumCapacity;
+  while(NumToReserve < MinNumToReserve)
+    NumToReserve *= 2;
 
-  if(CurrentCapacity >= BytesToReserve)
+  if(CurrentCapacity >= NumToReserve)
     return Slice(CurrentCapacity, Ptr);
+
+  if(Allocator.Resize(Ptr, NumToReserve * SizeOf<T>()))
+  {
+    return Slice(NumToReserve, Ptr);
+  }
 
   auto OldAllocatedMemory = Slice(CurrentCapacity, Ptr);
   auto OldUsedMemory      = Slice(CurrentNum, Ptr);
-  auto NewAllocatedMemory = SliceAllocate<T>(Allocator, BytesToReserve);
+  auto NewAllocatedMemory = SliceAllocate<T>(Allocator, NumToReserve);
   auto NewUsedMemory      = Slice(NewAllocatedMemory, 0, CurrentNum);
 
-  Assert(NewAllocatedMemory.Num == BytesToReserve);
+  Assert(NewAllocatedMemory.Num == NumToReserve);
 
   if(OldUsedMemory)
   {

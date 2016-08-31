@@ -41,7 +41,7 @@ struct shared_array
 
 
   shared_array() = default;
-  shared_array(allocator_interface* Allocator) { *this = {}; this->Allocator = Allocator; }
+  shared_array(allocator_interface& Allocator) { *this = {}; this->Allocator = &Allocator; }
   shared_array(shared_array const& ToCopy);
   shared_array(shared_array&& ToMove);
   ~shared_array();
@@ -83,7 +83,7 @@ typename shared_array<T>::shared*
 ImplSharedArrayCreateShared(allocator_interface* Allocator)
 {
   Assert(Allocator);
-  auto Shared = Allocate<typename shared_array<T>::shared>(Allocator);
+  auto Shared = Allocate<typename shared_array<T>::shared>(*Allocator);
   Assert(Shared);
   // Note: Do not initialize Shared->InitialMemory.
   Shared->RefCount = 1;
@@ -98,7 +98,7 @@ void
 ImplSharedArrayDestroyShared(allocator_interface* Allocator, typename shared_array<T>::shared* Shared)
 {
   Assert(Allocator);
-  Deallocate(Allocator, Shared);
+  Deallocate(*Allocator, Shared);
 }
 
 template<typename T>
@@ -128,7 +128,7 @@ ImplSharedArrayReleaseRef(typename shared_array<T>::shared* Shared, allocator_in
   if(Shared->RefCount <= 0)
   {
     SliceDestruct(Slice(Shared->Num, Shared->Ptr));
-    SliceDeallocate(Allocator, Slice(Shared->Capacity, Shared->Ptr));
+    SliceDeallocate(*Allocator, Slice(Shared->Capacity, Shared->Ptr));
     ImplSharedArrayDestroyShared<T>(Allocator, Shared);
   }
 }
@@ -185,7 +185,7 @@ Reserve(shared_array<T>& Array, size_t MinBytesToReserve)
   bool const IsUnique = Array.Shared->RefCount <= 1;
   if(IsUnique)
   {
-    auto NewAllocatedMemory = ContainerReserve(Array.Allocator,
+    auto NewAllocatedMemory = ContainerReserve(*Array.Allocator,
                                                Array.Ptr(), Array.Num(),
                                                Array.Capacity(),
                                                MinBytesToReserve,
@@ -200,7 +200,7 @@ Reserve(shared_array<T>& Array, size_t MinBytesToReserve)
     // Allocate memory and copy over the old data, regardless of whether the
     // currently shared data may have enough capacity.
 
-    auto Allocator = Array.Allocator;
+    auto& Allocator = *Array.Allocator;
 
     // Gather current array data.
     auto OldAllocatedMemory = AllocatedMemory(Array);
@@ -214,10 +214,10 @@ Reserve(shared_array<T>& Array, size_t MinBytesToReserve)
     SliceCopy(NewUsedMemory, AsConst(OldUsedMemory));
 
     // Let go of the old Shared reference.
-    ImplSharedArrayReleaseRef<T>(Array.Shared, Array.Allocator);
+    ImplSharedArrayReleaseRef<T>(Array.Shared, &Allocator);
 
     // Create a new Shared reference and initialize it.
-    Array.Shared = ImplSharedArrayCreateShared<T>(Allocator);
+    Array.Shared = ImplSharedArrayCreateShared<T>(&Allocator);
     Array.Shared->Capacity = NewAllocatedMemory.Num;
     Array.Shared->Num = NewUsedMemory.Num;
     Array.Shared->Ptr = NewAllocatedMemory.Ptr;

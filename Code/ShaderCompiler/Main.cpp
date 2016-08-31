@@ -131,7 +131,7 @@ ParseCommandLineOptions(slice<char const*> Args, cmd_options* Options)
         ++Index;
         if(Index >= Args.Num)
         {
-          LogError("Missing argument for -glsl-spv.");
+          LogError("Missing argument for -spirv-vert.");
           LogUsage(GlobalLog);
           return false;
         }
@@ -143,7 +143,7 @@ ParseCommandLineOptions(slice<char const*> Args, cmd_options* Options)
         ++Index;
         if(Index >= Args.Num)
         {
-          LogError("Missing argument for -frag.");
+          LogError("Missing argument for -glsl-frag.");
           LogUsage(GlobalLog);
           return false;
         }
@@ -155,7 +155,7 @@ ParseCommandLineOptions(slice<char const*> Args, cmd_options* Options)
         ++Index;
         if(Index >= Args.Num)
         {
-          LogError("Missing argument for -frag.");
+          LogError("Missing argument for -spirv-frag.");
           LogUsage(GlobalLog);
           return false;
         }
@@ -288,7 +288,11 @@ main(int NumArgs, char const* Args[])
     if(CompiledGLSL && Options.VertexShaderOutFilePath.Glsl)
     {
       auto const FileName = Options.VertexShaderOutFilePath.Glsl;
-      if(!WriteArrayContentToFile(Slice(GlslVertexShader.Code), FileName))
+      if(FileName == "-"_S)
+      {
+        printf("%s", StrPtr(GlslVertexShader.Code));
+      }
+      else if(!WriteArrayContentToFile(Slice(GlslVertexShader.Code), FileName))
       {
         LogWarning("%*s: Failed to write glsl vertex shader file.", Convert<int>(FileName.Num), FileName.Ptr);
       }
@@ -309,7 +313,11 @@ main(int NumArgs, char const* Args[])
       if(CompiledSpv && Options.VertexShaderOutFilePath.Spirv)
       {
         auto const FileName = Options.VertexShaderOutFilePath.Spirv;
-        if(!WriteArrayContentToFile(Slice(SpirvVertexShader.Code), FileName))
+        if(FileName == "-"_S)
+        {
+          printf("%*s", Convert<int>(SpirvVertexShader.Code.Num * 4), Reinterpret<char const*>(SpirvVertexShader.Code.Ptr));
+        }
+        else if(!WriteArrayContentToFile(Slice(SpirvVertexShader.Code), FileName))
         {
           LogWarning("%*s: Failed to write spv vertex shader file.", Convert<int>(FileName.Num), FileName.Ptr);
         }
@@ -344,7 +352,11 @@ main(int NumArgs, char const* Args[])
     if(CompiledGLSL && Options.FragmentShaderOutFilePath.Glsl)
     {
       auto const FileName = Options.FragmentShaderOutFilePath.Glsl;
-      if(!WriteArrayContentToFile(Slice(GlslFragmentShader.Code), FileName))
+      if(FileName == "-"_S)
+      {
+        printf("%s", StrPtr(GlslVertexShader.Code));
+      }
+      else if(!WriteArrayContentToFile(Slice(GlslFragmentShader.Code), FileName))
       {
         LogWarning("%*s: Failed to write glsl fragment shader file.", Convert<int>(FileName.Num), FileName.Ptr);
       }
@@ -365,7 +377,11 @@ main(int NumArgs, char const* Args[])
       if(CompiledSpv && Options.FragmentShaderOutFilePath.Spirv)
       {
         auto const FileName = Options.FragmentShaderOutFilePath.Spirv;
-        if(!WriteArrayContentToFile(Slice(SpirvFragmentShader.Code), FileName))
+        if(FileName == "-"_S)
+        {
+          printf("%*s", Convert<int>(SpirvFragmentShader.Code.Num * 4), Reinterpret<char const*>(SpirvFragmentShader.Code.Ptr));
+        }
+        else if(!WriteArrayContentToFile(Slice(SpirvFragmentShader.Code), FileName))
         {
           LogWarning("%*s: Failed to write spv fragment shader file.", Convert<int>(FileName.Num), FileName.Ptr);
         }

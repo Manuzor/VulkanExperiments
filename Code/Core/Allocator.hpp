@@ -27,17 +27,22 @@ public:
   virtual void* Allocate(memory_size Size, size_t Alignment) = 0;
   virtual void Deallocate(void* Memory) = 0;
 
+  /// Resize an existing allocation without relocating it.
+  ///
+  /// When \a Ptr is \c nullptr or \a NewSize is zero, the result
+  ///
+  /// \note This is NOT like \c realloc!
   virtual bool Resize(void* Ptr, memory_size NewSize) { return false; }
 
   virtual memory_size AllocationSize(void* Ptr) { return Bytes(0); }
 };
 
+/// \note This allocator does not support resizing.
 class CORE_API mallocator : public allocator_interface
 {
 public:
   virtual void* Allocate(memory_size Size, size_t Alignment) override;
   virtual void Deallocate(void* Memory) override;
-  virtual bool Resize(void* Ptr, memory_size NewSize) override;
   virtual memory_size AllocationSize(void* Ptr) override;
 };
 

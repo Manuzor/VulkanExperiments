@@ -309,7 +309,7 @@ VulkanCreateInstance(vulkan& Vulkan, vulkan_enable_validation EnableValidation)
   //
   {
     LogBeginScope("Creating Vulkan instance.");
-    Defer [](){ LogEndScope(""); };
+    Defer [](){ LogEndScope("=========="); };
 
     VkApplicationInfo ApplicationInfo{};
     {
@@ -336,7 +336,11 @@ VulkanCreateInstance(vulkan& Vulkan, vulkan_enable_validation EnableValidation)
       CreateInfo.ppEnabledLayerNames = LayerNames.Ptr;
     }
 
-    VulkanVerify(Vulkan.vkCreateInstance(&CreateInfo, nullptr, &Vulkan.InstanceHandle));
+    if(Vulkan.vkCreateInstance(&CreateInfo, nullptr, &Vulkan.InstanceHandle) != VK_SUCCESS)
+    {
+      LogError("Unable to create Vulkan instance.");
+      return false;
+    }
   }
 
   return true;
