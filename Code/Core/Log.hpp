@@ -9,6 +9,10 @@
 
 // TODO: Use arc_string instead of array<char>, slice<char>, slice<char const>, char*, char const*.
 
+#if !defined(LOGGING_ENABLED)
+  #define LOGGING_ENABLED 1
+#endif
+
 
 enum class log_level
 {
@@ -59,11 +63,19 @@ CORE_API
 void
 LogMessageDispatch(log_level LogLevel, log_data* Log, arc_string Message, ...);
 
-#define LogBeginScope(...) LogMessageDispatch(log_level::ScopeBegin, __VA_ARGS__)
-#define LogEndScope(...)   LogMessageDispatch(log_level::ScopeEnd,   __VA_ARGS__)
-#define LogInfo(...)       LogMessageDispatch(log_level::Info,       __VA_ARGS__)
-#define LogWarning(...)    LogMessageDispatch(log_level::Warning,    __VA_ARGS__)
-#define LogError(...)      LogMessageDispatch(log_level::Error,      __VA_ARGS__)
+#if LOGGING_ENABLED
+  #define LogBeginScope(...) LogMessageDispatch(log_level::ScopeBegin, __VA_ARGS__)
+  #define LogEndScope(...)   LogMessageDispatch(log_level::ScopeEnd,   __VA_ARGS__)
+  #define LogInfo(...)       LogMessageDispatch(log_level::Info,       __VA_ARGS__)
+  #define LogWarning(...)    LogMessageDispatch(log_level::Warning,    __VA_ARGS__)
+  #define LogError(...)      LogMessageDispatch(log_level::Error,      __VA_ARGS__)
+#else
+  #define LogBeginScope(...) NoOp
+  #define LogEndScope(...)   NoOp
+  #define LogInfo(...)       NoOp
+  #define LogWarning(...)    NoOp
+  #define LogError(...)      NoOp
+#endif
 
 //
 // Default Log Sinks
