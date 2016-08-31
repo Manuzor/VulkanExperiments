@@ -296,7 +296,7 @@ auto
   {
     static mallocator BaseAllocator{};
 
-    #if 1
+    #if 0
       static string_allocator* TheAllocator{};
       if(TheAllocator == nullptr)
       {
