@@ -113,12 +113,19 @@ input_context::~input_context()
 input_slot*
 input_context::operator[](input_id SlotId)
 {
-  auto Slot = Get(&this->Slots, SlotId);
+  return GetInputSlot(*this, SlotId);
+}
+
+auto
+::GetInputSlot(input_context& Context, input_id SlotId)
+  -> input_slot*
+{
+  auto Slot = Get(&Context.Slots, SlotId);
   if(Slot)
     return Slot;
 
-  if(this->Parent)
-    return (*this->Parent)[SlotId];
+  if(Context.Parent)
+    return GetInputSlot(*Context.Parent, SlotId);
 
   return nullptr;
 }

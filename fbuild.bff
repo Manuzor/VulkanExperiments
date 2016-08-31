@@ -46,6 +46,9 @@
                    + ' /DBB_Enable_Assert'      // Enable assertions.
                    + ' /DBB_Enable_BoundsCheck' // Enable bounds checking.
 
+                   + ' /DDEBUG'
+                   + ' /D_DEBUG'
+
                    //
                    // Windows specific defines
                    //

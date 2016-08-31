@@ -10,7 +10,8 @@
 using input_id = slice<char const>;
 
 /// Creates an input_id from a C-string.
-input_id CORE_API
+CORE_API
+input_id
 InputId(char const* InputName);
 
 /// Creates an input_id from a string literal.
@@ -48,25 +49,32 @@ struct CORE_API input_slot
   uint64 Frame;
 };
 
-bool CORE_API
+CORE_API
+bool
 ButtonIsUp(input_slot const* Slot);
 
-void CORE_API
+CORE_API
+void
 SetButtonIsUp(input_slot* Slot, bool Value);
 
-bool CORE_API
+CORE_API
+bool
 ButtonIsDown(input_slot const* Slot);
 
-void CORE_API
+CORE_API
+void
 SetButtonIsDown(input_slot* Slot, bool NewValue);
 
-float CORE_API
+CORE_API
+float
 AxisValue(input_slot const* Slot);
 
-void CORE_API
+CORE_API
+void
 SetAxisValue(input_slot* Slot, float NewValue);
 
-float CORE_API
+CORE_API
+float
 ActionValue(input_slot const* Slot);
 
 void CORE_API
@@ -80,7 +88,8 @@ struct CORE_API input_value_properties
   float Exponent = 1.0f;
 };
 
-void CORE_API
+CORE_API
+void
 SetDeadZones(input_value_properties* Properties, float BothValues);
 
 // Sample signature: void Listener(input_id SlotId, input_slot Slot)
@@ -122,35 +131,47 @@ public:
   virtual ~input_context() = 0;
 };
 
-void CORE_API
+CORE_API
+input_slot*
+GetInputSlot(input_context& Context, input_id SlotId);
+
+CORE_API
+void
 RegisterInputSlot(input_context& Context, input_type Type, input_id SlotId);
 
-bool CORE_API
+CORE_API
+bool
 AddInputSlotMapping(input_context& Context, input_id SourceSlotId, input_id TargetSlotId, float Scale = 1.0f);
 
-bool CORE_API
+CORE_API
+bool
 RemoveInputTrigger(input_context& Context, input_id SourceSlotId, input_id TargetSlotId);
 
 /// Overload for booleans.
 ///
 /// A boolean value is treated as \c 0.0f for \c false and \c 1.0f for \c true
 /// values.
-bool CORE_API
+CORE_API
+bool
 UpdateInputSlotValue(input_context& Context, input_id TriggeringSlotId, bool NewValue);
 
 /// Return: Will return $(D false) if the slot does not exist.
-bool CORE_API
+CORE_API
+bool
 UpdateInputSlotValue(input_context& Context, input_id TriggeringSlotId, float NewValue);
 
 /// Applies special settings for the given input slot, if there are any, and
 /// returns an adjusted value.
-float CORE_API
+CORE_API
+float
 AttuneInputValue(input_context const& Context, input_id SlotId, float RawValue);
 
-void CORE_API
+CORE_API
+void
 BeginInputFrame(input_context& Context);
 
-void CORE_API
+CORE_API
+void
 EndInputFrame(input_context& Context);
 
 

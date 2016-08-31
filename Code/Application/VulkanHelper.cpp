@@ -395,7 +395,7 @@ auto
   // Select a present mode
   //
 
-  VkPresentModeKHR SwapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+  VkPresentModeKHR SwapchainPresentMode = VK_PRESENT_MODE_MAX_ENUM_KHR;
   {
     // Fetch available present modes
 
@@ -415,35 +415,73 @@ auto
       {
         case VK_PRESENT_MODE_MAILBOX_KHR:
         {
-          // Always accept mailbox if VSync is requested.
           if(VSync == vsync::On)
           {
+            // Always prefer mailbox if VSync is requested.
             SwapchainPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+          }
+          else
+          {
+            // Don't use this mode when VSync is not requested.
           }
         } break;
 
         case VK_PRESENT_MODE_FIFO_KHR:
         {
-          // Accept only if we don't have mailbox already and VSync is requested.
-          if(VSync == vsync::On && SwapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR)
+          if(VSync == vsync::On)
           {
-            SwapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+            // Accept only if we don't have mailbox already.
+            if(SwapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR)
+            {
+              SwapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+            }
+          }
+          else
+          {
+            // Don't use this mode when VSync is not requested.
           }
         } break;
 
         case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
         {
-          if(VSync == vsync::Off && !AllowFifoRelaxedWhenVSyncIsOff)
-            break;
-
-          // Accept only if we don't have either mailbox or regular FIFO already. VSync setting is ignored.
-          if(SwapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR && SwapchainPresentMode != VK_PRESENT_MODE_FIFO_KHR)
+          if(VSync == vsync::On)
           {
-            SwapchainPresentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+            if(SwapchainPresentMode != VK_PRESENT_MODE_IMMEDIATE_KHR)
+            {
+              SwapchainPresentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+            }
+          }
+          else
+          {
+            if(SwapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR && SwapchainPresentMode != VK_PRESENT_MODE_FIFO_KHR)
+            {
+              SwapchainPresentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+            }
+          }
+        } break;
+
+        case VK_PRESENT_MODE_IMMEDIATE_KHR:
+        {
+          if(VSync == vsync::On)
+          {
+            // Don't use this mode when VSync is requested.
+          }
+          else
+          {
+            if(SwapchainPresentMode != VK_PRESENT_MODE_FIFO_RELAXED_KHR)
+            {
+              SwapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+            }
           }
         } break;
       }
     }
+  }
+
+  if(SwapchainPresentMode == VK_PRESENT_MODE_MAX_ENUM_KHR)
+  {
+    LogError("Unable to find a swapchain present mode.");
+    return false;
   }
 
   LogInfo("Swapchain present mode: %s", VulkanEnumName(SwapchainPresentMode));

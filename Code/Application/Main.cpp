@@ -1704,6 +1704,9 @@ enum class exit_code : int
 static exit_code
 ApplicationEntryPoint(HINSTANCE ProcessHandle)
 {
+  //
+  // Settings
+  //
   // Whether to show the current FPS in the window title text.
   bool ShowFpsInWindowTitle = false;
   DebugCode(ShowFpsInWindowTitle = true);
@@ -1713,9 +1716,12 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
 
   // Whether to enable Vulkan validation layers or not.
   // Note that validation drains quite some performance.
-  vulkan_enable_validation VulkanValidation = vulkan_enable_validation::Yes;
+  vulkan_enable_validation VulkanValidation = vulkan_enable_validation::No;
 
 
+  //
+  // =============
+  //
   int CurrentExitCode = 0;
 
   Win32SetupConsole("Vulkan Experiments Console");
@@ -2164,6 +2170,8 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
     frame_time_stats FrameTimeStats{ Allocator };
     FrameTimeStats.MaxNumSamples = 256;
 
+    bool AutoCamera = true;
+
     while(::GlobalRunning)
     {
       StopwatchStart(&FrameTimer);
@@ -2191,9 +2199,12 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
         break;
       }
 
-      if(ButtonIsDown(SystemInput[keyboard::P]))
+      if(input_slot* Slot = GetInputSlot(SystemInput, keyboard::P))
       {
-        PrintFrameTimeStats(FrameTimeStats, GlobalLog);
+        if(ButtonIsDown(Slot) && Slot->Frame == SystemInput.CurrentFrame)
+        {
+          PrintFrameTimeStats(FrameTimeStats, GlobalLog);
+        }
       }
 
       //Vulkan.DepthStencilValue = Clamp(Vulkan.DepthStencilValue + AxisValue(SystemInput[MyInputSlots.Depth]), 0.8f, 1.0f);
@@ -2215,6 +2226,20 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
         Cam.InputYaw += AxisValue(SystemInput[MyInputSlots.Camera.AbsYaw]);
         Cam.InputPitch += AxisValue(SystemInput[MyInputSlots.Camera.RelPitch]) * Cam.RotationSpeed * DeltaSeconds;
         Cam.InputPitch += AxisValue(SystemInput[MyInputSlots.Camera.AbsPitch]);
+
+        if(input_slot* Slot = GetInputSlot(SystemInput, keyboard::T))
+        {
+          if(ButtonIsDown(Slot) && Slot->Frame == SystemInput.CurrentFrame)
+          {
+            AutoCamera = !AutoCamera;
+          }
+        }
+
+        if(AutoCamera)
+        {
+          Cam.InputYaw += 0.1f * Cam.RotationSpeed * DeltaSeconds;
+        }
+
         Cam.Transform.Rotation = Quaternion(UpVector3,    Radians(Cam.InputYaw)) *
                                  Quaternion(RightVector3, Radians(Cam.InputPitch));
         SafeNormalize(&Cam.Transform.Rotation);
