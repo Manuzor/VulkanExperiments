@@ -407,18 +407,19 @@ auto
 
     VulkanVerify(Vulkan.vkGetPhysicalDeviceSurfacePresentModesKHR(Vulkan.Gpu.GpuHandle, SurfaceHandle, &PresentModeCount, PresentModes.Ptr));
 
-    bool const AllowFifoRelaxedWhenVSyncIsOff = false;
-
-    for(auto Candidate : Slice(PresentModes))
+    auto ChoosePresentMode = [](VkPresentModeKHR CurrentPresentMode,
+                                VkPresentModeKHR NewPresentMode,
+                                vsync VSync)
+      -> VkPresentModeKHR
     {
-      switch(Candidate)
+      switch(NewPresentMode)
       {
         case VK_PRESENT_MODE_MAILBOX_KHR:
         {
           if(VSync == vsync::On)
           {
-            // Always prefer mailbox if VSync is requested.
-            SwapchainPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+            // Always prefer MAILBOX if VSync is requested.
+            return VK_PRESENT_MODE_MAILBOX_KHR;
           }
           else
           {
@@ -430,15 +431,20 @@ auto
         {
           if(VSync == vsync::On)
           {
-            // Accept only if we don't have mailbox already.
-            if(SwapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR)
+            // Prefer MAILBOX if we have it already.
+            if(CurrentPresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
             {
-              SwapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+              return VK_PRESENT_MODE_MAILBOX_KHR;
+            }
+            else
+            {
+              return VK_PRESENT_MODE_FIFO_KHR;
             }
           }
           else
           {
             // Don't use this mode when VSync is not requested.
+            return CurrentPresentMode;
           }
         } break;
 
@@ -446,16 +452,19 @@ auto
         {
           if(VSync == vsync::On)
           {
-            if(SwapchainPresentMode != VK_PRESENT_MODE_IMMEDIATE_KHR)
+            // Use only if we don't already have MAILBOX or FIFO.
+            if(CurrentPresentMode != VK_PRESENT_MODE_MAILBOX_KHR &&
+               CurrentPresentMode != VK_PRESENT_MODE_FIFO_KHR)
             {
-              SwapchainPresentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+              return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
             }
           }
           else
           {
-            if(SwapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR && SwapchainPresentMode != VK_PRESENT_MODE_FIFO_KHR)
+            // Use only if we don't already have IMMEDIATE.
+            if(CurrentPresentMode != VK_PRESENT_MODE_IMMEDIATE_KHR)
             {
-              SwapchainPresentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+              return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
             }
           }
         } break;
@@ -468,13 +477,18 @@ auto
           }
           else
           {
-            if(SwapchainPresentMode != VK_PRESENT_MODE_FIFO_RELAXED_KHR)
-            {
-              SwapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-            }
+            // Always prefer IMMEDIATE when VSync is requested.
+            return VK_PRESENT_MODE_IMMEDIATE_KHR;
           }
         } break;
       }
+      // Return the current mode by default
+      return CurrentPresentMode;
+    };
+
+    for(auto Candidate : Slice(PresentModes))
+    {
+      SwapchainPresentMode = ChoosePresentMode(SwapchainPresentMode, Candidate, VSync);
     }
   }
 
