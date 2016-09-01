@@ -6,27 +6,29 @@
 
 // TODO: Change the name of this struct to something else as it might conflict
 // with std stuff.
-struct time { double InternalData; };
+struct duration { double InternalData; };
 
-constexpr time operator + (time   A, time   B) { return { A.InternalData + B.InternalData }; }
-inline    void operator +=(time&  A, time   B) { A.InternalData += B.InternalData; }
-constexpr time operator - (time   A, time   B) { return { A.InternalData - B.InternalData }; }
-inline    void operator -=(time&  A, time   B) { A.InternalData -= B.InternalData; }
-constexpr time operator * (time   A, time   B) { return { A.InternalData * B.InternalData }; }
-constexpr time operator * (time   A, double B) { return { A.InternalData * B }; }
-constexpr time operator * (double A, time   B) { return { A * B.InternalData }; }
-inline    void operator *=(time&  A, time   B) { A.InternalData *= B.InternalData; }
-inline    void operator *=(time&  A, double B) { A.InternalData *= B; }
-constexpr time operator / (time   A, time   B) { return { A.InternalData / B.InternalData }; }
-constexpr time operator / (time   A, double B) { return { A.InternalData / B }; }
-inline    void operator /=(time&  A, time   B) { A.InternalData /= B.InternalData; }
-inline    void operator /=(time&  A, double B) { A.InternalData /= B; }
-constexpr bool operator ==(time&  A, time   B) { return A.InternalData == B.InternalData; }
-constexpr bool operator !=(time&  A, time   B) { return A.InternalData != B.InternalData; }
-constexpr bool operator < (time&  A, time   B) { return A.InternalData <  B.InternalData; }
-constexpr bool operator <=(time&  A, time   B) { return A.InternalData <= B.InternalData; }
-constexpr bool operator > (time&  A, time   B) { return A.InternalData >  B.InternalData; }
-constexpr bool operator >=(time&  A, time   B) { return A.InternalData >= B.InternalData; }
+constexpr duration operator + (duration A, duration B) { return { A.InternalData + B.InternalData }; }
+constexpr duration operator - (duration A, duration B) { return { A.InternalData - B.InternalData }; }
+constexpr duration operator * (duration A, duration B) { return { A.InternalData * B.InternalData }; }
+constexpr duration operator * (duration A, double   B) { return { A.InternalData * B }; }
+constexpr duration operator * (double   A, duration B) { return { A * B.InternalData }; }
+constexpr duration operator / (duration A, duration B) { return { A.InternalData / B.InternalData }; }
+constexpr duration operator / (duration A, double   B) { return { A.InternalData / B }; }
+
+inline void operator +=(duration& A, duration B) { A.InternalData += B.InternalData; }
+inline void operator -=(duration& A, duration B) { A.InternalData -= B.InternalData; }
+inline void operator *=(duration& A, duration B) { A.InternalData *= B.InternalData; }
+inline void operator *=(duration& A, double   B) { A.InternalData *= B; }
+inline void operator /=(duration& A, duration B) { A.InternalData /= B.InternalData; }
+inline void operator /=(duration& A, double   B) { A.InternalData /= B; }
+
+constexpr bool operator ==(duration& A, duration B) { return A.InternalData == B.InternalData; }
+constexpr bool operator !=(duration& A, duration B) { return A.InternalData != B.InternalData; }
+constexpr bool operator < (duration& A, duration B) { return A.InternalData <  B.InternalData; }
+constexpr bool operator <=(duration& A, duration B) { return A.InternalData <= B.InternalData; }
+constexpr bool operator > (duration& A, duration B) { return A.InternalData >  B.InternalData; }
+constexpr bool operator >=(duration& A, duration B) { return A.InternalData >= B.InternalData; }
 
 struct stopwatch
 {
@@ -37,55 +39,55 @@ struct stopwatch
 
 
 //
-// Time creation and extraction
+// Duration creation and extraction
 //
 
-time constexpr
+duration constexpr
 Seconds(double Amount)
 {
   return { Amount };
 }
 
-time constexpr
+duration constexpr
 Milliseconds(double Amount)
 {
   return Seconds(Amount / 1000.0);
 }
 
-time constexpr
+duration constexpr
 Microseconds(double Amount)
 {
   return Milliseconds(Amount / 1000.0);
 }
 
-time constexpr
+duration constexpr
 Nanoseconds(double Amount)
 {
   return Microseconds(Amount / 1000.0);
 }
 
 double constexpr
-TimeAsSeconds(time Time)
+DurationAsSeconds(duration Duration)
 {
-  return Time.InternalData;
+  return Duration.InternalData;
 }
 
 double constexpr
-TimeAsMilliseconds(time Time)
+DurationAsMilliseconds(duration Duration)
 {
-  return TimeAsSeconds(Time) * 1000.0;
+  return DurationAsSeconds(Duration) * 1000.0;
 }
 
 double constexpr
-TimeAsMicroseconds(time Time)
+DurationAsMicroseconds(duration Duration)
 {
-  return TimeAsMilliseconds(Time) * 1000.0;
+  return DurationAsMilliseconds(Duration) * 1000.0;
 }
 
 double constexpr
-TimeAsNanoseconds(time Time)
+DurationAsNanoseconds(duration Duration)
 {
-  return TimeAsMicroseconds(Time) * 1000.0;
+  return DurationAsMicroseconds(Duration) * 1000.0;
 }
 
 
@@ -99,5 +101,5 @@ StopwatchStart(stopwatch* Stopwatch);
 void CORE_API
 StopwatchStop(stopwatch* Stopwatch);
 
-time CORE_API
-StopwatchTime(stopwatch* Stopwatch);
+duration CORE_API
+StopwatchDuration(stopwatch const* Stopwatch);

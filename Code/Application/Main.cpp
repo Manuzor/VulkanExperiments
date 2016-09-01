@@ -1596,18 +1596,18 @@ struct my_input_slots
 
 struct frame_time_sample
 {
-  time CPU;
-  time GPU;
-  time Total;
+  duration CPU;
+  duration GPU;
+  duration Total;
 };
 
 struct frame_time_stats
 {
   struct sample
   {
-    time CpuTime;
-    time GpuTime;
-    time FrameTime;
+    duration CpuTime;
+    duration GpuTime;
+    duration FrameTime;
   };
 
   sample FastestSample{};
@@ -1652,22 +1652,22 @@ PrintFrameTimeStats(frame_time_stats const& FrameTimeStats, log_data* Log)
   LogBeginScope("Frame Time Stats (%u samples)", FrameTimeStats.Samples.Num);
   {
     LogInfo(Log, "Fastest Frame: (%4.u FPS) %fs, CPU: %fs, GPU: %fs",
-            Round<uint64>(1.0f / TimeAsSeconds(FastestSample.FrameTime)),
-            TimeAsSeconds(FastestSample.FrameTime),
-            TimeAsSeconds(FastestSample.CpuTime),
-            TimeAsSeconds(FastestSample.GpuTime));
+            Round<uint64>(1.0f / DurationAsSeconds(FastestSample.FrameTime)),
+            DurationAsSeconds(FastestSample.FrameTime),
+            DurationAsSeconds(FastestSample.CpuTime),
+            DurationAsSeconds(FastestSample.GpuTime));
 
     LogInfo(Log, "Slowest Frame: (%4.u FPS) %fs, CPU: %fs, GPU: %fs",
-            Round<uint64>(1.0f / TimeAsSeconds(SlowestSample.FrameTime)),
-            TimeAsSeconds(SlowestSample.FrameTime),
-            TimeAsSeconds(SlowestSample.CpuTime),
-            TimeAsSeconds(SlowestSample.GpuTime));
+            Round<uint64>(1.0f / DurationAsSeconds(SlowestSample.FrameTime)),
+            DurationAsSeconds(SlowestSample.FrameTime),
+            DurationAsSeconds(SlowestSample.CpuTime),
+            DurationAsSeconds(SlowestSample.GpuTime));
 
     LogInfo(Log, "Average Frame: (%4.u FPS) %fs, CPU: %fs, GPU: %fs",
-            Round<uint64>(1.0f / TimeAsSeconds(AverageSample.FrameTime)),
-            TimeAsSeconds(AverageSample.FrameTime),
-            TimeAsSeconds(AverageSample.CpuTime),
-            TimeAsSeconds(AverageSample.GpuTime));
+            Round<uint64>(1.0f / DurationAsSeconds(AverageSample.FrameTime)),
+            DurationAsSeconds(AverageSample.FrameTime),
+            DurationAsSeconds(AverageSample.CpuTime),
+            DurationAsSeconds(AverageSample.GpuTime));
   }
   LogEndScope("Frame Time Stats");
 }
@@ -1901,7 +1901,7 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
     // Swapchain
     //
     {
-      LogBeginScope("Preparing swapchain for the first time.");
+      LogBeginScope("Preparing swapchain for the first duration.");
 
       if(!VulkanPrepareSwapchain(Vulkan, Vulkan.Swapchain, WindowSetup.ClientExtents, VSync))
       {
@@ -2171,8 +2171,8 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
     stopwatch FrameTimer{};
     stopwatch PerfTimer{};
 
-    time CurrentFrameTime = Milliseconds(16); // Assume 16 milliseconds for the first frame.
-    float DeltaSeconds = Convert<float>(TimeAsSeconds(CurrentFrameTime));
+    duration CurrentFrameTime = Milliseconds(16); // Assume 16 milliseconds for the first frame.
+    float DeltaSeconds = Convert<float>(DurationAsSeconds(CurrentFrameTime));
 
     frame_time_stats FrameTimeStats{ Allocator };
     FrameTimeStats.MaxNumSamples = 256;
@@ -2256,7 +2256,7 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
       auto const ViewProjectionMatrix = CameraViewProjectionMatrix(Cam, Cam.Transform);
 
       StopwatchStop(&PerfTimer);
-      auto FrameTimeOnCpu = StopwatchTime(&PerfTimer);
+      auto FrameTimeOnCpu = StopwatchDuration(&PerfTimer);
 
       StopwatchStart(&PerfTimer);
 
@@ -2294,13 +2294,13 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
       RedrawWindow(Window->WindowHandle, nullptr, nullptr, RDW_INTERNALPAINT);
 
       StopwatchStop(&PerfTimer);
-      auto FrameTimeOnGpu = StopwatchTime(&PerfTimer);
+      auto FrameTimeOnGpu = StopwatchDuration(&PerfTimer);
 
       // Update frame timer.
       {
         StopwatchStop(&FrameTimer);
-        CurrentFrameTime = StopwatchTime(&FrameTimer);
-        DeltaSeconds = Convert<float>(TimeAsSeconds(CurrentFrameTime));
+        CurrentFrameTime = StopwatchDuration(&FrameTimer);
+        DeltaSeconds = Convert<float>(DurationAsSeconds(CurrentFrameTime));
       }
 
       // Capture timing data.
@@ -2312,11 +2312,11 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
         AddFrameTimeSample(FrameTimeStats, Sample);
       }
 
-      time const IdealFrameTime(Seconds(1 / 60.0f));
-      time const AcceptableFrameTime(2 * IdealFrameTime);
-      time const BadFrameTime(2 * AcceptableFrameTime);
+      duration const IdealFrameTime(Seconds(1 / 60.0f));
+      duration const AcceptableFrameTime(2 * IdealFrameTime);
+      duration const BadFrameTime(2 * AcceptableFrameTime);
 
-      double const CurrentSeconds = TimeAsSeconds(CurrentFrameTime);
+      double const CurrentSeconds = DurationAsSeconds(CurrentFrameTime);
       uint64 const CurrentFramesPerSecond = Round<uint64>(1.0 / CurrentSeconds);
 
       if(CurrentFrameTime > IdealFrameTime)

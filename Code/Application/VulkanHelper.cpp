@@ -2244,7 +2244,7 @@ auto
       VulkanVerify(Device.vkQueueSubmit(Vulkan.Queue, 1, &SubmitInfo, CopyFence));
 
       auto FenceTimeOut = Seconds(100);
-      VulkanVerify(Device.vkWaitForFences(DeviceHandle, 1, &CopyFence, VK_TRUE, Convert<uint64>(TimeAsNanoseconds(FenceTimeOut))));
+      VulkanVerify(Device.vkWaitForFences(DeviceHandle, 1, &CopyFence, VK_TRUE, Convert<uint64>(DurationAsNanoseconds(FenceTimeOut))));
 
       Device.vkDestroyFence(DeviceHandle, CopyFence, nullptr);
 

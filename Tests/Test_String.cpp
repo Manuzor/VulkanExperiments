@@ -81,7 +81,7 @@ TEST_CASE("String Benchmark", "[String][.Benchmark]")
     StopwatchStart(&Stopwatch);
     StringBenchmark(String);
     StopwatchStop(&Stopwatch);
-    printf("Default string allocator: %f", TimeAsSeconds(StopwatchTime(&Stopwatch)));
+    printf("Default string allocator: %f", DurationAsSeconds(StopwatchDuration(&Stopwatch)));
   }
 
   SECTION("mallocator")
@@ -93,6 +93,6 @@ TEST_CASE("String Benchmark", "[String][.Benchmark]")
     StopwatchStart(&Stopwatch);
     StringBenchmark(String);
     StopwatchStop(&Stopwatch);
-    printf("mallocator: %f", TimeAsSeconds(StopwatchTime(&Stopwatch)));
+    printf("mallocator: %f", DurationAsSeconds(StopwatchDuration(&Stopwatch)));
   }
 }

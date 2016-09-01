@@ -25,11 +25,11 @@ auto
 }
 
 auto
-::StopwatchTime(stopwatch* Stopwatch)
-  -> time
+::StopwatchDuration(stopwatch const* Stopwatch)
+  -> duration
 {
   auto Delta = Stopwatch->EndTimestamp - Stopwatch->StartTimestamp;
-  time Time;
-  Time.InternalData = Cast<double>(Delta) / Cast<double>(Stopwatch->Frequency);
-  return Time;
+  duration Duration;
+  Duration.InternalData = Cast<double>(Delta) / Cast<double>(Stopwatch->Frequency);
+  return Duration;
 }
