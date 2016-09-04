@@ -87,6 +87,7 @@ struct window
   input_keyboard_slots* Keyboard;
   input_mouse_slots* Mouse;
   vulkan* Vulkan;
+  uint64 DrawCount;
 };
 
 static window*
@@ -2088,6 +2089,8 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
     frame_stats* FrameStats = FrameRegistryGetStats(&FrameStatsRegistry, "FrameStats");
     FrameStats->MaxNumSamples = 256;
 
+    uint64 FrameCount = 0;
+    int LastKnownFrameDrawCountDelta = 0;
     bool AutoCamera = true;
 
     while(::GlobalRunning)
@@ -2252,6 +2255,14 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
         sprintf_s(WindowTextBuffer, "Vulkan Experiments (%4lluFPS)", CurrentFramesPerSecond);
         SetWindowTextA(Window->WindowHandle, WindowTextBuffer);
       }
+
+      ++FrameCount;
+      int FrameDrawCountDelta = Convert<int>(FrameCount - Window->DrawCount);
+      if(FrameDrawCountDelta != LastKnownFrameDrawCountDelta)
+      {
+        LogWarning("Draw/Frame count mismatch: %u/%u", Window->DrawCount, FrameCount);
+        LastKnownFrameDrawCountDelta = FrameDrawCountDelta;
+      }
     }
 
     FrameStatsPrintEvaluated(FrameEvaluateStats(FrameStats), GlobalLog);
@@ -2321,6 +2332,7 @@ Win32MainWindowCallback(HWND WindowHandle, UINT Message,
     {
       temp_allocator TempAllocator;
       VulkanDraw(*Vulkan);
+      ++Window->DrawCount;
     }
 
     if(MustBeginAndEndPaint)
