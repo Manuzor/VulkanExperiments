@@ -1,4 +1,5 @@
 #include "VulkanHelper.hpp"
+#include "Stats.hpp"
 
 #include <Core/Array.hpp>
 #include <Core/Log.hpp>
@@ -1594,98 +1595,6 @@ struct my_input_slots
   input_slot CamReset;
 };
 
-struct frame_time_sample
-{
-  duration CPU;
-  duration GPU;
-  duration Total;
-};
-
-struct frame_time_stats
-{
-  struct sample
-  {
-    duration CpuTime;
-    duration GpuTime;
-    duration FrameTime;
-  };
-
-  sample FastestSample{};
-  sample SlowestSample{};
-  array<sample> Samples;
-
-  size_t MaxNumSamples{};
-  size_t NumSamples{};
-  size_t SampleIndex{};
-
-  frame_time_stats(allocator_interface& Allocator)
-    : Samples{ Allocator }
-  {
-  }
-};
-
-static void
-PrintFrameTimeStats(frame_time_stats const& FrameTimeStats, log_data* Log)
-{
-  frame_time_stats::sample FastestSample{ Seconds(1e20f), Seconds(1e20f), Seconds(1e20f) };
-  frame_time_stats::sample SlowestSample{};
-  frame_time_stats::sample AverageSample{};
-
-  for(auto& Sample : Slice(FrameTimeStats.Samples))
-  {
-    AverageSample.CpuTime += Sample.CpuTime;
-    AverageSample.GpuTime += Sample.GpuTime;
-    AverageSample.FrameTime += Sample.FrameTime;
-
-    FastestSample.CpuTime = Min(Sample.CpuTime, FastestSample.CpuTime);
-    FastestSample.GpuTime = Min(Sample.GpuTime, FastestSample.GpuTime);
-    FastestSample.FrameTime = Min(Sample.FrameTime, FastestSample.FrameTime);
-    SlowestSample.CpuTime = Max(Sample.CpuTime, SlowestSample.CpuTime);
-    SlowestSample.GpuTime = Max(Sample.GpuTime, SlowestSample.GpuTime);
-    SlowestSample.FrameTime = Max(Sample.FrameTime, SlowestSample.FrameTime);
-  }
-
-  AverageSample.CpuTime /= Convert<double>(FrameTimeStats.Samples.Num);
-  AverageSample.GpuTime /= Convert<double>(FrameTimeStats.Samples.Num);
-  AverageSample.FrameTime /= Convert<double>(FrameTimeStats.Samples.Num);
-
-  LogBeginScope("Frame Time Stats (%u samples)", FrameTimeStats.Samples.Num);
-  {
-    LogInfo(Log, "Fastest Frame: (%4.u FPS) %fs, CPU: %fs, GPU: %fs",
-            Round<uint64>(1.0f / DurationAsSeconds(FastestSample.FrameTime)),
-            DurationAsSeconds(FastestSample.FrameTime),
-            DurationAsSeconds(FastestSample.CpuTime),
-            DurationAsSeconds(FastestSample.GpuTime));
-
-    LogInfo(Log, "Slowest Frame: (%4.u FPS) %fs, CPU: %fs, GPU: %fs",
-            Round<uint64>(1.0f / DurationAsSeconds(SlowestSample.FrameTime)),
-            DurationAsSeconds(SlowestSample.FrameTime),
-            DurationAsSeconds(SlowestSample.CpuTime),
-            DurationAsSeconds(SlowestSample.GpuTime));
-
-    LogInfo(Log, "Average Frame: (%4.u FPS) %fs, CPU: %fs, GPU: %fs",
-            Round<uint64>(1.0f / DurationAsSeconds(AverageSample.FrameTime)),
-            DurationAsSeconds(AverageSample.FrameTime),
-            DurationAsSeconds(AverageSample.CpuTime),
-            DurationAsSeconds(AverageSample.GpuTime));
-  }
-  LogEndScope("Frame Time Stats");
-}
-
-static void
-AddFrameTimeSample(frame_time_stats& Stats, frame_time_stats::sample Sample)
-{
-  auto const RequiredNumArrayElements = Stats.SampleIndex + 1;
-  if(RequiredNumArrayElements > Stats.Samples.Num)
-  {
-    ExpandBy(Stats.Samples, RequiredNumArrayElements - Stats.Samples.Num);
-  }
-
-  Stats.Samples[Stats.SampleIndex] = Sample;
-  Stats.SampleIndex = Wrap(Stats.SampleIndex + 1, 0, Stats.MaxNumSamples);
-  Stats.NumSamples = Min(Stats.NumSamples + 1, Stats.MaxNumSamples);
-}
-
 void
 PrepareInputSlots(input_context         Context,
                   my_input_slots*       MyInputSlots,
@@ -2174,8 +2083,10 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
     duration CurrentFrameTime = Milliseconds(16); // Assume 16 milliseconds for the first frame.
     float DeltaSeconds = Convert<float>(DurationAsSeconds(CurrentFrameTime));
 
-    frame_time_stats FrameTimeStats{ Allocator };
-    FrameTimeStats.MaxNumSamples = 256;
+    frame_stats_registry FrameStatsRegistry;
+
+    frame_stats* FrameStats = FrameRegistryGetStats(&FrameStatsRegistry, "FrameStats");
+    FrameStats->MaxNumSamples = 256;
 
     bool AutoCamera = true;
 
@@ -2208,7 +2119,7 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
 
       if(InputButtonWasPressed(Keyboard.P))
       {
-        PrintFrameTimeStats(FrameTimeStats, GlobalLog);
+        FrameStatsPrintEvaluated(FrameEvaluateStats(FrameStats), GlobalLog);
       }
 
       //Vulkan.DepthStencilValue = Clamp(Vulkan.DepthStencilValue + InputAxisValue(SystemInput[MyInputSlots.Depth]), 0.8f, 1.0f);
@@ -2305,11 +2216,11 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
 
       // Capture timing data.
       {
-        frame_time_stats::sample Sample;
+        frame_sample Sample;
         Sample.CpuTime = FrameTimeOnCpu;
         Sample.GpuTime = FrameTimeOnGpu;
         Sample.FrameTime = CurrentFrameTime;
-        AddFrameTimeSample(FrameTimeStats, Sample);
+        FrameStatsAddSample(FrameStats, Sample);
       }
 
       duration const IdealFrameTime(Seconds(1 / 60.0f));
@@ -2343,7 +2254,7 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
       }
     }
 
-    PrintFrameTimeStats(FrameTimeStats, GlobalLog);
+    FrameStatsPrintEvaluated(FrameEvaluateStats(FrameStats), GlobalLog);
   }
 
   return exit_code::Success;
