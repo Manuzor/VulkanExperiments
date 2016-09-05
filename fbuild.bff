@@ -110,16 +110,24 @@
 
 .SolutionProjects = {}
 
-Alias( 'GlslangLibs' )
 {
-  .MyGlslangBuildPath = '$VulkanSDKPath$/glslang/build'
-  .Targets =
+  .SourceConfigs = { 'Debug' 'Release' } // The directory of the original
+  .TargetConfigs = { 'Debug' 'Release' } // Our suffix internally
+  ForEach( .SourceConfig in .SourceConfigs
+           .TargetConfig in .TargetConfigs )
   {
-    '$MyGlslangBuildPath$/glslang/Debug/glslang.lib'
-    '$MyGlslangBuildPath$/glslang/OSDependent/Windows/Debug/OSDependent.lib'
-    '$MyGlslangBuildPath$/OGLCompilersDLL/Debug/OGLCompiler.lib'
-    '$MyGlslangBuildPath$/hlsl/Debug/HLSL.lib'
-    '$MyGlslangBuildPath$/SPIRV/Debug/SPIRV.lib'
+    Alias( 'GlslangLibs-$TargetConfig$' )
+    {
+      .MyGlslangBuildPath = '$VulkanSDKPath$/glslang/build'
+      .Targets =
+      {
+        '$MyGlslangBuildPath$/glslang/$SourceConfig$/glslang$VulkanDebugLibSuffix$.lib'
+        '$MyGlslangBuildPath$/glslang/OSDependent/Windows/$SourceConfig$/OSDependent$VulkanDebugLibSuffix$.lib'
+        '$MyGlslangBuildPath$/OGLCompilersDLL/$SourceConfig$/OGLCompiler$VulkanDebugLibSuffix$.lib'
+        '$MyGlslangBuildPath$/hlsl/$SourceConfig$/HLSL$VulkanDebugLibSuffix$.lib'
+        '$MyGlslangBuildPath$/SPIRV/$SourceConfig$/SPIRV$VulkanDebugLibSuffix$.lib'
+      }
+    }
   }
 }
 

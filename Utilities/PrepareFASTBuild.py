@@ -29,7 +29,7 @@ def Main():
   Windows10SDKVersion = Manifest["Windows10SDK"]["Version"]
   VS2015Path = Path(Manifest["VS2015"]["Path"])
   VulkanSDKPath = Path(Manifest["VulkanSDK"]["Path"])
-  VulkanSDKVersion = Path(Manifest["VulkanSDK"]["Version"])
+  VulkanSDKVersion = Manifest["VulkanSDK"]["Version"]
 
   assert Windows10SDKPath and Windows10SDKPath.exists()
   assert Windows10SDKVersion
@@ -56,6 +56,10 @@ def Main():
     if VulkanSDKPath.exists():
       Write(".VulkanSDKPath = '{}'".format(VulkanSDKPath))
       Write(".VulkanSDKVersion = '{}'".format(VulkanSDKVersion))
+      VersionParts = VulkanSDKVersion.split(".")
+      Version = tuple(map(int, VersionParts))
+      IsOld = Version[0] == 1 and Version[1] == 0 and Version[2] <= 13
+      Write(".VulkanDebugLibSuffix = '{}'".format("" if IsOld else "d"))
 
 
 if __name__ == '__main__':
