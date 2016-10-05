@@ -71,10 +71,8 @@ struct window_setup
   char const* WindowClassName;
   extent2_<uint> ClientExtents;
 
-  bool HasCustomWindowX;
+  bool HasCustomPosition;
   int WindowX;
-
-  bool HasCustomWindowY;
   int WindowY;
 };
 
@@ -139,9 +137,9 @@ Win32CreateWindow(allocator_interface& Allocator, window_setup const* Args,
   WindowRect.bottom -= WindowRect.top;
 
   // Apply user translation
-  WindowRect.left = Args->HasCustomWindowX ? Cast<LONG>(Args->WindowX) : 0;
+  WindowRect.left = Args->HasCustomPosition ? Cast<LONG>(Args->WindowX) : 0;
   WindowRect.right += WindowRect.left;
-  WindowRect.top = Args->HasCustomWindowY ? Cast<LONG>(Args->WindowY) : 0;
+  WindowRect.top = Args->HasCustomPosition ? Cast<LONG>(Args->WindowY) : 0;
   WindowRect.bottom += WindowRect.top;
 
 
@@ -153,8 +151,8 @@ Win32CreateWindow(allocator_interface& Allocator, window_setup const* Args,
   WindowRect.bottom += WindowWorkArea.top;
 
   HWND WindowHandle;
-  auto const WindowX = Args->HasCustomWindowX ? WindowRect.left : CW_USEDEFAULT;
-  auto const WindowY = Args->HasCustomWindowY ? WindowRect.top : CW_USEDEFAULT;
+  auto const WindowX = Args->HasCustomPosition ? WindowRect.left : CW_USEDEFAULT;
+  auto const WindowY = Args->HasCustomPosition ? WindowRect.top : CW_USEDEFAULT;
   auto const WindowWidth = WindowRect.right - WindowRect.left;
   auto const WindowHeight = WindowRect.bottom - WindowRect.top;
   WindowHandle = CreateWindowExA(WindowStyleEx,             // _In_     DWORD     dwExStyle
@@ -1700,7 +1698,10 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
   //
   int CurrentExitCode = 0;
 
+  bool HasConsole{};
   Win32SetupConsole("Vulkan Experiments Console");
+  RECT InitialConsoleRect{};
+  HasConsole = !!GetWindowRect(GetConsoleWindow(), &InitialConsoleRect);
 
   mallocator Mallocator{};
   allocator_interface& Allocator = Mallocator;
@@ -1759,6 +1760,9 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
     window_setup WindowSetup{};
     WindowSetup.ProcessHandle = ProcessHandle;
     WindowSetup.WindowClassName = "VulkanExperimentsWindowClass";
+    WindowSetup.HasCustomPosition = HasConsole;
+    WindowSetup.WindowX = InitialConsoleRect.right - InitialConsoleRect.left;
+    WindowSetup.WindowY = InitialConsoleRect.top + 50;
     WindowSetup.ClientExtents.Width = 1280;
     WindowSetup.ClientExtents.Height = 720;
     auto Window = Win32CreateWindow(Allocator, &WindowSetup);
@@ -2073,7 +2077,7 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
     }
 
     //
-    // Main Loop
+    // Main Loop | *mainloop*
     //
     Vulkan.DepthStencilValue = 1.0f;
     ::GlobalRunning = true;
