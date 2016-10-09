@@ -399,9 +399,9 @@ VulkanSetupDebugging(vulkan& Vulkan)
     DebugSetupInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
 
     VulkanVerify(Vulkan.vkCreateDebugReportCallbackEXT(Vulkan.InstanceHandle,
-                                                  &DebugSetupInfo,
-                                                  nullptr,
-                                                  &Vulkan.DebugCallbackHandle));
+                                                       &DebugSetupInfo,
+                                                       nullptr,
+                                                       &Vulkan.DebugCallbackHandle));
     return true;
   }
   else
@@ -909,34 +909,27 @@ VulkanPrepareRenderPass(vulkan& Vulkan)
     LogBeginScope("Preparing render pass.");
     Defer [](){ LogEndScope("Finished preparing render pass."); };
 
-    fixed_block<2, VkAttachmentDescription> AttachmentsBlock;
-    auto Attachments = Slice(AttachmentsBlock);
+    VkAttachmentDescription Attachments[2]{ InitStruct<VkAttachmentDescription>() };
     {
-      auto& Attachment = Attachments[0];
-      Attachment = InitStruct<decltype(Attachment)>();
-
-      Attachment.format = Vulkan.Surface.Format;
-      Attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-      Attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-      Attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-      Attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-      Attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-      Attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      Attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      Attachments[0].format = Vulkan.Surface.Format;
+      Attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+      Attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+      Attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+      Attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+      Attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+      Attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      Attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
 
     {
-      auto& Attachment = Attachments[1];
-      Attachment = InitStruct<decltype(Attachment)>();
-
-      Attachment.format = Vulkan.Depth.Format;
-      Attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-      Attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-      Attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-      Attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-      Attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-      Attachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-      Attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+      Attachments[1].format = Vulkan.Depth.Format;
+      Attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+      Attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+      Attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+      Attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+      Attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+      Attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+      Attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
 
     auto ColorReference = InitStruct<VkAttachmentReference>();
@@ -961,13 +954,17 @@ VulkanPrepareRenderPass(vulkan& Vulkan)
 
     auto RenderPassCreateInfo = InitStruct<VkRenderPassCreateInfo>();
     {
-      RenderPassCreateInfo.attachmentCount = Cast<uint32>(Attachments.Num);
-      RenderPassCreateInfo.pAttachments = Attachments.Ptr;
+      RenderPassCreateInfo.attachmentCount = (uint32)ArrayCount(Attachments);
+      RenderPassCreateInfo.pAttachments = Attachments;
       RenderPassCreateInfo.subpassCount = 1;
       RenderPassCreateInfo.pSubpasses = &SubpassDesc;
     }
 
     VulkanVerify(Device.vkCreateRenderPass(DeviceHandle, &RenderPassCreateInfo, nullptr, &Vulkan.RenderPass));
+
+    Attachments[0].format = Vulkan.RenderTarget2.ImageFormat;
+    Attachments[1].format = Vulkan.RenderTarget2.Depth.Format;
+    VulkanVerify(Device.vkCreateRenderPass(DeviceHandle, &RenderPassCreateInfo, nullptr, &Vulkan.RenderTarget2.RenderPass));
   }
 
 
@@ -1062,6 +1059,14 @@ static void VulkanCreateFramebuffers(vulkan& Vulkan)
                                                     nullptr,
                                                     &Vulkan.Framebuffers[Index]));
   }
+  auto& RT2 = Vulkan.RenderTarget2;
+  Attachments[1] = RT2.Depth.View;
+  Attachments[0] = RT2.ImageView;
+  FramebufferCreateInfo.renderPass = RT2.RenderPass;
+  VulkanVerify(Vulkan.Device.vkCreateFramebuffer(Vulkan.Device.DeviceHandle,
+                                                  &FramebufferCreateInfo,
+                                                  nullptr,
+                                                  &RT2.Framebuffer));
 }
 
 static void VulkanDestroyFramebuffers(vulkan& Vulkan)
@@ -1141,6 +1146,9 @@ VulkanCreateCommandBuffers(vulkan& Vulkan, VkCommandPool CommandPool, uint32 Num
   VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan.DrawCommandBuffers.Ptr));
   VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan.PrePresentCommandBuffers.Ptr));
   VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan.PostPresentCommandBuffers.Ptr));
+
+  AllocateInfo.commandBufferCount = 1;
+  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, &Vulkan.RenderTarget2.DrawCommandBuffer));
 }
 
 static void VulkanDestroyCommandBuffers(vulkan& Vulkan, VkCommandPool CommandPool)
@@ -1270,37 +1278,23 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
 {
   BoundsCheck(DrawCommandBuffers.Num == Framebuffers.Num);
 
-  auto const& Device = Vulkan.Device;
-
-  fixed_block<2, VkClearValue> ClearValues;
-
-  // Regular clear color.
-  SliceCopy(Slice(ClearValues[0].color.float32),
-            AsConst(Slice(ClearColor.Data)));
-
-  // DepthStencil clear values.
-  ClearValues[1].depthStencil.depth = ClearDepth;
-  ClearValues[1].depthStencil.stencil = ClearStencil;
-
-  auto RenderPassBeginInfo = InitStruct<VkRenderPassBeginInfo>();
+  auto RecordingHelper = [](vulkan& Vulkan,
+                            VkRenderPass RenderPass,
+                            VkFramebuffer Framebuffer,
+                            VkCommandBuffer DrawCommandBuffer,
+                            slice<VkClearValue> ClearValues)
   {
-    RenderPassBeginInfo.renderPass = Vulkan.RenderPass;
-    RenderPassBeginInfo.renderArea.extent.width = Vulkan.Swapchain.Extent.Width;
-    RenderPassBeginInfo.renderArea.extent.height = Vulkan.Swapchain.Extent.Height;
-    RenderPassBeginInfo.clearValueCount = Cast<uint32>(ClearValues.Num);
-    RenderPassBeginInfo.pClearValues = First(ClearValues);
-  }
+    auto const& Device = Vulkan.Device;
 
-  auto BeginCommandBufferInfo = InitStruct<VkCommandBufferBeginInfo>();
-
-  auto const Num = DrawCommandBuffers.Num;
-  for(size_t Index = 0; Index < Num; ++Index)
-  {
-    RenderPassBeginInfo.framebuffer = Framebuffers[Index];
-
-    auto DrawCommandBuffer = DrawCommandBuffers[Index];
-
-    VulkanVerify(Device.vkBeginCommandBuffer(DrawCommandBuffer, &BeginCommandBufferInfo));
+    auto RenderPassBeginInfo = InitStruct<VkRenderPassBeginInfo>();
+    {
+      RenderPassBeginInfo.renderPass = RenderPass;
+      RenderPassBeginInfo.framebuffer = Framebuffer;
+      RenderPassBeginInfo.renderArea.extent.width = Vulkan.Swapchain.Extent.Width;
+      RenderPassBeginInfo.renderArea.extent.height = Vulkan.Swapchain.Extent.Height;
+      RenderPassBeginInfo.clearValueCount = Cast<uint32>(ClearValues.Num);
+      RenderPassBeginInfo.pClearValues = First(ClearValues);
+    }
     Device.vkCmdBeginRenderPass(DrawCommandBuffer, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
     {
       // Set viewport
@@ -1326,8 +1320,6 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
       }
 
       // Draw scene objects
-      VkDeviceSize NoOffset{};
-
       for(auto Renderable : Slice(Vulkan.Renderables))
       {
         VulkanEnsureIsReadyForDrawing(Vulkan, *Renderable);
@@ -1349,7 +1341,50 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
       }
     }
     Device.vkCmdEndRenderPass(DrawCommandBuffer);
-    VulkanVerify(Device.vkEndCommandBuffer(DrawCommandBuffer));
+  };
+
+  VkClearValue ClearValues_[2];
+
+  // Regular clear color.
+  SliceCopy(Slice(ClearValues_[0].color.float32),
+            Slice(ClearColor.Data));
+
+  // DepthStencil clear values.
+  ClearValues_[1].depthStencil.depth = ClearDepth;
+  ClearValues_[1].depthStencil.stencil = ClearStencil;
+
+  slice<VkClearValue> ClearValues = Slice(ClearValues_);
+
+  auto const Num = DrawCommandBuffers.Num;
+  for(size_t Index = 0; Index < Num; ++Index)
+  {
+    auto BeginCommandBufferInfo = InitStruct<VkCommandBufferBeginInfo>();
+
+    auto& RT2 = Vulkan.RenderTarget2;
+    VulkanVerify(Vulkan.Device.vkBeginCommandBuffer(RT2.DrawCommandBuffer, &BeginCommandBufferInfo));
+    {
+      auto const& Device = Vulkan.Device;
+      VulkanSetImageLayout(Device, RT2.DrawCommandBuffer,
+                           RT2.Image,
+                           { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+      RecordingHelper(Vulkan, RT2.RenderPass, RT2.Framebuffer, RT2.DrawCommandBuffer, ClearValues);
+
+      VulkanSetImageLayout(Device, RT2.DrawCommandBuffer,
+                           RT2.Image,
+                           { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    }
+    VulkanVerify(Vulkan.Device.vkEndCommandBuffer(RT2.DrawCommandBuffer));
+
+    VulkanVerify(Vulkan.Device.vkBeginCommandBuffer(DrawCommandBuffers[Index], &BeginCommandBufferInfo));
+    {
+      RecordingHelper(Vulkan, Vulkan.RenderPass, Framebuffers[Index], DrawCommandBuffers[Index], ClearValues);
+    }
+    VulkanVerify(Vulkan.Device.vkEndCommandBuffer(DrawCommandBuffers[Index]));
   }
 }
 
@@ -1828,6 +1863,73 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
     }
     Defer [VulkanPtr](){ VulkanCleanupSwapchain(*VulkanPtr, VulkanPtr->Swapchain); };
 
+    //
+    // RenderTarget2 image setup.
+    //
+    {
+      Vulkan.RenderTarget2.ImageFormat = VK_FORMAT_R8G8B8A8_UNORM; // TODO: Check for best format here.
+
+      auto const& Device = Vulkan.Device;
+      auto const DeviceHandle = Device.DeviceHandle;
+      auto& RT2 = Vulkan.RenderTarget2;
+
+      // Create the image.
+      auto ImageCreateInfo = InitStruct<VkImageCreateInfo>();
+      {
+        ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+        ImageCreateInfo.format = RT2.ImageFormat;
+        ImageCreateInfo.extent = { Vulkan.Swapchain.Extent.Width, Vulkan.Swapchain.Extent.Height, 1 };
+        ImageCreateInfo.mipLevels = 1;
+        ImageCreateInfo.arrayLayers = 1;
+        ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        ImageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT |
+                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+      }
+      VulkanVerify(Device.vkCreateImage(DeviceHandle, &ImageCreateInfo, nullptr, &RT2.Image));
+
+      // Allocate memory for the image.
+      VkMemoryRequirements MemoryRequirements;
+      Device.vkGetImageMemoryRequirements(DeviceHandle, RT2.Image, &MemoryRequirements);
+
+      auto MemoryAllocateInfo = InitStruct<VkMemoryAllocateInfo>();
+      MemoryAllocateInfo.allocationSize = MemoryRequirements.size;
+      MemoryAllocateInfo.memoryTypeIndex = VulkanDetermineMemoryTypeIndex(Vulkan.Gpu.MemoryProperties,
+                                                                          MemoryRequirements.memoryTypeBits,
+                                                                          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+      VulkanVerify(Device.vkAllocateMemory(DeviceHandle,
+                                           &MemoryAllocateInfo,
+                                           nullptr,
+                                           &RT2.ImageMemory));
+
+      // Bind the image to the allocated memory.
+      VulkanVerify(Device.vkBindImageMemory(DeviceHandle,
+                                            RT2.Image,
+                                            RT2.ImageMemory,
+                                            0)); // Offset
+
+      // Set image layout to something useful.
+      VulkanSetImageLayout(Device, Vulkan.SetupCommandBuffer,
+                           RT2.Image,
+                           { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+                           VK_IMAGE_LAYOUT_UNDEFINED,
+                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+      // Create a view to that image.
+      auto ImageViewCreateInfo = InitStruct<VkImageViewCreateInfo>();
+      {
+        ImageViewCreateInfo.image = RT2.Image;
+        ImageViewCreateInfo.format = RT2.ImageFormat;
+        ImageViewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+      }
+      VulkanVerify(Device.vkCreateImageView(DeviceHandle, &ImageViewCreateInfo, nullptr, &RT2.ImageView));
+
+      VulkanPrepareDepth(Vulkan, RT2.Depth, Vulkan.Swapchain.Extent);
+    }
+
 
     //
     // Create Command Buffers
@@ -1998,10 +2100,41 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
 
         Kitten->Transform.Translation = Vec3(0, 0, 2);
 
+        #if 0
         Copy(Kitten->Texture.Image, KittenImage);
         VulkanUploadTexture(Vulkan,
                             TextureUploadCommandBuffer,
                             Kitten->Texture);
+        #else
+        Kitten->Texture.ImageViewHandle = Vulkan.RenderTarget2.ImageView;
+        Kitten->Texture.ImageHandle = Vulkan.RenderTarget2.Image;
+        Kitten->Texture.ImageFormat = Vulkan.RenderTarget2.ImageFormat;
+        Kitten->Texture.ImageTiling = VK_IMAGE_TILING_OPTIMAL;
+        Kitten->Texture.ImageLayout = VK_IMAGE_LAYOUT_GENERAL; // TODO: Get the proper layout?
+
+        //
+        // Create sampler.
+        //
+        auto SamplerCreateInfo = InitStruct<VkSamplerCreateInfo>();
+        {
+          SamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+          SamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+          SamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+          SamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+          SamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+          SamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+          SamplerCreateInfo.anisotropyEnable = VK_TRUE;
+          SamplerCreateInfo.maxLod = 1;
+          SamplerCreateInfo.maxAnisotropy = 8;
+          SamplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+          SamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+          SamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+        }
+        VulkanVerify(Vulkan.Device.vkCreateSampler(Vulkan.Device.DeviceHandle,
+                                                   &SamplerCreateInfo,
+                                                   nullptr,
+                                                   &Kitten->Texture.SamplerHandle));
+        #endif
 
         VulkanSetQuadGeometry(Vulkan, Kitten->VertexBuffer, Kitten->IndexBuffer);
       }
@@ -2129,6 +2262,11 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
         FrameStatsPrintEvaluated(FrameEvaluateStats(FrameStats), GlobalLog);
       }
 
+      if(InputButtonWasPressed(Keyboard.Digit_1))
+      {
+        // TODO: Copy RenderTarget2 image?
+      }
+
       //Vulkan.DepthStencilValue = Clamp(Vulkan.DepthStencilValue + InputAxisValue(SystemInput[MyInputSlots.Depth]), 0.8f, 1.0f);
 
       //
@@ -2144,10 +2282,20 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
           UpVector(Cam.Transform)      * UpMovement
         );
 
-        Cam.InputYaw += InputAxisValue(MyInputSlots.CamRelYaw) * Cam.RotationSpeed * DeltaSeconds;
-        Cam.InputYaw += InputActionValue(MyInputSlots.CamAbsYaw);
-        Cam.InputPitch += InputAxisValue(MyInputSlots.CamRelPitch) * Cam.RotationSpeed * DeltaSeconds;
-        Cam.InputPitch += InputActionValue(MyInputSlots.CamAbsPitch);
+
+        float InputYawDelta = InputActionValue(MyInputSlots.CamAbsYaw) +
+                              InputAxisValue(MyInputSlots.CamRelYaw) * Cam.RotationSpeed * DeltaSeconds;
+        float InputPitchDelta = InputActionValue(MyInputSlots.CamAbsPitch) +
+                                InputAxisValue(MyInputSlots.CamRelPitch) * Cam.RotationSpeed * DeltaSeconds;
+
+        Cam.InputYaw += InputYawDelta;
+        Cam.InputPitch += InputPitchDelta;
+
+        if(!IsNearlyZero(InputYawDelta) ||
+           !IsNearlyZero(InputYawDelta))
+        {
+          AutoCamera = false;
+        }
 
         if(InputButtonWasPressed(Keyboard.T))
         {
@@ -2192,7 +2340,7 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
         // TODO: Don't do this every frame?
         for(auto SceneObject : Slice(Vulkan.SceneObjects))
         {
-          SceneObject->UboModel.Data.ViewProjectionMatrix = Mat4x4(SceneObject->Transform) * ViewProjectionMatrix;
+          SceneObject->UboModel.Data.ModelViewProjectionMatrix = Mat4x4(SceneObject->Transform) * ViewProjectionMatrix;
           VulkanUploadShaderBufferData(Vulkan, SceneObject->UboModel);
         }
       }

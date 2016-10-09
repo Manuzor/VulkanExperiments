@@ -2047,8 +2047,7 @@ auto
                       VkCommandBuffer            CommandBuffer,
                       vulkan_texture2d&          Texture,
                       vulkan_force_linear_tiling ForceLinearTiling,
-                      VkImageUsageFlags          ImageUsageFlags
-)
+                      VkImageUsageFlags          ImageUsageFlags)
   -> bool
 {
   auto const& Device = Vulkan.Device;
@@ -2933,7 +2932,7 @@ auto
                                   0, // flags
                                   &RawTarget));
 
-  MemCopy(Data.Num, RawTarget, Data.Ptr);
+  MemCopyBytes(Bytes(Data.Num), RawTarget, Data.Ptr);
 
   Device.vkUnmapMemory(Device.DeviceHandle, ShaderBuffer.MemoryHandle);
 }

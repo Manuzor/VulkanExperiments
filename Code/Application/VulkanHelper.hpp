@@ -130,7 +130,7 @@ struct vulkan_scene_object : public vulkan_renderable
 {
   struct ubo_model_data
   {
-    mat4x4 ViewProjectionMatrix;
+    mat4x4 ModelViewProjectionMatrix;
   };
 
   using ubo_model = vulkan_shader_buffer<ubo_model_data>;
@@ -270,6 +270,18 @@ struct vulkan : public vulkan_instance_functions
   //
   // Misc
   //
+
+  struct
+  {
+    VkDeviceMemory ImageMemory;
+    VkFormat ImageFormat;
+    VkImage Image;
+    VkImageView ImageView;
+    VkRenderPass RenderPass;
+    VkFramebuffer Framebuffer;
+    vulkan_depth Depth;
+    VkCommandBuffer DrawCommandBuffer;
+  } RenderTarget2;
 
   float DepthStencilValue = 1.0f;
 
