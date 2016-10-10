@@ -1933,6 +1933,7 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
       {
         ImageViewCreateInfo.image = RT2.Image;
         ImageViewCreateInfo.format = RT2.ImageFormat;
+        ImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         ImageViewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
       }
       VulkanVerify(Device.vkCreateImageView(DeviceHandle, &ImageViewCreateInfo, nullptr, &RT2.ImageView));
