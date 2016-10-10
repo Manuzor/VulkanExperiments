@@ -44,6 +44,14 @@ struct CORE_API log_data
 
 CORE_API extern log_data* GlobalLog;
 
+/// Changes the global log for the scope this object is created in.
+struct restore_global_log
+{
+  log_data* const LogBackup;
+  explicit restore_global_log(log_data* Log) : LogBackup(::GlobalLog) { ::GlobalLog = Log; }
+  ~restore_global_log() { ::GlobalLog = this->LogBackup; }
+};
+
 CORE_API
 void
 LogIndent(log_data* Log, int By = 1);

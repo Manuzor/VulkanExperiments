@@ -80,7 +80,7 @@ auto
 #include <cstdio>
 
 static bool
-ReadFileContentIntoArray(char const* FileName, array<uint8>* Array, log_data* Log)
+ReadFileContentIntoArray(char const* FileName, array<uint8>* Array)
 {
   Clear(*Array);
 
@@ -109,15 +109,14 @@ ReadFileContentIntoArray(char const* FileName, array<uint8>* Array, log_data* Lo
 
     if(Delta > 0)
     {
-      LogError(Log, "Didn't reach the end of file but failed to read any more bytes: %s", FileName);
+      LogError("Didn't reach the end of file but failed to read any more bytes: %s", FileName);
       return false;
     }
   }
 }
 
 static compiled_shader*
-LoadAndCompileShader(shader_manager& ShaderManager, slice<char const> FileName,
-                     log_data* Log)
+LoadAndCompileShader(shader_manager& ShaderManager, slice<char const> FileName)
 {
   // Make a copy of FileName to ensure it's zero terminated.
   arc_string FileNameString{ FileName };
@@ -126,9 +125,9 @@ LoadAndCompileShader(shader_manager& ShaderManager, slice<char const> FileName,
   temp_allocator Allocator{};
 
   array<uint8> Content{ Allocator };
-  if(!ReadFileContentIntoArray(InputFilePath.Ptr, &Content, Log))
+  if(!ReadFileContentIntoArray(InputFilePath.Ptr, &Content))
   {
-    LogError(Log, "Failed to read file: %s", InputFilePath.Ptr);
+    LogError("Failed to read file: %s", InputFilePath.Ptr);
     return nullptr;
   }
 
@@ -140,11 +139,11 @@ LoadAndCompileShader(shader_manager& ShaderManager, slice<char const> FileName,
 
   {
     // TODO: Supply the GlobalLog here as soon as the cfg parser code is more robust.
-    cfg_parsing_context ParsingContext{ InputFilePath, Log };
+    cfg_parsing_context ParsingContext{ InputFilePath, GlobalLog };
 
     if(!CfgDocumentParseFromString(CompiledShader->Cfg, Slice(CompiledShader->CfgSource), &ParsingContext))
     {
-      LogError(Log, "Failed to parse cfg.");
+      LogError("Failed to parse cfg.");
       return nullptr;
     }
   }
@@ -215,8 +214,7 @@ LoadAndCompileShader(shader_manager& ShaderManager, slice<char const> FileName,
 }
 
 auto
-::GetCompiledShader(shader_manager& Manager, slice<char const> FileName,
-                    log_data* Log)
+::GetCompiledShader(shader_manager& Manager, slice<char const> FileName)
   -> compiled_shader*
 {
   for(auto CompiledShader : Slice(Manager.CompiledShaders))
@@ -227,7 +225,7 @@ auto
     }
   }
 
-  return LoadAndCompileShader(Manager, FileName, Log);
+  return LoadAndCompileShader(Manager, FileName);
 }
 
 auto

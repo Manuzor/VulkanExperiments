@@ -10,9 +10,6 @@
 #include <vulkan/vulkan.h>
 
 
-struct log_data;
-
-
 // Include <ShaderCompiler/ShaderCompiler.hpp> for these types.
 struct glsl_shader;
 struct spirv_shader;
@@ -41,8 +38,7 @@ void
 DestroyShaderManager(allocator_interface& Allocator, shader_manager* Manager);
 
 compiled_shader*
-GetCompiledShader(shader_manager& Manager, slice<char const> FileName,
-                  log_data* Log = nullptr);
+GetCompiledShader(shader_manager& Manager, slice<char const> FileName);
 
 bool
 HasShaderStage(compiled_shader& CompiledShader, shader_stage Stage);

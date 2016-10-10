@@ -829,8 +829,11 @@ ImplVulkanPrepareRenderableFoo(vulkan& Vulkan, arc_string const& ShaderPath, vul
   //
   // Get compiled shader
   //
-  Foo->Shader = GetCompiledShader(*Vulkan.ShaderManager, Slice(ShaderPath), GlobalLog);
-  Assert(Foo->Shader != nullptr);
+  {
+    restore_global_log Restore_{ nullptr };
+    Foo->Shader = GetCompiledShader(*Vulkan.ShaderManager, Slice(ShaderPath));
+    Assert(Foo->Shader != nullptr);
+  }
 
   //
   // Prepare Descriptor Set Layout
@@ -1000,8 +1003,11 @@ VulkanPrepareRenderPass(vulkan& Vulkan)
 
     // Get descriptor counts
     scoped_dictionary<VkDescriptorType, uint32> DescriptorCounts{ &Allocator };
-    GetDescriptorTypeCounts(*Vulkan.DebugGridsFoo.Shader, DescriptorCounts);
-    GetDescriptorTypeCounts(*Vulkan.SceneObjectsFoo.Shader, DescriptorCounts);
+    {
+      restore_global_log Restore_{ nullptr };
+      GetDescriptorTypeCounts(*Vulkan.DebugGridsFoo.Shader, DescriptorCounts);
+      GetDescriptorTypeCounts(*Vulkan.SceneObjectsFoo.Shader, DescriptorCounts);
+    }
 
     uint32 const MaxNumInstances = 50;
 
@@ -1367,16 +1373,16 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
       VulkanSetImageLayout(Device, RT2.DrawCommandBuffer,
                            RT2.Image,
                            { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                           VK_IMAGE_LAYOUT_UNDEFINED,
+                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
       RecordingHelper(Vulkan, RT2.RenderPass, RT2.Framebuffer, RT2.DrawCommandBuffer, ClearValues);
 
       VulkanSetImageLayout(Device, RT2.DrawCommandBuffer,
                            RT2.Image,
                            { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
     VulkanVerify(Vulkan.Device.vkEndCommandBuffer(RT2.DrawCommandBuffer));
 
@@ -1532,14 +1538,18 @@ VulkanDraw(vulkan& Vulkan)
   {
     VkPipelineStageFlags const SubmitPipelineStages = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 
+    VkCommandBuffer DrawCommandBuffers[2];
+    DrawCommandBuffers[0] = Vulkan.RenderTarget2.DrawCommandBuffer;
+    DrawCommandBuffers[1] = Vulkan.DrawCommandBuffers[Vulkan.CurrentSwapchainImage.Index];
+
     auto SubmitInfo = InitStruct<VkSubmitInfo>();
     SubmitInfo.pWaitDstStageMask = &SubmitPipelineStages;
     SubmitInfo.waitSemaphoreCount = 1;
     SubmitInfo.pWaitSemaphores = &Vulkan.PresentCompleteSemaphore;
     SubmitInfo.signalSemaphoreCount = 1;
     SubmitInfo.pSignalSemaphores = &Vulkan.RenderCompleteSemaphore;
-    SubmitInfo.commandBufferCount = 1;
-    SubmitInfo.pCommandBuffers = &Vulkan.DrawCommandBuffers[Vulkan.CurrentSwapchainImage.Index];
+    SubmitInfo.commandBufferCount = (uint32)ArrayCount(DrawCommandBuffers);
+    SubmitInfo.pCommandBuffers = DrawCommandBuffers;
     VulkanVerify(Device.vkQueueSubmit(Vulkan.Queue, 1, &SubmitInfo, NullFence));
   }
 
@@ -1725,7 +1735,7 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
 
   // Whether to enable Vulkan validation layers or not.
   // Note that validation drains quite some performance.
-  vulkan_enable_validation VulkanValidation = vulkan_enable_validation::No;
+  vulkan_enable_validation VulkanValidation = vulkan_enable_validation::Yes;
 
 
   //
