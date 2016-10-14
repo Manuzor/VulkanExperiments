@@ -978,7 +978,7 @@ VulkanPrepareRenderPass(vulkan& Vulkan)
     // Debug Grids
     {
       auto PipelineDesc = InitStruct<vulkan_graphics_pipeline_desc>();
-      PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
+      PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
       PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
       VulkanPrepareRenderableFoo<vulkan_debug_grid::vertex>(Vulkan, DataPath("Shader/DebugGrid.shader"), PipelineDesc, &Vulkan.DebugGridsFoo);
     }
