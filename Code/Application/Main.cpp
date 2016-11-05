@@ -691,11 +691,11 @@ struct vulkan_graphics_pipeline_desc
 };
 
 static VkPipeline
-ImplVulkanCreateGraphicsPipeline(vulkan& Vulkan,
-                                 compiled_shader& CompiledShader,
-                                 VkPipelineLayout PipelineLayout,
-                                 vulkan_graphics_pipeline_desc& Desc,
-                                 size_t VertexDataStride)
+VulkanCreateGraphicsPipeline(vulkan& Vulkan,
+                             compiled_shader& CompiledShader,
+                             VkPipelineLayout PipelineLayout,
+                             vulkan_graphics_pipeline_desc& Desc,
+                             size_t VertexDataStride)
 {
   auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
@@ -775,13 +775,15 @@ ImplVulkanCreateGraphicsPipeline(vulkan& Vulkan,
     ColorBlendState.pAttachments = &ColorBlendStateAttachment;
   }
 
-  fixed_block<2, VkDynamicState> DynamicStatesBlock;
-  DynamicStatesBlock[0] = VK_DYNAMIC_STATE_VIEWPORT;
-  DynamicStatesBlock[1] = VK_DYNAMIC_STATE_SCISSOR;
+  VkDynamicState DynamicStates[2]{
+    VK_DYNAMIC_STATE_VIEWPORT,
+    VK_DYNAMIC_STATE_SCISSOR
+  };
+
   auto DynamicState = InitStruct<VkPipelineDynamicStateCreateInfo>();
   {
-    DynamicState.dynamicStateCount = Cast<uint32>(DynamicStatesBlock.Num);
-    DynamicState.pDynamicStates = First(DynamicStatesBlock);
+    DynamicState.dynamicStateCount = (uint32_t)ArrayCount(DynamicStates);
+    DynamicState.pDynamicStates = DynamicStates;
   }
 
   auto GraphicsPipelineCreateInfo = InitStruct<VkGraphicsPipelineCreateInfo>();
@@ -806,16 +808,6 @@ ImplVulkanCreateGraphicsPipeline(vulkan& Vulkan,
                                                 nullptr,
                                                 &Pipeline));
   return Pipeline;
-}
-
-template<typename VertexType>
-inline VkPipeline
-VulkanCreateGraphicsPipeline(vulkan& Vulkan,
-                             compiled_shader* CompiledShader,
-                             VkPipelineLayout PipelineLayout,
-                             vulkan_graphics_pipeline_desc& Desc)
-{
-  return ImplVulkanCreateGraphicsPipeline(Vulkan, CompiledShader, PipelineLayout, Desc, SizeOf<VertexType>());
 }
 
 void
@@ -875,7 +867,7 @@ ImplVulkanPrepareRenderableFoo(vulkan& Vulkan, arc_string const& ShaderPath, vul
   // Create Pipeline
   //
   {
-    Foo->Pipeline = ImplVulkanCreateGraphicsPipeline(Vulkan, *Foo->Shader, Foo->PipelineLayout, PipelineDesc, VertexDataStride);
+    Foo->Pipeline = VulkanCreateGraphicsPipeline(Vulkan, *Foo->Shader, Foo->PipelineLayout, PipelineDesc, VertexDataStride);
     Assert(Foo->Pipeline);
   }
 
