@@ -166,8 +166,6 @@ vulkan::vulkan(allocator_interface& Allocator)
   , DebugGrids(Allocator)
   , Renderables(Allocator)
   , DrawCommandBuffers(Allocator)
-  , PrePresentCommandBuffers(Allocator)
-  , PostPresentCommandBuffers(Allocator)
 {
 }
 
@@ -189,8 +187,6 @@ auto
 ::Finalize(vulkan& Vulkan)
   -> void
 {
-  Reset(Vulkan.PostPresentCommandBuffers);
-  Reset(Vulkan.PrePresentCommandBuffers);
   Reset(Vulkan.DrawCommandBuffers);
   Finalize(Vulkan.Swapchain);
   Reset(Vulkan.SceneObjects);

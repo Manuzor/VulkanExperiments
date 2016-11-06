@@ -241,10 +241,7 @@ struct vulkan : public vulkan_instance_functions
   // Command Buffers
   //
   VkCommandBuffer SetupCommandBuffer;
-  // TODO Combine arrays into one and assign slices instead.
-  array<VkCommandBuffer> DrawCommandBuffers;
-  array<VkCommandBuffer> PrePresentCommandBuffers;
-  array<VkCommandBuffer> PostPresentCommandBuffers;
+  array<VkCommandBuffer> DrawCommandBuffers; // One for each swapchain image.
 
 
   //

@@ -912,8 +912,8 @@ VulkanPrepareRenderPass(vulkan& Vulkan)
       Attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
       Attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
       Attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-      Attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      Attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      Attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+      Attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
 
     {
@@ -1138,12 +1138,8 @@ VulkanCreateCommandBuffers(vulkan& Vulkan, VkCommandPool CommandPool, uint32 Num
   }
 
   SetNum(Vulkan.DrawCommandBuffers, Num);
-  SetNum(Vulkan.PrePresentCommandBuffers, Num);
-  SetNum(Vulkan.PostPresentCommandBuffers, Num);
 
   VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan.DrawCommandBuffers.Ptr));
-  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan.PrePresentCommandBuffers.Ptr));
-  VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, Vulkan.PostPresentCommandBuffers.Ptr));
 
   AllocateInfo.commandBufferCount = 1;
   VulkanVerify(Device.vkAllocateCommandBuffers(DeviceHandle, &AllocateInfo, &Vulkan.RenderTarget2.DrawCommandBuffer));
@@ -1154,13 +1150,9 @@ static void VulkanDestroyCommandBuffers(vulkan& Vulkan, VkCommandPool CommandPoo
   auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
-  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan.PostPresentCommandBuffers.Num), Vulkan.PostPresentCommandBuffers.Ptr);
-  Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan.PrePresentCommandBuffers.Num), Vulkan.PrePresentCommandBuffers.Ptr);
   Device.vkFreeCommandBuffers(DeviceHandle, CommandPool, Cast<uint32>(Vulkan.DrawCommandBuffers.Num), Vulkan.DrawCommandBuffers.Ptr);
 
   Clear(Vulkan.DrawCommandBuffers);
-  Clear(Vulkan.PrePresentCommandBuffers);
-  Clear(Vulkan.PostPresentCommandBuffers);
 }
 
 // TODO
@@ -1361,20 +1353,7 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
     auto& RT2 = Vulkan.RenderTarget2;
     VulkanVerify(Vulkan.Device.vkBeginCommandBuffer(RT2.DrawCommandBuffer, &BeginCommandBufferInfo));
     {
-      auto const& Device = Vulkan.Device;
-      VulkanSetImageLayout(Device, RT2.DrawCommandBuffer,
-                           RT2.Image,
-                           { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-                           VK_IMAGE_LAYOUT_UNDEFINED,
-                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
       RecordingHelper(Vulkan, RT2.RenderPass, RT2.Framebuffer, RT2.DrawCommandBuffer, ClearValues);
-
-      VulkanSetImageLayout(Device, RT2.DrawCommandBuffer,
-                           RT2.Image,
-                           { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
     VulkanVerify(Vulkan.Device.vkEndCommandBuffer(RT2.DrawCommandBuffer));
 
@@ -1383,88 +1362,6 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
       RecordingHelper(Vulkan, Vulkan.RenderPass, Framebuffers[Index], DrawCommandBuffers[Index], ClearValues);
     }
     VulkanVerify(Vulkan.Device.vkEndCommandBuffer(DrawCommandBuffers[Index]));
-  }
-}
-
-static void
-VulkanBuildPrePresentCommands(vulkan_device const& Device,
-                              slice<VkCommandBuffer> PrePresentCommandBuffers,
-                              slice<VkImage> PresentationImages)
-{
-  BoundsCheck(PrePresentCommandBuffers.Num == PresentationImages.Num);
-
-  auto const DeviceHandle = Device.DeviceHandle;
-
-  auto BeginCommandBufferInfo = InitStruct<VkCommandBufferBeginInfo>();
-
-  size_t const Num = PrePresentCommandBuffers.Num;
-  for(size_t Index = 0; Index < Num; ++Index)
-  {
-    auto const PrePresentCommandBuffer = PrePresentCommandBuffers[Index];
-    auto const PresentationImage = PresentationImages[Index];
-
-    VulkanVerify(Device.vkBeginCommandBuffer(PrePresentCommandBuffer, &BeginCommandBufferInfo));
-
-    {
-      auto ImageBarrier = InitStruct<VkImageMemoryBarrier>();
-      ImageBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-      ImageBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-      ImageBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      ImageBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-      ImageBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-      ImageBarrier.image = PresentationImage;
-
-      Device.vkCmdPipelineBarrier(PrePresentCommandBuffer,
-                                  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                                  VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                  0,
-                                  0, nullptr, // memory barriers
-                                  0, nullptr, // buffer barriers
-                                  1, &ImageBarrier);
-    }
-
-    VulkanVerify(Device.vkEndCommandBuffer(PrePresentCommandBuffer));
-  }
-}
-
-static void
-VulkanBuildPostPresentCommands(vulkan_device const& Device,
-                               slice<VkCommandBuffer> PostPresentCommandBuffers,
-                               slice<VkImage> PresentationImages)
-{
-  BoundsCheck(PostPresentCommandBuffers.Num == PresentationImages.Num);
-
-  auto const DeviceHandle = Device.DeviceHandle;
-
-  auto BeginCommandBufferInfo = InitStruct<VkCommandBufferBeginInfo>();
-
-  size_t const Num = PostPresentCommandBuffers.Num;
-  for(size_t Index = 0; Index < Num; ++Index)
-  {
-    auto const PostPresentCommandBuffer = PostPresentCommandBuffers[Index];
-    auto const PresentationImage = PresentationImages[Index];
-
-    VulkanVerify(Device.vkBeginCommandBuffer(PostPresentCommandBuffer, &BeginCommandBufferInfo));
-
-    {
-      auto ImageBarrier = InitStruct<VkImageMemoryBarrier>();
-      ImageBarrier.srcAccessMask = 0;
-      ImageBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-      ImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-      ImageBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      ImageBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-      ImageBarrier.image = PresentationImage;
-
-      Device.vkCmdPipelineBarrier(PostPresentCommandBuffer,
-                                  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                                  VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                  0,
-                                  0, nullptr, // memory barriers
-                                  0, nullptr, // buffer barriers
-                                  1, &ImageBarrier);
-    }
-
-    VulkanVerify(Device.vkEndCommandBuffer(PostPresentCommandBuffer));
   }
 }
 
@@ -1512,18 +1409,6 @@ VulkanDraw(vulkan& Vulkan)
     #endif
   }
 
-
-  //
-  // Submit post-present commands.
-  //
-  {
-    auto SubmitInfo = InitStruct<VkSubmitInfo>();
-    SubmitInfo.commandBufferCount = 1;
-    SubmitInfo.pCommandBuffers = &Vulkan.PostPresentCommandBuffers[Vulkan.CurrentSwapchainImage.Index];
-    VulkanVerify(Device.vkQueueSubmit(Vulkan.Queue, 1, &SubmitInfo, NullFence));
-  }
-
-
   //
   // Submit draw commands.
   //
@@ -1544,18 +1429,6 @@ VulkanDraw(vulkan& Vulkan)
     SubmitInfo.pCommandBuffers = DrawCommandBuffers;
     VulkanVerify(Device.vkQueueSubmit(Vulkan.Queue, 1, &SubmitInfo, NullFence));
   }
-
-
-  //
-  // Submit pre-present commands.
-  //
-  {
-    auto SubmitInfo = InitStruct<VkSubmitInfo>();
-    SubmitInfo.commandBufferCount = 1;
-    SubmitInfo.pCommandBuffers = &Vulkan.PrePresentCommandBuffers[Vulkan.CurrentSwapchainImage.Index];
-    VulkanVerify(Device.vkQueueSubmit(Vulkan.Queue, 1, &SubmitInfo, NullFence));
-  }
-
 
   //
   // Present
@@ -1913,13 +1786,6 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
                                             RT2.ImageMemory,
                                             0)); // Offset
 
-      // Set image layout to something useful.
-      VulkanSetImageLayout(Device, Vulkan.SetupCommandBuffer,
-                           RT2.Image,
-                           { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-                           VK_IMAGE_LAYOUT_UNDEFINED,
-                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
       // Create a view to that image.
       auto ImageViewCreateInfo = InitStruct<VkImageViewCreateInfo>();
       {
@@ -2204,12 +2070,6 @@ ApplicationEntryPoint(HINSTANCE ProcessHandle)
                               color::Gray,
                               Vulkan.DepthStencilValue,
                               0);
-      VulkanBuildPrePresentCommands(Vulkan.Device,
-                                    Slice(Vulkan.PrePresentCommandBuffers),
-                                    Slice(Vulkan.Swapchain.Images));
-      VulkanBuildPostPresentCommands(Vulkan.Device,
-                                     Slice(Vulkan.PostPresentCommandBuffers),
-                                     Slice(Vulkan.Swapchain.Images));
     }
 
     //
