@@ -910,8 +910,6 @@ VulkanPrepareRenderPass(vulkan& Vulkan)
       Attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
       Attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
       Attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-      Attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-      Attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
       Attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
       Attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
@@ -921,8 +919,6 @@ VulkanPrepareRenderPass(vulkan& Vulkan)
       Attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
       Attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
       Attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-      Attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-      Attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
       Attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
       Attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
