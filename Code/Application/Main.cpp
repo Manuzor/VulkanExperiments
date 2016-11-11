@@ -1272,59 +1272,53 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
   {
     auto const& Device = Vulkan.Device;
 
+    // Set viewport
+    auto Viewport = InitStruct<VkViewport>();
+    {
+      Viewport.height = Cast<float>(Vulkan.Swapchain.Extent.Height);
+      Viewport.width = Cast<float>(Vulkan.Swapchain.Extent.Width);
+      Viewport.minDepth = 0.0f;
+      Viewport.maxDepth = 1.0f;
+    }
+    Device.vkCmdSetViewport(DrawCommandBuffer, 0, 1, &Viewport);
+
+    // Set scissor
+    auto Scissor = InitStruct<VkRect2D>();
+    {
+      Scissor.extent.width = Vulkan.Swapchain.Extent.Width;
+      Scissor.extent.height = Vulkan.Swapchain.Extent.Height;
+    }
+    Device.vkCmdSetScissor(DrawCommandBuffer, 0, 1, &Scissor);
+
     auto RenderPassBeginInfo = InitStruct<VkRenderPassBeginInfo>();
     {
       RenderPassBeginInfo.renderPass = RenderPass;
       RenderPassBeginInfo.framebuffer = Framebuffer;
-      RenderPassBeginInfo.renderArea.extent.width = Vulkan.Swapchain.Extent.Width;
-      RenderPassBeginInfo.renderArea.extent.height = Vulkan.Swapchain.Extent.Height;
+      RenderPassBeginInfo.renderArea = Scissor;
       RenderPassBeginInfo.clearValueCount = Cast<uint32>(ClearValues.Num);
       RenderPassBeginInfo.pClearValues = First(ClearValues);
     }
     Device.vkCmdBeginRenderPass(DrawCommandBuffer, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    // Draw scene objects
+    for(auto Renderable : Slice(Vulkan.Renderables))
     {
-      // Set viewport
+      VulkanEnsureIsReadyForDrawing(Vulkan, *Renderable);
+
+      auto Shader = Renderable->Foo->Shader;
+      if(Shader == nullptr)
       {
-        auto Viewport = InitStruct<VkViewport>();
-        {
-          Viewport.height = Cast<float>(Vulkan.Swapchain.Extent.Height);
-          Viewport.width = Cast<float>(Vulkan.Swapchain.Extent.Width);
-          Viewport.minDepth = 0.0f;
-          Viewport.maxDepth = 1.0f;
-        }
-        Device.vkCmdSetViewport(DrawCommandBuffer, 0, 1, &Viewport);
+        LogError("No shader for renderable: %s", StrPtr(Renderable->Name));
       }
 
-      // Set scissor
-      {
-        auto Scissor = InitStruct<VkRect2D>();
-        {
-          Scissor.extent.width = Vulkan.Swapchain.Extent.Width;
-          Scissor.extent.height = Vulkan.Swapchain.Extent.Height;
-        }
-        Device.vkCmdSetScissor(DrawCommandBuffer, 0, 1, &Scissor);
-      }
-
-      // Draw scene objects
-      for(auto Renderable : Slice(Vulkan.Renderables))
-      {
-        VulkanEnsureIsReadyForDrawing(Vulkan, *Renderable);
-
-        auto Shader = Renderable->Foo->Shader;
-        if(Shader == nullptr)
-        {
-          LogError("No shader for renderable: %s", StrPtr(Renderable->Name));
-        }
-
-        Device.vkCmdBindDescriptorSets(DrawCommandBuffer,
-                                       VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                       Renderable->Foo->PipelineLayout,
-                                       0, // Descriptor set offset
-                                       1, &Renderable->DescriptorSet,
-                                       0, nullptr); // Dynamic offsets
-        Device.vkCmdBindPipeline(DrawCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Renderable->Foo->Pipeline);
-        Renderable->Draw(Vulkan, DrawCommandBuffer);
-      }
+      Device.vkCmdBindDescriptorSets(DrawCommandBuffer,
+                                     VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                     Renderable->Foo->PipelineLayout,
+                                     0, // Descriptor set offset
+                                     1, &Renderable->DescriptorSet,
+                                     0, nullptr); // Dynamic offsets
+      Device.vkCmdBindPipeline(DrawCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Renderable->Foo->Pipeline);
+      Renderable->Draw(Vulkan, DrawCommandBuffer);
     }
     Device.vkCmdEndRenderPass(DrawCommandBuffer);
   };
@@ -1361,14 +1355,9 @@ VulkanBuildDrawCommands(vulkan&                Vulkan,
   }
 }
 
-static bool GlobalIsDrawing = false;
-
 static void
 VulkanDraw(vulkan& Vulkan)
 {
-  ::GlobalIsDrawing = true;
-  Defer [](){ ::GlobalIsDrawing = false; };
-
   auto const& Device = Vulkan.Device;
   auto const DeviceHandle = Device.DeviceHandle;
 
