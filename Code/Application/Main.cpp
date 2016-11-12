@@ -1398,7 +1398,7 @@ VulkanDraw(vulkan& Vulkan)
   // Submit draw commands.
   //
   {
-    VkPipelineStageFlags const SubmitPipelineStages = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    VkPipelineStageFlags const SubmitPipelineStages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
     VkCommandBuffer DrawCommandBuffers[2];
     DrawCommandBuffers[0] = Vulkan.RenderTarget2.DrawCommandBuffer;
